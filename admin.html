@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casa Brumi — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #F7F7F5; --text: #2C2C2C; --text-light: #6B6B6B;
+  --accent: #8B7355; --border: #E0DDD8; --white: #FFFFFF;
+  --success: #2E7D32; --danger: #C62828; --gold: #C9A96E;
+  --sidebar: #1E1E1E;
+}
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── LOGIN ── */
+#loginScreen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #1E1E1E 0%, #3a3a3a 100%);
+}
+.login-box { background: white; border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+.login-logo { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; letter-spacing: 3px; margin-bottom: 6px; }
+.login-sub { font-size: 0.78rem; color: var(--text-light); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 32px; }
+.login-box input { width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.95rem; font-family: 'Inter', sans-serif; margin-bottom: 16px; outline: none; transition: border-color 0.3s; }
+.login-box input:focus { border-color: var(--accent); }
+.login-box button { width: 100%; padding: 14px; background: var(--text); color: white; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.3s; font-family: 'Inter', sans-serif; }
+.login-box button:hover { background: #444; }
+.login-error { color: var(--danger); font-size: 0.82rem; margin-top: 12px; display: none; }
+
+/* ── LAYOUT ── */
+#appScreen { display: none; min-height: 100vh; }
+.layout { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar { width: 240px; background: var(--sidebar); color: white; padding: 32px 0; flex-shrink: 0; display: flex; flex-direction: column; }
+.sidebar-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 600; letter-spacing: 2px; padding: 0 24px 32px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.sidebar-logo span { display: block; font-family: 'Inter', sans-serif; font-size: 0.65rem; color: rgba(255,255,255,0.4); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+.sidebar-menu { padding: 24px 0; flex: 1; }
+.sidebar-item { display: flex; align-items: center; gap: 12px; padding: 12px 24px; cursor: pointer; font-size: 0.88rem; font-weight: 500; color: rgba(255,255,255,0.6); transition: all 0.3s; border-left: 3px solid transparent; }
+.sidebar-item:hover { background: rgba(255,255,255,0.05); color: white; }
+.sidebar-item.active { background: rgba(201,169,110,0.15); color: var(--gold); border-left-color: var(--gold); }
+.sidebar-item .icon { font-size: 1.1rem; width: 20px; }
+.sidebar-footer { padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.1); }
+.view-store-btn { display: block; text-align: center; padding: 10px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); text-decoration: none; border-radius: 8px; font-size: 0.82rem; transition: all 0.3s; }
+.view-store-btn:hover { background: rgba(255,255,255,0.15); color: white; }
+.logout-btn { width: 100%; margin-top: 10px; padding: 10px; background: none; color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-family: 'Inter', sans-serif; transition: all 0.3s; }
+.logout-btn:hover { color: white; border-color: rgba(255,255,255,0.3); }
+
+/* MAIN */
+.main { flex: 1; overflow-y: auto; }
+.top-bar { background: white; padding: 20px 32px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.top-bar h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 600; }
+.top-bar .top-stats { display: flex; gap: 24px; }
+.stat { text-align: center; }
+.stat .num { font-size: 1.4rem; font-weight: 600; color: var(--accent); }
+.stat .lbl { font-size: 0.72rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* CONTENT PANELS */
+.panel { display: none; padding: 32px; }
+.panel.active { display: block; }
+
+/* ── PRODUCT FORM ── */
+.form-card { background: white; border-radius: 16px; padding: 32px; border: 1px solid var(--border); max-width: 700px; }
+.form-card h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; margin-bottom: 24px; color: var(--text); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group label { font-size: 0.82rem; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group input, .form-group select, .form-group textarea {
+  padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+  font-size: 0.92rem; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.3s; background: var(--bg);
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); background: white; }
+.form-group textarea { resize: vertical; min-height: 90px; }
+.image-preview { width: 100%; height: 180px; border-radius: 10px; border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 8px; background: var(--bg); }
+.image-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.image-preview .placeholder { color: var(--text-light); font-size: 0.85rem; text-align: center; padding: 10px; }
+.badge-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge-opt { padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 20px; font-size: 0.78rem; cursor: pointer; transition: all 0.3s; background: none; font-family: 'Inter', sans-serif; }
+.badge-opt.selected { background: var(--accent); color: white; border-color: var(--accent); }
+.form-actions { display: flex; gap: 12px; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
+.btn-primary { padding: 12px 28px; background: var(--text); color: white; border: none; border-radius: 10px; font-size: 0.92rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.3s; }
+.btn-primary:hover { background: #444; }
+.btn-secondary { padding: 12px 28px; background: none; color: var(--text-light); border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.92rem; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.3s; }
+.btn-secondary:hover { border-color: var(--text); color: var(--text); }
+.btn-success { padding: 12px 28px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 0.92rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #2C2C2C; color: white; padding: 14px 28px; border-radius: 12px; font-size: 0.9rem; font-weight: 500; z-index: 9999; transition: transform 0.4s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+
+/* ── PRODUCT LIST ── */
+.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.search-input { padding: 10px 16px; border: 1.5px solid var(--border); border-radius: 25px; font-size: 0.88rem; font-family: 'Inter', sans-serif; outline: none; width: 220px; background: white; }
+.search-input:focus { border-color: var(--accent); }
+.products-table { width: 100%; }
+.product-row { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; display: grid; grid-template-columns: 60px 1fr auto auto auto; gap: 16px; align-items: center; }
+.product-row img { width: 56px; height: 70px; object-fit: cover; border-radius: 8px; background: var(--bg); }
+.product-row .prod-info h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 2px; }
+.product-row .prod-info p { font-size: 0.8rem; color: var(--text-light); }
+.product-row .prod-price { font-weight: 600; color: var(--accent); font-size: 0.95rem; white-space: nowrap; }
+.product-row .prod-cat { font-size: 0.75rem; background: #F0EDE8; color: var(--accent); padding: 4px 12px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+.product-row .prod-actions { display: flex; gap: 8px; }
+.action-btn { padding: 7px 14px; border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 500; transition: opacity 0.2s; }
+.action-btn:hover { opacity: 0.8; }
+.edit-btn { background: #EEF2FF; color: #3730A3; }
+.del-btn { background: #FEE2E2; color: #B91C1C; }
+.archive-btn { background: #FFF8E1; color: #B45309; }
+.restore-btn { background: #E8F5E9; color: #2E7D32; }
+.archived-row { opacity: 0.65; background: #FAFAFA !important; }
+.status-badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+.status-active { background: #E8F5E9; color: #2E7D32; }
+.status-archived { background: #FFF3E0; color: #B45309; }
+.empty-list { text-align: center; padding: 60px; color: var(--text-light); }
+.empty-list h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; margin-bottom: 8px; }
+
+/* CONFIRM DIALOG */
+.confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9000; align-items: center; justify-content: center; }
+.confirm-overlay.show { display: flex; }
+.confirm-box { background: white; border-radius: 16px; padding: 32px; max-width: 380px; width: 90%; text-align: center; }
+.confirm-box h3 { font-size: 1.1rem; margin-bottom: 10px; }
+.confirm-box p { color: var(--text-light); font-size: 0.88rem; margin-bottom: 24px; }
+.confirm-actions { display: flex; gap: 12px; justify-content: center; }
+
+@media (max-width: 700px) {
+  .sidebar { display: none; }
+  .product-row { grid-template-columns: 50px 1fr; }
+  .prod-price, .prod-cat { display: none; }
+  .prod-actions { grid-column: 1/-1; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">Casa Brumi</div>
+    <div class="login-sub">Panel de Administración</div>
+    <input type="password" id="passwordInput" placeholder="Contraseña" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">Entrar</button>
+    <p class="login-error" id="loginError">❌ Contraseña incorrecta</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen">
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        Casa Brumi
+        <span>Panel Admin</span>
+      </div>
+      <nav class="sidebar-menu">
+        <div class="sidebar-item active" onclick="showPanel('dashboard')">
+          <span class="icon">📊</span> Dashboard
+        </div>
+        <div class="sidebar-item" onclick="showPanel('addProduct')">
+          <span class="icon">➕</span> Agregar Producto
+        </div>
+        <div class="sidebar-item" onclick="showPanel('products')">
+          <span class="icon">👗</span> Mis Productos
+        </div>
+        <div class="sidebar-item" onclick="showPanel('archived')">
+          <span class="icon">📦</span> Archivados <span id="archivedBadge" style="margin-left:auto;background:rgba(201,169,110,0.3);color:var(--gold);border-radius:20px;padding:1px 8px;font-size:0.72rem">0</span>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="index.html" target="_blank" class="view-store-btn">🛍️ Ver Tienda</a>
+        <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="top-bar">
+        <h1 id="panelTitle">Dashboard</h1>
+        <div class="top-stats">
+          <div class="stat">
+            <div class="num" id="statTotal">0</div>
+            <div class="lbl">Productos</div>
+          </div>
+          <div class="stat">
+            <div class="num" id="statCats">0</div>
+            <div class="lbl">Categorías</div>
+          </div>
+          <div class="stat">
+            <div class="num" id="statArchived" style="color:#B45309">0</div>
+            <div class="lbl">Archivados</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="panel active" id="panel-dashboard" style="padding:32px">
+        <div style="max-width:600px">
+          <h2 style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;margin-bottom:8px">¡Bienvenido, Johander! 👋</h2>
+          <p style="color:var(--text-light);margin-bottom:32px">Desde aquí administras todo el catálogo de Casa Brumi.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+            <div style="background:white;border-radius:14px;padding:24px;border:1px solid var(--border);cursor:pointer" onclick="showPanel('addProduct')">
+              <div style="font-size:2rem;margin-bottom:10px">➕</div>
+              <h3 style="font-size:1rem;margin-bottom:4px">Agregar Producto</h3>
+              <p style="font-size:0.82rem;color:var(--text-light)">Sube una nueva pieza al catálogo</p>
+            </div>
+            <div style="background:white;border-radius:14px;padding:24px;border:1px solid var(--border);cursor:pointer" onclick="showPanel('products')">
+              <div style="font-size:2rem;margin-bottom:10px">👗</div>
+              <h3 style="font-size:1rem;margin-bottom:4px">Ver Productos</h3>
+              <p style="font-size:0.82rem;color:var(--text-light)">Edita o elimina prendas</p>
+            </div>
+            <div style="background:white;border-radius:14px;padding:24px;border:1px solid var(--border)">
+              <div style="font-size:2rem;margin-bottom:10px">📱</div>
+              <h3 style="font-size:1rem;margin-bottom:4px">Total Productos</h3>
+              <p style="font-size:1.6rem;font-weight:600;color:var(--accent)" id="dashTotal">0</p>
+            </div>
+            <div style="background:white;border-radius:14px;padding:24px;border:1px solid var(--border)">
+              <a href="index.html" target="_blank" style="text-decoration:none;color:inherit">
+                <div style="font-size:2rem;margin-bottom:10px">🌐</div>
+                <h3 style="font-size:1rem;margin-bottom:4px">Ver Tienda</h3>
+                <p style="font-size:0.82rem;color:var(--text-light)">Cómo la ven tus clientes</p>
+              </a>
+            </div>
+          </div>
+          <div style="background:#FFF8EE;border:1px solid #F0DEB5;border-radius:12px;padding:20px">
+            <h4 style="font-size:0.9rem;margin-bottom:8px">💡 Tip del día</h4>
+            <p style="font-size:0.85rem;color:var(--text-light)">Usa <strong>Photoroom</strong> para darle un fondo profesional a las fotos de tus prendas antes de subirlas. ¡Hace una gran diferencia!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD PRODUCT -->
+      <div class="panel" id="panel-addProduct">
+        <div class="form-card">
+          <h2 id="formTitle">➕ Agregar Nuevo Producto</h2>
+          <input type="hidden" id="editIndex" value="-1">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Nombre del Producto *</label>
+              <input type="text" id="f-name" placeholder="Ej: Vestido Satinado Strapless">
+            </div>
+            <div class="form-group">
+              <label>Precio (RD$) *</label>
+              <input type="number" id="f-price" placeholder="Ej: 3150" min="0">
+            </div>
+            <div class="form-group">
+              <label>Categoría *</label>
+              <select id="f-category">
+                <option value="">Seleccionar...</option>
+                <option value="vestidos">Vestidos</option>
+                <option value="tops">Tops</option>
+                <option value="conjuntos">Conjuntos</option>
+                <option value="faldas">Faldas</option>
+                <option value="pantalones">Pantalones</option>
+                <option value="accesorios">Accesorios</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tallas disponibles</label>
+              <input type="text" id="f-sizes" placeholder="Ej: S, M, L, XL">
+            </div>
+            <div class="form-group">
+              <label>Colores</label>
+              <input type="text" id="f-colors" placeholder="Ej: Negro, Blanco, Rosa">
+            </div>
+            <div class="form-group">
+              <label>Material</label>
+              <input type="text" id="f-material" placeholder="Ej: Satín de seda sintética">
+            </div>
+            <div class="form-group full">
+              <label>URL de la Foto *</label>
+              <input type="text" id="f-image" placeholder="https://..." oninput="previewImage(this.value)">
+              <div class="image-preview" id="imagePreview">
+                <div class="placeholder">📷 La foto aparecerá aquí cuando pegues el link</div>
+              </div>
+            </div>
+            <div class="form-group full">
+              <label>Descripción</label>
+              <textarea id="f-description" placeholder="Describe la prenda: corte, ocasión, detalles especiales..."></textarea>
+            </div>
+            <div class="form-group full">
+              <label>Etiqueta (opcional)</label>
+              <div class="badge-options">
+                <button class="badge-opt" onclick="selectBadge(this, '')">Ninguna</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Nuevo')">Nuevo</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Popular')">Popular</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Oferta')">Oferta</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Último')">Último</button>
+              </div>
+              <input type="hidden" id="f-badge" value="">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" onclick="saveProduct()">💾 Guardar Producto</button>
+            <button class="btn-secondary" onclick="clearForm()">Limpiar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUCT LIST -->
+      <div class="panel" id="panel-products">
+        <div class="list-header">
+          <p style="font-size:0.85rem;color:var(--text-light)">Los productos activos aparecen en tu tienda. Archiva los que ya no estén disponibles.</p>
+          <input class="search-input" type="text" placeholder="🔍 Buscar producto..." oninput="searchProducts(this.value)">
+        </div>
+        <div class="products-table" id="productsTable"></div>
+      </div>
+
+      <!-- ARCHIVED -->
+      <div class="panel" id="panel-archived">
+        <div class="list-header">
+          <p style="font-size:0.85rem;color:var(--text-light)">Productos archivados — no aparecen en la tienda. Puedes restaurarlos cuando vuelvan a estar disponibles.</p>
+          <input class="search-input" type="text" placeholder="🔍 Buscar..." oninput="searchArchived(this.value)">
+        </div>
+        <div class="products-table" id="archivedTable"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- CONFIRM -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <h3>¿Eliminar producto?</h3>
+    <p>Esta acción no se puede deshacer. El producto se eliminará del catálogo.</p>
+    <div class="confirm-actions">
+      <button class="btn-secondary" onclick="closeConfirm()">Cancelar</button>
+      <button class="action-btn del-btn" style="padding:10px 20px;font-size:0.9rem" onclick="confirmDelete()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'casabrumi_products';
+const ARCHIVE_KEY = 'casabrumi_archived';
+const PASSWORD = 'casabrumi2026'; // ← Cambia esto por tu contraseña
+let products = [];
+let archived = [];
+let deleteIndex = -1;
+let selectedBadge = '';
+
+// ─── AUTH ─────────────────────────────────────────
+function login() {
+  const pwd = document.getElementById('passwordInput').value;
+  if (pwd === PASSWORD) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+    loadProducts();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('passwordInput').focus();
+  }
+}
+
+function logout() {
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('passwordInput').value = '';
+}
+
+// ─── NAVIGATION ───────────────────────────────────
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+
+  const titles = { dashboard: 'Dashboard', addProduct: 'Agregar Producto', products: 'Mis Productos', archived: 'Productos Archivados' };
+  document.getElementById('panelTitle').textContent = titles[name];
+
+  const items = document.querySelectorAll('.sidebar-item');
+  const map = { dashboard: 0, addProduct: 1, products: 2, archived: 3 };
+  if (items[map[name]]) items[map[name]].classList.add('active');
+
+  if (name === 'products') renderProductList(products);
+  if (name === 'archived') renderArchivedList(archived);
+  if (name === 'dashboard') updateStats();
+  if (name === 'addProduct') { clearForm(); document.getElementById('formTitle').textContent = '➕ Agregar Nuevo Producto'; }
+}
+
+// ─── LOAD / SAVE ──────────────────────────────────
+function loadProducts() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  products = saved ? JSON.parse(saved) : [];
+  const savedArchived = localStorage.getItem(ARCHIVE_KEY);
+  archived = savedArchived ? JSON.parse(savedArchived) : [];
+  updateStats();
+}
+
+function saveToStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+  localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
+  updateStats();
+}
+
+function updateStats() {
+  const total = products.length;
+  const cats = [...new Set(products.map(p => p.category).filter(Boolean))].length;
+  const arch = archived.length;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statCats').textContent = cats;
+  document.getElementById('statArchived').textContent = arch;
+  document.getElementById('dashTotal').textContent = total;
+  document.getElementById('archivedBadge').textContent = arch;
+}
+
+// ─── SAVE PRODUCT ─────────────────────────────────
+function saveProduct() {
+  const name = document.getElementById('f-name').value.trim();
+  const price = document.getElementById('f-price').value.trim();
+  const category = document.getElementById('f-category').value;
+  const image = document.getElementById('f-image').value.trim();
+
+  if (!name || !price || !category) {
+    showToast('Por favor completa: nombre, precio y categoría', 'error');
+    return;
+  }
+
+  const product = {
+    id: Date.now(),
+    name,
+    price: Number(price),
+    category,
+    sizes: document.getElementById('f-sizes').value.trim(),
+    colors: document.getElementById('f-colors').value.trim(),
+    material: document.getElementById('f-material').value.trim(),
+    image,
+    description: document.getElementById('f-description').value.trim(),
+    badge: selectedBadge,
+    createdAt: new Date().toISOString()
+  };
+
+  const editIndex = parseInt(document.getElementById('editIndex').value);
+  if (editIndex >= 0) {
+    product.id = products[editIndex].id;
+    product.createdAt = products[editIndex].createdAt;
+    products[editIndex] = product;
+    showToast('✅ Producto actualizado correctamente', 'success');
+  } else {
+    products.unshift(product);
+    showToast('✅ Producto agregado al catálogo', 'success');
+  }
+
+  saveToStorage();
+  clearForm();
+  showPanel('products');
+}
+
+// ─── EDIT ─────────────────────────────────────────
+function editProduct(index) {
+  const p = products[index];
+  document.getElementById('editIndex').value = index;
+  document.getElementById('f-name').value = p.name;
+  document.getElementById('f-price').value = p.price;
+  document.getElementById('f-category').value = p.category;
+  document.getElementById('f-sizes').value = p.sizes || '';
+  document.getElementById('f-colors').value = p.colors || '';
+  document.getElementById('f-material').value = p.material || '';
+  document.getElementById('f-image').value = p.image || '';
+  document.getElementById('f-description').value = p.description || '';
+  selectedBadge = p.badge || '';
+  document.querySelectorAll('.badge-opt').forEach(b => {
+    b.classList.toggle('selected', b.getAttribute('onclick').includes(`'${selectedBadge}'`));
+  });
+  previewImage(p.image);
+  document.getElementById('formTitle').textContent = '✏️ Editar Producto';
+  showPanel('addProduct');
+}
+
+// ─── ARCHIVE ──────────────────────────────────────
+function archiveProduct(index) {
+  const product = products[index];
+  product.archivedAt = new Date().toISOString();
+  archived.unshift(product);
+  products.splice(index, 1);
+  saveToStorage();
+  renderProductList(products);
+  showToast('📦 Producto archivado — ya no aparece en la tienda', 'error');
+}
+
+function restoreProduct(index) {
+  const product = archived[index];
+  delete product.archivedAt;
+  products.unshift(product);
+  archived.splice(index, 1);
+  saveToStorage();
+  renderArchivedList(archived);
+  showToast('✅ Producto restaurado — ya aparece en la tienda', 'success');
+}
+
+// ─── DELETE ───────────────────────────────────────
+function askDelete(index) {
+  deleteIndex = index;
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.remove('show');
+  deleteIndex = -1;
+}
+function confirmDelete() {
+  if (deleteIndex >= 0) {
+    archived.splice(deleteIndex, 1);
+    saveToStorage();
+    renderArchivedList(archived);
+    showToast('🗑️ Producto eliminado permanentemente', 'error');
+  }
+  closeConfirm();
+}
+
+// ─── RENDER LIST ──────────────────────────────────
+function renderProductList(list) {
+  const table = document.getElementById('productsTable');
+  if (list.length === 0) {
+    table.innerHTML = `<div class="empty-list"><h3>Aún no tienes productos activos</h3><p>Haz clic en "Agregar Producto" para comenzar</p></div>`;
+    return;
+  }
+  table.innerHTML = list.map((p) => {
+    const realIndex = products.indexOf(p);
+    return `
+    <div class="product-row">
+      <img src="${p.image || 'https://via.placeholder.com/60x75?text=?'}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/60x75?text=?'">
+      <div class="prod-info">
+        <h4>${p.name}</h4>
+        <p>${p.sizes || 'Sin tallas especificadas'} • ${p.colors || 'Sin colores'}</p>
+      </div>
+      <div class="prod-price">RD$ ${Number(p.price).toLocaleString()}</div>
+      <div class="prod-cat">${p.category}</div>
+      <div class="prod-actions">
+        <button class="action-btn edit-btn" onclick="editProduct(${realIndex})">✏️ Editar</button>
+        <button class="action-btn archive-btn" onclick="archiveProduct(${realIndex})" title="Ocultar del catálogo sin borrar">📦 Archivar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderArchivedList(list) {
+  const table = document.getElementById('archivedTable');
+  if (list.length === 0) {
+    table.innerHTML = `<div class="empty-list"><h3>No tienes productos archivados</h3><p>Cuando archives una prenda aparecerá aquí</p></div>`;
+    return;
+  }
+  table.innerHTML = list.map((p, i) => {
+    const date = p.archivedAt ? new Date(p.archivedAt).toLocaleDateString('es-DO') : '';
+    return `
+    <div class="product-row archived-row">
+      <img src="${p.image || 'https://via.placeholder.com/60x75?text=?'}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/60x75?text=?'">
+      <div class="prod-info">
+        <h4>${p.name}</h4>
+        <p>${p.sizes || 'Sin tallas'} • Archivado el ${date}</p>
+      </div>
+      <div class="prod-price" style="color:var(--text-light)">RD$ ${Number(p.price).toLocaleString()}</div>
+      <div class="prod-cat" style="background:#FFF3E0;color:#B45309">${p.category}</div>
+      <div class="prod-actions">
+        <button class="action-btn restore-btn" onclick="restoreProduct(${i})">♻️ Restaurar</button>
+        <button class="action-btn del-btn" onclick="askDelete(${i})">🗑️ Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function searchProducts(query) {
+  const filtered = query
+    ? products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) || p.category.toLowerCase().includes(query.toLowerCase()))
+    : products;
+  renderProductList(filtered);
+}
+
+function searchArchived(query) {
+  const filtered = query
+    ? archived.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+    : archived;
+  renderArchivedList(filtered);
+}
+
+// ─── UTILS ────────────────────────────────────────
+function clearForm() {
+  ['f-name','f-price','f-sizes','f-colors','f-material','f-image','f-description'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-category').value = '';
+  document.getElementById('editIndex').value = '-1';
+  selectedBadge = '';
+  document.querySelectorAll('.badge-opt').forEach(b => b.classList.remove('selected'));
+  document.getElementById('imagePreview').innerHTML = '<div class="placeholder">📷 La foto aparecerá aquí cuando pegues el link</div>';
+}
+
+function previewImage(url) {
+  const preview = document.getElementById('imagePreview');
+  if (url && url.startsWith('http')) {
+    preview.innerHTML = `<img src="${url}" alt="preview" onerror="this.parentElement.innerHTML='<div class=\\'placeholder\\'>❌ No se pudo cargar la imagen</div>'">`;
+  } else {
+    preview.innerHTML = '<div class="placeholder">📷 La foto aparecerá aquí cuando pegues el link</div>';
+  }
+}
+
+function selectBadge(btn, value) {
+  document.querySelectorAll('.badge-opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedBadge = value;
+  document.getElementById('f-badge').value = value;
+}
+
+function showToast(msg, type = '') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = `toast ${type} show`;
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// Allow Enter key on login
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeConfirm();
+});
+</script>
+</body>
+</html>
