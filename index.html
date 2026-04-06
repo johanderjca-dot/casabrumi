@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casa Brumi — Moda Femenina</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #FAFAF8; --text: #2C2C2C; --text-light: #6B6B6B;
+      --accent: #8B7355; --border: #E8E4DF; --card-bg: #FFFFFF;
+      --success: #25D366; --danger: #E74C3C;
+    }
+    html, body { height: 100%; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    .header { background: white; border-bottom: 1px solid var(--border); padding: 16px 20px; position: sticky; top: 0; z-index: 100; }
+    .header h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; color: var(--accent); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .filters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filter-btn { padding: 8px 16px; border: 1.5px solid var(--border); background: white; border-radius: 20px; cursor: pointer; font-size: 0.9rem; }
+    .filter-btn.active { background: var(--accent); color: white; }
+    .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+    .product-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); cursor: pointer; }
+    .product-image-container { position: relative; width: 100%; aspect-ratio: 1; background: var(--bg); }
+    .product-image { width: 100%; height: 100%; object-fit: cover; }
+    .image-counter { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; }
+    .product-info { padding: 12px; }
+    .product-name { font-weight: 600; margin-bottom: 6px; }
+    .product-price { color: var(--accent); font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; }
+    .btn-whatsapp { width: 100%; padding: 8px; background: var(--success); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; }
+    .modal.show { display: flex; }
+    .modal-content { background: white; max-width: 600px; width: 90%; border-radius: 12px; overflow: auto; max-height: 90vh; }
+    .modal-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+    .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+    .modal-body { padding: 20px; }
+    .gallery-image { width: 100%; border-radius: 8px; margin-bottom: 16px; }
+    .gallery-nav { display: flex; gap: 8px; margin-bottom: 16px; }
+    .nav-btn { flex: 1; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; }
+    .loading { text-align: center; padding: 40px; color: var(--text-light); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Casa Brumi</h1>
+  <span style="font-size: 0.9rem; color: var(--text-light);">Moda Femenina • Santo Domingo, RD</span>
+</div>
+
+<div class="container">
+  <h2 style="margin-bottom: 16px; text-align: center;">Nueva Colección 2026</h2>
+  <div class="filters" id="filters"></div>
+  <div class="products-grid" id="productsGrid"><div class="loading">Cargando productos...</div></div>
+</div>
+
+<div class="modal" id="productModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="modalProductName"></h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <img id="galleryImage" class="gallery-image" src="">
+      <div class="gallery-nav">
+        <button class="nav-btn" onclick="prevImage()">← Anterior</button>
+        <span style="flex: 1; text-align: center; line-height: 40px;" id="imageIndicator"></span>
+        <button class="nav-btn" onclick="nextImage()">Siguiente →</button>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <div class="product-price" id="modalProductPrice"></div>
+        <div class="product-stock" id="modalProductStock"></div>
+      </div>
+      <button class="btn-whatsapp" onclick="sendWhatsappMessage()">Enviar WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCncQbqrDIKyWWo9QXBfR31cT30S0fGfOI",
+  authDomain: "brumi-cb671.firebaseapp.com",
+  projectId: "brumi-cb671",
+  storageBucket: "brumi-cb671.firebaseestorage.app",
+  messagingSenderId: "886209508750",
+  appId: "1:886209508750:web:3b1b82d155e3af9a55e0df",
+  measurementId: "G-GMK0Y11NXZ"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let allProducts = [];
+let currentFilter = 'todos';
+let selectedProduct = null;
+let currentImageIndex = 0;
+
+async function loadProducts() {
+  try {
+    const snapshot = await db.collection('products').get();
+    allProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderProducts();
+    renderFilters();
+  } catch (error) {
+    console.error('Error:', error);
+    document.getElementById('productsGrid').innerHTML = '<div class="loading" style="color: var(--danger);">Error cargando productos</div>';
+  }
+}
+
+function renderFilters() {
+  const categories = ['todos', ...new Set(allProducts.map(p => p.category))];
+  const filtersDiv = document.getElementById('filters');
+  filtersDiv.innerHTML = categories.map(cat => `
+    <button class="filter-btn ${cat === 'todos' ? 'active' : ''}" onclick="filterProducts('${cat}')">${cat.toUpperCase()}</button>
+  `).join('');
+}
+
+function filterProducts(category) {
+  currentFilter = category;
+  document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  renderProducts();
+}
+
+function renderProducts() {
+  const filtered = currentFilter === 'todos' ? allProducts : allProducts.filter(p => p.category === currentFilter);
+  const html = filtered.map(product => `
+    <div class="product-card" onclick="openProductDetail('${product.id}')">
+      <div class="product-image-container">
+        <img class="product-image" src="${product.photos?.[0] || ''}" alt="${product.name}">
+        ${product.photos?.length > 1 ? `<div class="image-counter">${product.photos.length} fotos</div>` : ''}
+      </div>
+      <div class="product-info">
+        <div class="product-name">${product.name}</div>
+        <div class="product-price">RD$ ${product.price.toLocaleString()}</div>
+        <button class="btn-whatsapp" onclick="event.stopPropagation(); sendWhatsappQuick('${product.name}', '${product.price}')">Consultar</button>
+      </div>
+    </div>
+  `).join('') || '<div class="loading">Sin productos</div>';
+  document.getElementById('productsGrid').innerHTML = html;
+}
+
+function openProductDetail(productId) {
+  selectedProduct = allProducts.find(p => p.id === productId);
+  currentImageIndex = 0;
+  if (!selectedProduct) return;
+  document.getElementById('modalProductName').textContent = selectedProduct.name;
+  document.getElementById('modalProductPrice').textContent = `RD$ ${selectedProduct.price.toLocaleString()}`;
+  document.getElementById('modalProductStock').textContent = selectedProduct.stock > 0 ? '✓ En stock' : '❌ Agotado';
+  showImage();
+  document.getElementById('productModal').classList.add('show');
+}
+
+function showImage() {
+  if (!selectedProduct?.photos?.length) return;
+  document.getElementById('galleryImage').src = selectedProduct.photos[currentImageIndex];
+  document.getElementById('imageIndicator').textContent = `${currentImageIndex + 1} / ${selectedProduct.photos.length}`;
+}
+
+function nextImage() {
+  if (!selectedProduct?.photos) return;
+  currentImageIndex = (currentImageIndex + 1) % selectedProduct.photos.length;
+  showImage();
+}
+
+function prevImage() {
+  if (!selectedProduct?.photos) return;
+  currentImageIndex = (currentImageIndex - 1 + selectedProduct.photos.length) % selectedProduct.photos.length;
+  showImage();
+}
+
+function closeModal() {
+  document.getElementById('productModal').classList.remove('show');
+}
+
+function sendWhatsappMessage() {
+  if (!selectedProduct) return;
+  const message = `Hola, me interesa el ${selectedProduct.name} a RD$ ${selectedProduct.price}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+function sendWhatsappQuick(productName, price) {
+  const message = `Hola, me interesa el ${productName} a RD$ ${price}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+loadProducts();
+</script>
+
+</body>
+</html>
