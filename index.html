@@ -506,6 +506,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [pagoRapidoId,        setPagoRapidoId]        = useState('');
     const [gastoError,          setGastoError]          = useState('');
     const [usuarios,            setUsuarios]            = useState([]);
+    const [showEditGastoModal,  setShowEditGastoModal]  = useState(false);
+    const [editingGasto,        setEditingGasto]        = useState(null);
+    const [editGastoForm,       setEditGastoForm]       = useState({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false });
+    const [savingEditGasto,     setSavingEditGasto]     = useState(false);
+    const [editGastoError,      setEditGastoError]      = useState('');
+    const [showEditAbonoModal,  setShowEditAbonoModal]  = useState(false);
+    const [editingAbonoGasto,   setEditingAbonoGasto]   = useState(null);
+    const [editingAbonoIdx,     setEditingAbonoIdx]     = useState(null);
+    const [editingAbonoMonto,   setEditingAbonoMonto]   = useState('');
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -625,16 +634,87 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const handleAddAbono = async () => {
         if (!abonoMonto || !selectedGasto) return;
-        await addAbono(selectedGasto, abonoMonto, selectedGasto.historialAbonos);
+        const latest = gastos.find(g => g.id === selectedGasto.id) || selectedGasto;
+        await addAbono(latest, abonoMonto, latest.historialAbonos);
         setAbonoMonto(''); setShowAbonoModal(false); setSelectedGasto(null);
     };
 
     const revertirAbono = async (gasto, idx) => {
-        const historial    = [...(gasto.historialAbonos || [])];
+        const latest    = gastos.find(g => g.id === gasto.id) || gasto;
+        const historial = [...(latest.historialAbonos || [])];
         const montoRetirar = historial[idx].monto || 0;
         historial.splice(idx, 1);
-        const nuevoTotal = Math.max(0, (gasto.montoAbonado || 0) - montoRetirar);
-        await db.collection('gastos').doc(gasto.id).update({ montoAbonado: nuevoTotal, historialAbonos: historial });
+        const nuevoTotal = Math.max(0, (latest.montoAbonado || 0) - montoRetirar);
+        await db.collection('gastos').doc(latest.id).update({ montoAbonado: nuevoTotal, historialAbonos: historial });
+    };
+
+    const openEditGasto = (gasto) => {
+        setEditingGasto(gasto);
+        setEditGastoForm({
+            categoria:   gasto.categoria   || 'Operacional',
+            descripcion: gasto.descripcion || '',
+            monto:       gasto.monto?.toString() || '',
+            moneda:      gasto.moneda      || 'USD',
+            medioPago:   gasto.medioPago   || 'Efectivo',
+            propietario: gasto.propietario || 'Johander',
+            terminal:    gasto.terminal    || '',
+            proveedor:   gasto.proveedor   || '',
+            esCredito:   gasto.esCredito   || false,
+        });
+        setEditGastoError('');
+        setShowEditGastoModal(true);
+    };
+
+    const saveEditGasto = async () => {
+        if (!editGastoForm.descripcion || !editGastoForm.monto || savingEditGasto || !editingGasto) return;
+        setSavingEditGasto(true);
+        setEditGastoError('');
+        const id   = editingGasto.id;
+        const data = {
+            categoria:   editGastoForm.categoria,
+            descripcion: editGastoForm.descripcion,
+            monto:       parseFloat(editGastoForm.monto),
+            moneda:      editGastoForm.moneda || 'USD',
+            medioPago:   editGastoForm.medioPago,
+            propietario: editGastoForm.propietario,
+            terminal:    editGastoForm.medioPago === 'Tarjeta' ? editGastoForm.terminal : '',
+            proveedor:   editGastoForm.proveedor,
+            esCredito:   editGastoForm.esCredito,
+        };
+        setShowEditGastoModal(false);
+        setEditingGasto(null);
+        try {
+            await db.collection('gastos').doc(id).update(data);
+        } catch(e) {
+            setEditGastoError('Error: ' + e.message);
+            setShowEditGastoModal(true);
+        }
+        setSavingEditGasto(false);
+    };
+
+    const openEditAbono = (gasto, idx) => {
+        setEditingAbonoGasto(gasto);
+        setEditingAbonoIdx(idx);
+        setEditingAbonoMonto(String(gasto.historialAbonos?.[idx]?.monto || ''));
+        setShowEditAbonoModal(true);
+    };
+
+    const saveEditAbono = async () => {
+        if (!editingAbonoMonto || editingAbonoGasto === null || editingAbonoIdx === null) return;
+        const latest   = gastos.find(g => g.id === editingAbonoGasto.id) || editingAbonoGasto;
+        const historial  = [...(latest.historialAbonos || [])];
+        const montoViejo = historial[editingAbonoIdx]?.monto || 0;
+        const montoNuevo = parseFloat(editingAbonoMonto);
+        historial[editingAbonoIdx] = { ...historial[editingAbonoIdx], monto: montoNuevo };
+        const nuevoTotal = Math.max(0, (latest.montoAbonado || 0) - montoViejo + montoNuevo);
+        const id = editingAbonoGasto.id;
+        setShowEditAbonoModal(false);
+        setEditingAbonoGasto(null);
+        setEditingAbonoIdx(null);
+        setEditingAbonoMonto('');
+        try {
+            await db.collection('gastos').doc(id).update({ montoAbonado: nuevoTotal, historialAbonos: historial });
+        } catch(e) { console.error('Error al editar abono:', e); }
     };
 
     const handlePagoRapido = async () => {
@@ -819,12 +899,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const catPendiente= catCreditos.reduce((s,g)=>s+Math.max(0,(g.monto||0)-(g.montoAbonado||0)),0);
                     return (
                         <>
-                            <div className="page-header" style={{display:'flex',alignItems:'center',gap:14}}>
+                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                <div style={{display:'flex',alignItems:'center',gap:14}}>
                                 <button className="btn btn-glass btn-sm" onClick={()=>setActiveCat(null)}>← Volver</button>
                                 <div>
                                     <h1>{activeCat}</h1>
                                     <p>{catGastos.length} gasto{catGastos.length!==1?'s':''} registrado{catGastos.length!==1?'s':''}</p>
                                 </div>
+                                </div>
+                                <button className="btn btn-gold" onClick={()=>{setGastoForm(f=>({...f,categoria:activeCat}));setShowGastoModal(true);}}>{I.plus} Nuevo Gasto</button>
                             </div>
                             <div className="kpi-grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:20}}>
                                 <div className="kpi-card glass glass-mid">
@@ -872,10 +955,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         <td style={{fontSize:'11.5px',color:'var(--text-dim)',minWidth:'160px'}}>
                                                             {historial.length > 0
                                                                 ? historial.map((a,ai)=>(
-                                                                    <div key={ai} style={{marginBottom:4,display:'flex',gap:6,alignItems:'center'}}>
+                                                                    <div key={ai} style={{marginBottom:4,display:'flex',gap:4,alignItems:'center'}}>
                                                                         <span style={{fontFamily:'Fira Code',fontWeight:'600',color:'var(--text)'}}>{sym}{(a.monto||0).toFixed(0)}</span>
                                                                         <span style={{color:'var(--text-dimmer)',fontSize:'10.5px'}}>{new Date(a.fecha).toLocaleDateString('es-CO')}</span>
-                                                                        <button onClick={()=>revertirAbono(g,ai)} title="Eliminar este abono"
+                                                                        <button onClick={()=>openEditAbono(g,ai)} title="Editar abono"
+                                                                            style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-dimmer)',fontSize:'12px',lineHeight:1,padding:'0 2px',borderRadius:'3px'}}
+                                                                            onMouseEnter={e=>e.currentTarget.style.color='var(--sand-dark)'}
+                                                                            onMouseLeave={e=>e.currentTarget.style.color='var(--text-dimmer)'}>✎</button>
+                                                                        <button onClick={()=>revertirAbono(g,ai)} title="Eliminar abono"
                                                                             style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-dimmer)',fontSize:'13px',lineHeight:1,padding:'0 2px',borderRadius:'3px'}}
                                                                             onMouseEnter={e=>e.currentTarget.style.color='#8B3535'}
                                                                             onMouseLeave={e=>e.currentTarget.style.color='var(--text-dimmer)'}>×</button>
@@ -884,9 +971,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                 : <span style={{color:'var(--text-dimmer)'}}>—</span>
                                                             }
                                                         </td>
-                                                        <td>{g.esCredito && restante > 0 && (
-                                                            <button className="btn btn-glass btn-sm" onClick={()=>{setSelectedGasto(g);setAbonoMonto('');setShowAbonoModal(true);}}>+ Abono</button>
-                                                        )}</td>
+                                                        <td>
+                                                            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>openEditGasto(g)}>{I.edit} Editar</button>
+                                                                {g.esCredito && restante > 0 && (
+                                                                    <button className="btn btn-glass btn-sm" onClick={()=>{setSelectedGasto(g);setAbonoMonto('');setShowAbonoModal(true);}}>+ Abono</button>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}
@@ -1091,6 +1183,111 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <button className="btn btn-gold" onClick={addGasto} disabled={savingGasto} style={{flex:1,justifyContent:'center'}}>
                                     {savingGasto?'Guardando...':<>{I.plus} Registrar Gasto</>}
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showEditGastoModal && editingGasto && (
+                    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowEditGastoModal(false);setEditingGasto(null);}}}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:480}}>
+                            <div className="modal-hd">
+                                <h2>Editar Gasto</h2>
+                                <button className="modal-close" onClick={()=>{setShowEditGastoModal(false);setEditingGasto(null);}}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Categoría</label>
+                                <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={editGastoForm.categoria} onChange={e=>setEditGastoForm({...editGastoForm,categoria:e.target.value})}>
+                                    {CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Descripción</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    autoFocus value={editGastoForm.descripcion} onChange={e=>setEditGastoForm({...editGastoForm,descripcion:e.target.value})}
+                                    placeholder="Ej. Flete desde Venezuela" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Proveedor</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={editGastoForm.proveedor} onChange={e=>setEditGastoForm({...editGastoForm,proveedor:e.target.value})}
+                                    placeholder="Nombre del proveedor o empresa" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Monto</label>
+                                <div style={{display:'flex',gap:8}}>
+                                    <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)',width:'100px',flexShrink:0}}
+                                        value={editGastoForm.moneda} onChange={e=>setEditGastoForm({...editGastoForm,moneda:e.target.value})}>
+                                        <option value="USD">USD $</option>
+                                        <option value="DOP">DOP RD$</option>
+                                    </select>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)',flex:1}}
+                                        type="number" min="0" step="0.01" inputMode="decimal"
+                                        value={editGastoForm.monto} onChange={e=>setEditGastoForm({...editGastoForm,monto:e.target.value})} placeholder="0.00" />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Medio de pago</label>
+                                <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={editGastoForm.medioPago} onChange={e=>setEditGastoForm({...editGastoForm,medioPago:e.target.value,terminal:''})}>
+                                    <option>Efectivo</option>
+                                    <option>Tarjeta</option>
+                                    <option>Transferencia</option>
+                                </select>
+                            </div>
+                            {editGastoForm.medioPago === 'Tarjeta' && (
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Terminal / Banco</label>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                        value={editGastoForm.terminal} onChange={e=>setEditGastoForm({...editGastoForm,terminal:e.target.value})}
+                                        placeholder="Ej. Bancolombia, Davivienda..." />
+                                </div>
+                            )}
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Propietario</label>
+                                <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={editGastoForm.propietario} onChange={e=>setEditGastoForm({...editGastoForm,propietario:e.target.value})}>
+                                    {PROPIETARIOS.map(p=><option key={p} value={p}>{p}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <button type="button"
+                                    style={{width:'100%',padding:'11px',border:`2px solid ${editGastoForm.esCredito?'var(--text)':'var(--glass-border-h)'}`,borderRadius:'var(--r-sm)',background:editGastoForm.esCredito?'var(--text)':'transparent',color:editGastoForm.esCredito?'#FFFFFF':'var(--text-dim)',fontFamily:'inherit',fontWeight:'700',fontSize:'12px',letterSpacing:'1.5px',cursor:'pointer',transition:'all var(--t-fast)',textTransform:'uppercase'}}
+                                    onClick={()=>setEditGastoForm({...editGastoForm,esCredito:!editGastoForm.esCredito})}>
+                                    {editGastoForm.esCredito ? '✓ Crédito activo' : 'Crédito'}
+                                </button>
+                            </div>
+                            {editGastoError && <div className="error-msg" style={{marginBottom:0,marginTop:4}}>{editGastoError}</div>}
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={()=>{setShowEditGastoModal(false);setEditingGasto(null);}}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={saveEditGasto} disabled={savingEditGasto} style={{flex:1,justifyContent:'center'}}>
+                                    {savingEditGasto?'Guardando...':<>{I.edit} Guardar Cambios</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showEditAbonoModal && editingAbonoGasto && (
+                    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowEditAbonoModal(false);setEditingAbonoGasto(null);setEditingAbonoIdx(null);setEditingAbonoMonto('');}}}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:380}}>
+                            <div className="modal-hd">
+                                <h2>Editar Abono</h2>
+                                <button className="modal-close" onClick={()=>{setShowEditAbonoModal(false);setEditingAbonoGasto(null);setEditingAbonoIdx(null);setEditingAbonoMonto('');}}>×</button>
+                            </div>
+                            <div style={{background:'var(--glass-bg-mid)',borderRadius:'var(--r-sm)',padding:'12px 14px',marginBottom:18,fontSize:'13px',color:'var(--text-dim)'}}>
+                                {editingAbonoGasto.descripcion}
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Nuevo monto del abono</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    type="number" min="0" step="0.01" inputMode="decimal" autoFocus
+                                    value={editingAbonoMonto} onChange={e=>setEditingAbonoMonto(e.target.value)} placeholder="0.00" />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={()=>{setShowEditAbonoModal(false);setEditingAbonoGasto(null);setEditingAbonoIdx(null);setEditingAbonoMonto('');}}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={saveEditAbono} style={{flex:1,justifyContent:'center'}}>Guardar Cambio</button>
                             </div>
                         </div>
                     </div>
