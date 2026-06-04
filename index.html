@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa Brumi — Sistema de Gestion</title>
+
+    <!-- Firebase compat CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+    <!-- React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+        }
+        :root {
+            --sand:        #B8A48C;
+            --sand-light:  #CFC0A8;
+            --sand-dark:   #8A7660;
+            --sand-dim:    rgba(184,164,140,0.13);
+            --sand-border: rgba(184,164,140,0.32);
+
+            --glass-bg:      #FFFFFF;
+            --glass-bg-mid:  #F9F6F2;
+            --glass-bg-high: #FFFFFF;
+            --glass-border:  rgba(28,24,20,0.08);
+            --glass-border-h:rgba(28,24,20,0.16);
+            --glass-shadow:  0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+            --glass-shadow-lg: 0 8px 32px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.05);
+
+            --text:        #1C1814;
+            --text-dim:    rgba(28,24,20,0.50);
+            --text-dimmer: rgba(28,24,20,0.28);
+
+            --bg:          #F4F0EA;
+            --sidebar-bg:  #EDE8E1;
+
+            --header-h:  58px;
+            --sidebar-w: 220px;
+            --r:    12px;
+            --r-sm:  8px;
+            --t-fast:   160ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --t-normal: 240ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        html, body, #root { height: 100%; }
+        body { font-family: 'Fira Sans', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; color: var(--text); overflow-x: hidden; background: var(--bg); }
+
+        .scene { position: fixed; inset: 0; z-index: 0; background: var(--bg); }
+        .scene::before { display: none; }
+
+        .glass { background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow); position: relative; }
+        .glass::before { display: none; }
+        .glass > * { position: relative; z-index: 1; }
+        .glass-mid  { background: var(--glass-bg-mid); }
+        .glass-high { background: var(--glass-bg-high); box-shadow: var(--glass-shadow-lg); }
+
+        /* AUTH */
+        .auth-wrap { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+        @media (max-width: 768px) { .auth-wrap { grid-template-columns: 1fr; } .auth-left { display: none; } }
+        .auth-left { display: flex; align-items: center; justify-content: center; padding: 60px; position: relative; background: var(--sidebar-bg); border-right: 1px solid var(--glass-border); }
+        .auth-left-glow { display: none; }
+        .auth-logo-wrap { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; }
+        .auth-logo-wrap img { width: clamp(260px, 68%, 400px); filter: brightness(0); opacity: 0.85; user-select: none; }
+        .auth-right { display: flex; align-items: center; justify-content: center; padding: 48px 52px; background: #FFFFFF; }
+        .auth-form-box { width: 100%; max-width: 340px; }
+        .auth-form-box h2 { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.4px; margin-bottom: 4px; }
+        .auth-subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 28px; }
+
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 10.5px; font-weight: 700; color: var(--text-dimmer); margin-bottom: 7px; text-transform: uppercase; letter-spacing: 1px; }
+        .input-wrap { position: relative; }
+        .input-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-dimmer); pointer-events: none; }
+        .input-icon svg { width: 14px; height: 14px; display: block; }
+        .form-input { width: 100%; padding: 11px 14px 11px 38px; font-size: 13.5px; font-family: inherit; color: var(--text); outline: none; border-radius: var(--r-sm); border: 1px solid var(--glass-border); background: var(--glass-bg-mid); transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast); cursor: text; }
+        .form-input.no-icon { padding-left: 14px; }
+        .form-input::placeholder { color: var(--text-dimmer); }
+        .form-input:focus { background: #FFFFFF !important; border-color: var(--sand) !important; box-shadow: 0 0 0 3px var(--sand-dim) !important; outline: none; }
+
+        .error-msg { background: rgba(160,56,56,0.07); border: 1px solid rgba(160,56,56,0.18); border-radius: var(--r-sm); padding: 10px 13px; font-size: 12.5px; color: #8B3535; margin-bottom: 14px; }
+        .hint-box { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--sand-dark); font-family: 'Fira Code', monospace; font-weight: 500; margin-bottom: 18px; }
+        .hint-box svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+        .btn-submit { width: 100%; padding: 13px; border: none; border-radius: var(--r-sm); font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; color: #FFFFFF; background: var(--text); transition: opacity var(--t-fast); letter-spacing: 1px; text-transform: uppercase; }
+        .btn-submit:hover { opacity: 0.82; }
+        .btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .auth-switch { text-align: center; margin-top: 18px; font-size: 13px; color: var(--text-dimmer); }
+        .auth-switch a { color: var(--text); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+        /* LAYOUT */
+        .app-root { position: relative; z-index: 1; display: flex; min-height: 100vh; }
+
+        /* HEADER */
+        .app-header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); z-index: 200; display: flex; align-items: center; background: #FFFFFF; border-bottom: 1px solid var(--glass-border); box-shadow: 0 1px 0 rgba(28,24,20,0.04); }
+        .app-header-logo { width: var(--sidebar-w); flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: 100%; border-right: 1px solid var(--glass-border); padding: 0 18px; }
+        .app-header-logo img { height: 22px; filter: brightness(0); opacity: 0.8; object-fit: contain; }
+        .app-header-title { flex: 1; padding: 0 28px; }
+        .app-header-title strong { display: block; font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+        .app-header-title span { font-size: 11px; color: var(--text-dimmer); text-transform: capitalize; }
+        .app-header-right { display: flex; align-items: center; gap: 12px; padding-right: 24px; }
+        .app-header-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--text); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--bg); flex-shrink: 0; }
+        .app-header-divider { width: 1px; height: 22px; background: var(--glass-border); }
+
+        /* SIDEBAR */
+        .sidebar { width: var(--sidebar-w); position: fixed; top: var(--header-h); left: 0; bottom: 0; z-index: 100; display: flex; flex-direction: column; background: var(--sidebar-bg); border-right: 1px solid var(--glass-border); overflow-y: auto; }
+        .sidebar-nav { flex: 1; padding: 14px 10px; }
+        .nav-label { font-size: 9px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 2.5px; padding: 0 10px; margin: 16px 0 5px; }
+        .nav-label:first-child { margin-top: 0; }
+        .nav-item { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-dim); transition: background var(--t-fast), color var(--t-fast); margin-bottom: 1px; position: relative; }
+        .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+        .nav-item:hover { background: rgba(28,24,20,0.06); color: var(--text); }
+        .nav-item.active { background: var(--sand-dim); color: var(--sand-dark); font-weight: 600; border: 1px solid var(--sand-border); }
+        .nav-item.active::before { content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 2px; border-radius: 2px; background: var(--sand); }
+        .sidebar-footer { padding: 10px; border-top: 1px solid var(--glass-border); }
+        .user-tile { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; }
+        .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--text); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--bg); flex-shrink: 0; }
+        .user-tile-info { flex: 1; min-width: 0; }
+        .user-role  { font-size: 9px; font-weight: 700; color: var(--sand-dark); text-transform: uppercase; letter-spacing: 1.5px; }
+        .user-email { font-size: 11px; color: var(--text-dimmer); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+        .btn-logout { background: none; border: none; cursor: pointer; color: var(--text-dimmer); padding: 5px; border-radius: 6px; display: flex; align-items: center; transition: color var(--t-fast), background var(--t-fast); flex-shrink: 0; }
+        .btn-logout:hover { color: #8B3535; background: rgba(160,56,56,0.08); }
+        .btn-logout svg { width: 15px; height: 15px; }
+
+        /* MAIN */
+        .main { margin-left: var(--sidebar-w); flex: 1; padding: calc(var(--header-h) + 30px) 40px 36px; min-height: 100vh; background: var(--bg); }
+        .page-header { margin-bottom: 28px; }
+        .page-header h1 { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; margin-bottom: 3px; }
+        .page-header p  { font-size: 13px; color: var(--text-dim); }
+
+        .banner { border-radius: var(--r); padding: 26px 30px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; overflow: hidden; background: var(--text) !important; border: none !important; box-shadow: none !important; }
+        .banner-text h2 { font-size: 17px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; margin-bottom: 4px; }
+        .banner-text p  { font-size: 13px; color: rgba(255,255,255,0.50); }
+        .banner-stat { border-radius: 8px; padding: 14px 20px; text-align: center; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.14); }
+        .banner-stat-val   { font-size: 22px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.8px; font-family: 'Fira Code', monospace; }
+        .banner-stat-label { font-size: 9px; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; margin-top: 3px; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .kpi-card { border-radius: var(--r); padding: 20px 22px; transition: transform var(--t-normal), box-shadow var(--t-normal); cursor: default; }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.07); }
+        .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .kpi-label { font-size: 10px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .kpi-icon svg { width: 15px; height: 15px; }
+        .kpi-icon.gold  { background: var(--sand-dim); border: 1px solid var(--sand-border); color: var(--sand-dark); }
+        .kpi-icon.white { background: rgba(28,24,20,0.05); border: 1px solid var(--glass-border); color: var(--text-dim); }
+        .kpi-val { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -1px; font-family: 'Fira Code', monospace; line-height: 1; margin-bottom: 5px; }
+        .kpi-sub { font-size: 11px; color: var(--text-dimmer); }
+
+        .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .sec-header h2 { font-size: 11px; font-weight: 700; color: var(--text-dimmer); letter-spacing: 1.2px; text-transform: uppercase; }
+
+        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all var(--t-fast); white-space: nowrap; letter-spacing: 0.3px; }
+        .btn svg { width: 13px; height: 13px; }
+        .btn-gold { background: var(--text); color: #FFFFFF; border-color: var(--text); }
+        .btn-gold:hover { background: #3A3530; border-color: #3A3530; }
+        .btn-glass { background: transparent; border-color: var(--glass-border-h); color: var(--text-dim); }
+        .btn-glass:hover { background: rgba(28,24,20,0.05); color: var(--text); border-color: var(--glass-border-h); }
+        .btn-sm { padding: 5px 11px; font-size: 11px; }
+
+        .card { border-radius: var(--r); overflow: hidden; }
+        .card-body { padding: 24px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { padding: 10px 18px; text-align: left; font-size: 9.5px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--glass-border); background: var(--glass-bg-mid); white-space: nowrap; }
+        tbody td { padding: 12px 18px; font-size: 13px; border-bottom: 1px solid var(--glass-border); color: var(--text); transition: background var(--t-fast); }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: var(--glass-bg-mid); }
+        .td-num { font-family: 'Fira Code', monospace; font-weight: 500; }
+
+        .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 100px; font-size: 10.5px; font-weight: 600; }
+        .badge-dot { width: 4px; height: 4px; border-radius: 50%; }
+        .badge-gold  { background: var(--sand-dim); border: 1px solid var(--sand-border); color: var(--sand-dark); }
+        .badge-gold .badge-dot  { background: var(--sand); }
+        .badge-green { background: rgba(74,120,89,0.10); border: 1px solid rgba(74,120,89,0.22); color: #3D6646; }
+        .badge-green .badge-dot { background: #4A7859; }
+        .badge-gray  { background: rgba(28,24,20,0.06); border: 1px solid var(--glass-border); color: var(--text-dim); }
+        .badge-gray .badge-dot  { background: var(--text-dimmer); }
+
+        .empty { padding: 56px 40px; text-align: center; }
+        .empty-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--glass-bg-mid); border: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+        .empty-icon svg { width: 20px; height: 20px; color: var(--text-dimmer); }
+        .empty h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+        .empty p  { font-size: 13px; color: var(--text-dim); }
+
+        .coming-soon { padding: 64px 40px; text-align: center; }
+        .cs-icon { width: 56px; height: 56px; border-radius: 14px; background: var(--sand-dim); border: 1px solid var(--sand-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+        .cs-icon svg { width: 24px; height: 24px; color: var(--sand-dark); }
+        .cs-bar { width: 28px; height: 1.5px; background: var(--sand); border-radius: 2px; margin: 14px auto 16px; opacity: 0.5; }
+        .coming-soon h3 { font-size: 16px; font-weight: 600; color: var(--text); }
+        .coming-soon p  { font-size: 13px; color: var(--text-dim); max-width: 280px; margin: 8px auto 0; line-height: 1.6; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(28,24,20,0.30); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal { border-radius: 14px; padding: 28px; width: 100%; max-width: 430px; }
+        .modal-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+        .modal-hd h2 { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+        .modal-close { width: 28px; height: 28px; border-radius: 50%; background: var(--glass-bg-mid); border: 1px solid var(--glass-border); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-dimmer); font-size: 18px; line-height: 1; transition: background var(--t-fast); }
+        .modal-close:hover { background: rgba(28,24,20,0.08); color: var(--text); }
+        .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+        .modal-actions .btn { flex: 1; justify-content: center; padding: 12px; }
+
+        .loading-screen { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: var(--bg); border: none; box-shadow: none; }
+        .spinner { width: 32px; height: 32px; border: 2px solid rgba(28,24,20,0.10); border-top-color: var(--text); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        select.form-input { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 32px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(28%2C24%2C20%2C0.35)' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+        select.form-input option { background: #FFFFFF; color: #1C1814; }
+    </style>
+</head>
+<body>
+<div class="scene"></div>
+<div id="root"></div>
+
+<!-- Firebase init -->
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyDyiPAB0XbJmFNqAaB45vZgmuLdNS2f3bU",
+    authDomain: "casabrumiimportaciones.firebaseapp.com",
+    databaseURL: "https://casabrumiimportaciones-default-rtdb.firebaseio.com",
+    projectId: "casabrumiimportaciones",
+    storageBucket: "casabrumiimportaciones.firebasestorage.app",
+    messagingSenderId: "641061884042",
+    appId: "1:641061884042:web:9f825cc3e4f5e16d331d73",
+    measurementId: "G-HYJRC6WLF8"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABDgAAADICAYAAAANzVGFAAA2BElEQVR4nO3dC3hU1bnw8XcmCUkgAeQmCggqKDdFRQRBFEEoAiJUqKDgrd5JwSuIBVT0KPWOXEQQ5Cag4AWUVkUREQrHalutp+er9Bzt0bbSeqFatUKS/T1rWO90zWYymZlMktnh/3ue9Uwy2bP22puZzV7vvGstEQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIqFBtNwAAgGzkeV5tNwF1WCjELRgAAAAAAAAAAPDh6wMAAHzI3kB1I4MDAIDMC1dDnQAABBKBDdT0e433HAAAmUOAAwAAAAAABB4BDgAAAAAAEHgEOAAAAAAAQOAR4AAAAAAAAIFHgAMAAAAAAAQeAQ4AAAAAABB4BDgAAAAAAEDgEeAAAAAAAACBR4ADAAAAAAAEHgEOAAAAAAAQeAQ4AAAAAABA4BHgAAAAAAAAgUeAAwAAAAAABB4BDgAAAAAAEHgEOAAAAAAAQOAR4AAAAAAAAIFHgAMAAAAAAAQeAQ4AAAAAABB4BDgAAAAAAEDgEeAAAAAAAACBR4ADAAAAAAAEHgEOAAAAAAAQeAQ4AAAAAABA4BHgAAAAAAAAgUeAAwAAAAAABB4BDgAAAAAAEHgEOAAAAAAAQOAR4AAAAAAAAIFHgAMAAAAAAAQeAQ4AAAAAABB4ubXdAAAAUHsee+wx75M/fyLlZeXSqlUrOfbYY2XAgAGh2m4XAABAqghwAABwENm8ebO3du1a2bJli+zatUvKysoO2OaII9p4/fsPkHHjxhHsAAAAAAAgaDzPiz7WxTJ8+HBzgF4oFIo+5uXlefn5+ZFSr149LxwOx2wz9oILvNpud10t7nsOAAAAAICMcTuddak88sgjXnFxcSRgYQIYJqiRk5MT+T1eMX8z22iw45hjjiHIUQ3Ffc8BAICqI+0UAADLdDZDoVCd6nRedtll3hNPPBE5rpycHCkvL4+UkITk6PZHS+cuXaR5s2aRbf/2t93y/vv/JR9++GHk93A4HCmlpaXStm07+eijD7lvyCB9r5lHAAAAAAAyxv1WPejltc2bvY4dO0YzMkzRYSennXaat379+gqzMlatWnXAa83PnTt3JpMjg8V9zwEAAAAAkDFupzPI5aKLLvIKCwttgCLXy83NjfzctGlTb+HChUkHKc4777zosBYNclw47kKCHBkq7nsOAAAAAICMcTudQSsrVqzwRo8e7RUUFsTMtaHzaPTs2SutwMSgQYOimRxa1+o1awhyZKC47zkAAFB1DPoEAMDKxjk45s+f7z322GNSv359admypRQUFETb99lnn8nHH38sn376qXz11VeR50z78/LyIsu/mmJ+njJlitx5551p/59/5JFHeh999JHk5uZG5uPo3r27vP322zV2D/Hqq6965jjN3CHNmjWTc889t07cvzAHBwAAAACgWrjfqmdLMUu3usu2VlTMMBSzrbvdgAEDvC1bXq9ytsXjjz8ezQrRLA7zXHUf+4SSEq9t27YHHGvDhg29swYO9OY88kigM0nc9xwAAAAAAHU2wGEmAnWHh5hHE8gwQ09MMT/7Ax/5+fle7969vaefejqjnf9evXpFAynmsXv37tUWXHh88WKvqKgoGtjR4TZ6zG7Ap1WrVt7cuXMDGehw33MAAAAAANTZAMebb74Z6dQnyuAwzxcXF3v9+vXz7r33Xm/Hjh3V0tl/4oknolkc2pZnn3024/u66sqrosdlghk6uam/5OXaYEdo/+9du3b11q1dF6hAh/ueAwAAVcegTwAArGycg6NJkybel19+KeFwODIHRUlJicmmkG+//VYaNmokhx92mPTt27dG/j8/4YQTvHfffTcyr8e+fftk2LBh8sILL2Rs35dccom3bNkyycnJifxujtf8W3Tq1El69OghRUVF8vnnn8tbb70lH374YWQbMy+IYeYGCYdzZMiQs+Waa66RIUOGZP09DnNwAAAAAAAOigwOU3r06LE/Y8FmckyZMqXWshSWLFkSHTKjmRRbt27NSHuuuPzy6BAYrd8MU3nggQfi1j933jyvQ/v20WwPd8UY83u3bt2822+/3Xvqqadi2rjp1U3eU2vWeLNmzfLOP/98r2/fviaoUivn1H3PAQAAAABQpwMcM2bMiAlwNG58SK0OwzjqqKNi2jNmzJgqt+e22247YCnaww8/3DNDdCp77V133RUZohNdGtdMtGrr0KJzeOj8He7wHvN4yCG1c07d9xwAAAAAAHU6wGGKWTXEneBz6NCh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";
+
+const I = {
+    box:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>,
+    chart:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+    users:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    dollar:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+    truck:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
+    plus:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    logout:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+    invoice: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+    inbox:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>,
+    edit:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    mail:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+    lock:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+    key:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
+};
+
+// ── APP ──
+function App() {
+    const [user,       setUser]       = useState(null);
+    const [loading,    setLoading]    = useState(true);
+    const [email,      setEmail]      = useState('');
+    const [password,   setPassword]   = useState('');
+    const [isLogin,    setIsLogin]    = useState(true);
+    const [error,      setError]      = useState('');
+    const [busy,       setBusy]       = useState(false);
+    const [resetSent,  setResetSent]  = useState(false);
+
+    const MASTER_EMAIL = 'johanderjca@gmail.com';
+
+    useEffect(() => {
+        return auth.onAuthStateChanged(firebaseUser => {
+            if (firebaseUser) {
+                const isMaster = firebaseUser.email === MASTER_EMAIL;
+                // Carga inmediata sin esperar Firestore
+                setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: isMaster ? 'master' : 'vendedor', photoURL: firebaseUser.photoURL || null });
+                setLoading(false);
+                // Actualiza con datos de Firestore en segundo plano
+                db.collection('users').doc(firebaseUser.uid).get()
+                    .then(doc => {
+                        if (doc.exists) {
+                            setUser(prev => ({
+                                ...prev,
+                                role:     isMaster ? 'master' : (doc.data().role || prev.role),
+                                photoURL: doc.data().photoURL || prev.photoURL,
+                            }));
+                        }
+                    })
+                    .catch(() => {});
+            } else {
+                setUser(null);
+                setLoading(false);
+            }
+        });
+    }, []);
+
+    const handleAuth = async e => {
+        e.preventDefault();
+        setError(''); setBusy(true);
+        try {
+            if (isLogin) {
+                await auth.signInWithEmailAndPassword(email, password);
+            } else {
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
+                const role = email === 'johanderjca@gmail.com' ? 'master' : 'vendedor';
+                await db.collection('users').doc(cred.user.uid).set({
+                    email, role,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                if (role === 'vendedor') {
+                    await db.collection('vendedores').add({
+                        nombre:          email.split('@')[0],
+                        email,
+                        uid:             cred.user.uid,
+                        activo:          true,
+                        autoRegistrado:  true,
+                        fechaAlta:       firebase.firestore.FieldValue.serverTimestamp(),
+                    });
+                }
+            }
+        } catch (err) {
+            const msgs = {
+                'auth/user-not-found':   'Usuario no encontrado.',
+                'auth/wrong-password':   'Contrasena incorrecta.',
+                'auth/email-already-in-use': 'El correo ya esta registrado.',
+                'auth/invalid-email':    'Correo invalido.',
+                'auth/weak-password':    'La contrasena debe tener al menos 6 caracteres.',
+                'auth/invalid-credential': 'Credenciales incorrectas.',
+            };
+            setError(msgs[err.code] || err.message);
+        }
+        setBusy(false);
+    };
+
+    const handleReset = async () => {
+        if (!email) { setError('Ingresa tu correo para restablecer la contraseña.'); return; }
+        setBusy(true); setError('');
+        try {
+            await auth.sendPasswordResetEmail(email);
+            setResetSent(true);
+        } catch (err) {
+            setError('No se pudo enviar el correo. Verifica que el email sea correcto.');
+        }
+        setBusy(false);
+    };
+
+    const handleLogout = () => auth.signOut();
+
+    const handlePhotoChange = async (file) => {
+        if (!file || !auth.currentUser) return;
+        try {
+            const stor     = firebase.storage();
+            const ref      = stor.ref(`avatars/${auth.currentUser.uid}`);
+            await ref.put(file);
+            const photoURL = await ref.getDownloadURL();
+            await auth.currentUser.updateProfile({ photoURL });
+            await db.collection('users').doc(auth.currentUser.uid).update({ photoURL });
+            setUser(prev => ({ ...prev, photoURL }));
+        } catch(e) { console.error('Error subiendo foto:', e); }
+    };
+
+    if (loading) return (
+        <div className="loading-screen glass">
+            <div className="spinner" />
+        </div>
+    );
+
+    if (!user) return (
+        <div className="auth-wrap">
+            <div className="auth-left">
+                <div className="auth-left-glow" />
+                <div className="auth-logo-wrap">
+                    <img src={LOGO} alt="Casa Brumi Importaciones" />
+                </div>
+            </div>
+            <div className="auth-right">
+                <div className="auth-form-box glass glass-mid" style={{borderRadius:'18px', padding:'36px', boxShadow:'var(--glass-shadow-lg)'}}>
+                    <h2>{isLogin ? 'Bienvenido de vuelta' : 'Crear cuenta'}</h2>
+                    <p className="auth-subtitle">{isLogin ? 'Ingresa tus credenciales para acceder' : 'Completa los datos para registrarte'}</p>
+                    <form onSubmit={handleAuth} noValidate>
+                        <div className="form-group">
+                            <label htmlFor="a-email">Correo electronico</label>
+                            <div className="input-wrap">
+                                <span className="input-icon">{I.mail}</span>
+                                <input id="a-email" className="form-input glass" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                    type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@casabrumi.com" required />
+                            </div>
+                        </div>
+                        <div className="form-group" style={{marginBottom:12}}>
+                            <label htmlFor="a-pass">Contrasena</label>
+                            <div className="input-wrap">
+                                <span className="input-icon">{I.lock}</span>
+                                <input id="a-pass" className="form-input glass" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                    type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+                            </div>
+                        </div>
+                        {error && <div className="error-msg">{error}</div>}
+                        {resetSent && <div style={{background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.25)', borderRadius:'var(--r-sm)', padding:'10px 13px', fontSize:'12.5px', color:'#4ade80', marginBottom:14}}>Correo enviado. Revisa tu bandeja de entrada.</div>}
+
+                        <button className="btn-submit" type="submit" disabled={busy}>
+                            {busy ? 'Cargando...' : (isLogin ? 'Iniciar sesion' : 'Crear cuenta')}
+                        </button>
+                    </form>
+                    {isLogin && (
+                        <p style={{textAlign:'center', marginTop:12, fontSize:'12.5px'}}>
+                            <a style={{color:'var(--text-dimmer)', cursor:'pointer'}} onClick={handleReset}>¿Olvidaste tu contraseña?</a>
+                        </p>
+                    )}
+                    <p className="auth-switch">
+                        {isLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+                        <a onClick={() => { setIsLogin(!isLogin); setError(''); setResetSent(false); }}>{isLogin ? 'Crear una' : 'Iniciar sesion'}</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+
+    return user.role === 'master'
+        ? <AdminPanel user={user} onLogout={handleLogout} onPhotoChange={handlePhotoChange} />
+        : <VendedorPanel user={user} onLogout={handleLogout} onPhotoChange={handlePhotoChange} />;
+}
+
+// ── HEADER ──
+function Header({ user, onLogout, activeTab, navSections, onPhotoChange }) {
+    const fileRef = React.useRef(null);
+    const current = navSections.flatMap(s=>s.items).find(i=>i.key===activeTab);
+    const today   = new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    return (
+        <header className="app-header">
+            <div className="app-header-logo">
+                <img src={LOGO} alt="Casa Brumi" />
+            </div>
+            <div className="app-header-title">
+                <strong>{current?.label || 'Dashboard'}</strong>
+                <span>{today}</span>
+            </div>
+            <div className="app-header-right">
+                <div className="app-header-divider" />
+                <div className="app-header-avatar"
+                    onClick={() => fileRef.current?.click()}
+                    title="Clic para cambiar foto"
+                    style={{cursor:'pointer', overflow:'hidden', flexShrink:0}}>
+                    {user.photoURL
+                        ? <img src={user.photoURL} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt="foto" />
+                        : user.email[0].toUpperCase()
+                    }
+                    <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}}
+                        onChange={e => { if(e.target.files[0]) onPhotoChange(e.target.files[0]); e.target.value=''; }} />
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                    <span style={{fontSize:'9px',fontWeight:'700',color:'var(--sand-dark)',textTransform:'uppercase',letterSpacing:'1.2px'}}>{user.role}</span>
+                    <span style={{fontSize:'11px',color:'var(--text-dimmer)',maxWidth:'160px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email}</span>
+                </div>
+                <button className="btn-logout" onClick={onLogout} aria-label="Cerrar sesion">{I.logout}</button>
+            </div>
+        </header>
+    );
+}
+
+// ── SIDEBAR ──
+function Sidebar({ activeTab, setActiveTab, navSections }) {
+    return (
+        <aside className="sidebar" style={{borderRadius:0}}>
+            <nav className="sidebar-nav">
+                {navSections.map((sec, si) => (
+                    <div key={si}>
+                        <div className="nav-label">{sec.label}</div>
+                        {sec.items.map(item => (
+                            <div key={item.key} className={`nav-item ${activeTab === item.key ? 'active' : ''}`}
+                                onClick={() => setActiveTab(item.key)} role="button" tabIndex={0}
+                                onKeyDown={e => e.key === 'Enter' && setActiveTab(item.key)}>
+                                <span aria-hidden="true">{item.icon}</span>{item.label}
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </nav>
+        </aside>
+    );
+}
+
+// ── ADMIN PANEL ──
+function AdminPanel({ user, onLogout, onPhotoChange }) {
+    const [activeTab,  setActiveTab]  = useState('dashboard');
+    const [vendedores, setVendedores] = useState([]);
+    const [ventas,     setVentas]     = useState([]);
+    const [showModal,  setShowModal]  = useState(false);
+    const [form,       setForm]       = useState({ nombre: '', email: '' });
+    const [saving,     setSaving]     = useState(false);
+    const firstInputRef  = useRef(null);
+    const firstGastoRef  = useRef(null);
+    const chartRef       = useRef(null);
+    const chartInst      = useRef(null);
+    const CATEGORIAS     = ['Operacional','Importación','GROWTH','Logística','Personal','Impuestos','Almacenamiento'];
+    const PROPIETARIOS   = ['Johander','Germán'];
+    const [gastos,         setGastos]         = useState([]);
+    const [showGastoModal, setShowGastoModal] = useState(false);
+    const [gastoForm,      setGastoForm]      = useState({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
+    const [savingGasto,    setSavingGasto]    = useState(false);
+    const [activeCat,           setActiveCat]           = useState(null);
+    const [showAbonoModal,      setShowAbonoModal]      = useState(false);
+    const [selectedGasto,       setSelectedGasto]       = useState(null);
+    const [abonoMonto,          setAbonoMonto]          = useState('');
+    const [showPagoRapidoModal, setShowPagoRapidoModal] = useState(false);
+    const [pagoRapidoId,        setPagoRapidoId]        = useState('');
+    const [gastoError,          setGastoError]          = useState('');
+    const [usuarios,            setUsuarios]            = useState([]);
+
+    useEffect(() => {
+        const unsub = db.collection('users').onSnapshot(
+            snap => setUsuarios(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            () => {} // ignora error de permisos
+        );
+        return unsub;
+    }, []);
+
+    const cambiarRol = async (uid, nuevoRol) => {
+        if (!uid) return;
+        await db.collection('users').doc(uid).update({ role: nuevoRol });
+    };
+
+    useEffect(() => {
+        const unsub = db.collection('vendedores').orderBy('fechaAlta', 'desc').onSnapshot(
+            snap => setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            () => {}
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('ventas').orderBy('fecha', 'desc').onSnapshot(
+            snap => setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            () => {}
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('gastos').orderBy('fecha', 'desc').onSnapshot(
+            snap => setGastos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            () => {}
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => { if (showModal      && firstInputRef.current) firstInputRef.current.focus(); }, [showModal]);
+    useEffect(() => { if (showGastoModal && firstGastoRef.current) firstGastoRef.current.focus(); }, [showGastoModal]);
+
+    useEffect(() => {
+        if (activeTab !== 'dashboard' || !chartRef.current || typeof Chart === 'undefined') return;
+        const days = Array.from({length:7}, (_,i) => { const d=new Date(); d.setDate(d.getDate()-(6-i)); return d; });
+        const data = days.map(d => ventas.filter(v => { const vd=v.fecha?.toDate?.(); return vd&&vd.toDateString()===d.toDateString(); }).reduce((s,v)=>s+(v.monto||0),0));
+        const labels = days.map(d => d.toLocaleDateString('es-CO',{weekday:'short',day:'numeric'}));
+        if (chartInst.current) chartInst.current.destroy();
+        chartInst.current = new Chart(chartRef.current, {
+            type: 'bar',
+            data: { labels, datasets: [{ data, backgroundColor:'rgba(28,24,20,0.82)', hoverBackgroundColor:'#B8A48C', borderRadius:6, borderSkipped:false }] },
+            options: {
+                responsive:true, maintainAspectRatio:false,
+                plugins: {
+                    legend:{ display:false },
+                    tooltip:{ backgroundColor:'#1C1814', titleColor:'#fff', bodyColor:'rgba(255,255,255,0.65)', padding:10, cornerRadius:8,
+                        callbacks:{ label: ctx => ` $${ctx.raw.toFixed(2)}` } }
+                },
+                scales: {
+                    y: { grid:{ color:'rgba(28,24,20,0.05)' }, ticks:{ color:'rgba(28,24,20,0.35)', font:{family:'Fira Code',size:11} }, border:{ display:false } },
+                    x: { grid:{ display:false }, ticks:{ color:'rgba(28,24,20,0.45)', font:{size:11} }, border:{ display:false } }
+                }
+            }
+        });
+        return () => { if (chartInst.current) { chartInst.current.destroy(); chartInst.current=null; } };
+    }, [activeTab, ventas]);
+
+    const addVendedor = async () => {
+        if (!form.nombre || !form.email || saving) return;
+        setSaving(true);
+        await db.collection('vendedores').add({
+            nombre: form.nombre,
+            email:  form.email,
+            activo: true,
+            fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        setForm({ nombre: '', email: '' });
+        setShowModal(false);
+        setSaving(false);
+    };
+
+    const addGasto = async () => {
+        if (!gastoForm.descripcion || !gastoForm.monto || savingGasto) return;
+        setSavingGasto(true);
+        setGastoError('');
+        const unlock = setTimeout(() => setSavingGasto(false), 30000);
+        try {
+            const abonoInicial = gastoForm.esCredito ? parseFloat(gastoForm.montoAbonado || 0) : 0;
+            await db.collection('gastos').add({
+                categoria:       gastoForm.categoria,
+                descripcion:     gastoForm.descripcion,
+                monto:           parseFloat(gastoForm.monto),
+                moneda:          gastoForm.moneda || 'USD',
+                medioPago:       gastoForm.medioPago,
+                propietario:     gastoForm.propietario,
+                terminal:        gastoForm.medioPago === 'Tarjeta' ? gastoForm.terminal : '',
+                proveedor:       gastoForm.proveedor,
+                esCredito:       gastoForm.esCredito,
+                montoAbonado:    abonoInicial,
+                historialAbonos: abonoInicial > 0 ? [{ monto: abonoInicial, fecha: new Date().toISOString() }] : [],
+                fecha:           firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            clearTimeout(unlock);
+            setGastoForm({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
+            setShowGastoModal(false);
+        } catch(e) {
+            clearTimeout(unlock);
+            setGastoError('Error: ' + (e.code === 'permission-denied' ? 'Sin permiso — revisa las reglas de Firestore.' : e.message || e.code));
+        }
+        setSavingGasto(false);
+    };
+
+    const addAbono = async (gastoRef, monto, historial) => {
+        if (!monto || parseFloat(monto) <= 0) return;
+        const nuevoTotal  = (gastoRef.montoAbonado || 0) + parseFloat(monto);
+        const nuevoHistorial = [...(gastoRef.historialAbonos || []), { monto: parseFloat(monto), fecha: new Date().toISOString() }];
+        await db.collection('gastos').doc(gastoRef.id).update({ montoAbonado: nuevoTotal, historialAbonos: nuevoHistorial });
+    };
+
+    const handleAddAbono = async () => {
+        if (!abonoMonto || !selectedGasto) return;
+        await addAbono(selectedGasto, abonoMonto, selectedGasto.historialAbonos);
+        setAbonoMonto(''); setShowAbonoModal(false); setSelectedGasto(null);
+    };
+
+    const revertirAbono = async (gasto, idx) => {
+        const historial    = [...(gasto.historialAbonos || [])];
+        const montoRetirar = historial[idx].monto || 0;
+        historial.splice(idx, 1);
+        const nuevoTotal = Math.max(0, (gasto.montoAbonado || 0) - montoRetirar);
+        await db.collection('gastos').doc(gasto.id).update({ montoAbonado: nuevoTotal, historialAbonos: historial });
+    };
+
+    const handlePagoRapido = async () => {
+        if (!pagoRapidoId || !abonoMonto) return;
+        const g = gastos.find(x => x.id === pagoRapidoId);
+        if (!g) return;
+        await addAbono(g, abonoMonto, g.historialAbonos);
+        setAbonoMonto(''); setPagoRapidoId(''); setShowPagoRapidoModal(false);
+    };
+
+    const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
+
+    const navSections = [
+        { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
+        { label: 'Gestion',   items: [
+            { key: 'vendedores',  label: 'Vendedores',  icon: I.users  },
+            { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
+            { key: 'gastos',      label: 'Gastos',      icon: I.dollar },
+        ]},
+    ];
+
+    return (
+        <div className="app-root">
+            <img src={LOGO} aria-hidden="true" style={{position:'fixed',top:'50%',left:'50%',transform:'translate(calc(-50% + 110px), -50%)',width:'520px',maxWidth:'55vw',opacity:0.055,filter:'brightness(0)',pointerEvents:'none',userSelect:'none',zIndex:0}} />
+            <Header user={user} onLogout={onLogout} activeTab={activeTab} navSections={navSections} onPhotoChange={onPhotoChange} />
+            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
+            <main className="main">
+
+                {activeTab === 'dashboard' && <>
+                    <div className="kpi-grid">
+                        {[
+                            { label: 'Vendedores',    val: vendedores.length,        sub: 'registrados',   icon: I.users,   v: 'gold'  },
+                            { label: 'Ventas hoy',    val: ventas.filter(v => { const d=v.fecha?.toDate?.(); return d&&d.toDateString()===new Date().toDateString(); }).length, sub: 'registradas hoy', icon: I.invoice, v: 'white' },
+                            { label: 'Total ventas',  val: ventas.length,            sub: 'en el sistema', icon: I.chart,   v: 'white' },
+                            { label: 'Monto total',   val: `$${totalVentas.toFixed(0)}`, sub: 'acumulado', icon: I.dollar,  v: 'gold'  },
+                        ].map((k, i) => (
+                            <div className={`kpi-card glass ${i%2===0?'glass-mid':''}`} key={i}>
+                                <div className="kpi-top"><div className="kpi-label">{k.label}</div><div className={`kpi-icon ${k.v}`}>{k.icon}</div></div>
+                                <div className="kpi-val">{k.val}</div>
+                                <div className="kpi-sub">{k.sub}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:14,marginBottom:20}}>
+                        <div className="card glass" style={{padding:'22px 24px'}}>
+                            <div className="sec-header" style={{marginBottom:16}}><h2>Ventas — últimos 7 días</h2></div>
+                            <div style={{height:'200px'}}><canvas ref={chartRef}></canvas></div>
+                        </div>
+                        <div className="card glass" style={{padding:'22px 24px'}}>
+                            <div className="sec-header" style={{marginBottom:14}}><h2>Resumen</h2></div>
+                            {[
+                                { label:'Total acumulado', val:`$${totalVentas.toFixed(0)}`, icon:I.dollar },
+                                { label:'Vendedores activos', val:vendedores.length, icon:I.users },
+                                { label:'Ventas registradas', val:ventas.length, icon:I.chart },
+                            ].map((r,i)=>(
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:i<2?'1px solid var(--glass-border)':'none'}}>
+                                    <div className="kpi-icon gold">{r.icon}</div>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'0.8px',fontWeight:'700'}}>{r.label}</div>
+                                        <div style={{fontSize:'18px',fontWeight:'700',fontFamily:'Fira Code',color:'var(--text)',letterSpacing:'-0.5px',marginTop:2}}>{r.val}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {ventas.length > 0 && (
+                        <>
+                            <div className="sec-header" style={{marginTop:4}}><h2>Últimas ventas</h2></div>
+                            <div className="card glass">
+                                <table>
+                                    <thead><tr><th>Vendedor</th><th>Cliente</th><th>Producto</th><th>Monto</th><th>Estado</th></tr></thead>
+                                    <tbody>
+                                        {ventas.slice(0,5).map((v, i) => (
+                                            <tr key={i}>
+                                                <td style={{color:'var(--text-dim)', fontSize:'12px'}}>{v.vendedorEmail || '—'}</td>
+                                                <td><strong>{v.cliente || '—'}</strong></td>
+                                                <td style={{color:'var(--text-dim)'}}>{v.producto || '—'}</td>
+                                                <td className="td-num"><strong>${(v.monto||0).toFixed(2)}</strong></td>
+                                                <td><span className="badge badge-gray"><span className="badge-dot"/>{v.estado || 'Pendiente'}</span></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
+                </>}
+
+                {activeTab === 'vendedores' && <>
+                    <div className="page-header"><h1>Vendedores</h1><p>Equipo de ventas y control de acceso</p></div>
+                    <div className="sec-header">
+                        <h2>{vendedores.length} vendedor{vendedores.length !== 1 ? 'es' : ''} registrado{vendedores.length !== 1 ? 's' : ''}</h2>
+                        <button className="btn btn-gold" onClick={() => setShowModal(true)}>{I.plus} Agregar vendedor</button>
+                    </div>
+                    <div className="card glass">
+                        {vendedores.length > 0 ? (
+                            <table>
+                                <thead><tr><th>Nombre</th><th>Correo</th><th>Alta</th><th>Cuenta</th><th>Herramientas / Rol</th></tr></thead>
+                                <tbody>
+                                    {vendedores.map((v, i) => {
+                                        const userDoc = usuarios.find(u => u.email === v.email || (v.uid && u.id === v.uid));
+                                        return (
+                                            <tr key={i}>
+                                                <td>
+                                                    <strong>{v.nombre}</strong>
+                                                    {v.autoRegistrado && <span className="badge badge-gold" style={{marginLeft:8,fontSize:'9.5px'}}><span className="badge-dot"/>Auto-reg.</span>}
+                                                </td>
+                                                <td style={{color:'var(--text-dim)'}}>{v.email}</td>
+                                                <td className="td-num" style={{color:'var(--text-dimmer)',fontSize:'12px'}}>
+                                                    {v.fechaAlta?.toDate?.().toLocaleDateString('es') || '—'}
+                                                </td>
+                                                <td>
+                                                    {userDoc
+                                                        ? <span className="badge badge-green"><span className="badge-dot"/>Con acceso</span>
+                                                        : <span className="badge badge-gray"><span className="badge-dot"/>Sin cuenta</span>}
+                                                </td>
+                                                <td>
+                                                    {userDoc ? (
+                                                        <select value={userDoc.role || 'vendedor'}
+                                                            onChange={e => cambiarRol(userDoc.id, e.target.value)}
+                                                            style={{fontSize:'12px',padding:'5px 10px',border:'1px solid var(--glass-border)',borderRadius:'6px',background:'var(--glass-bg-mid)',color:'var(--text)',fontFamily:'inherit',cursor:'pointer',outline:'none'}}>
+                                                            <option value="vendedor">Vendedor</option>
+                                                            <option value="master">Master</option>
+                                                        </select>
+                                                    ) : (
+                                                        <span style={{fontSize:'12px',color:'var(--text-dimmer)'}}>—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="empty">
+                                <div className="empty-icon">{I.users}</div>
+                                <h3>Sin vendedores aun</h3>
+                                <p>Agrega tu primer vendedor para comenzar.</p>
+                            </div>
+                        )}
+                    </div>
+                </>}
+
+                {activeTab === 'proveedores' && <>
+                    <div className="page-header"><h1>Proveedores</h1><p>Gestion por pais de origen</p></div>
+                    <div className="card glass"><div className="coming-soon"><div className="cs-icon">{I.truck}</div><h3>Modulo de Proveedores</h3><div className="cs-bar"/><p>Proxima fase — Republica Dominicana y Venezuela</p></div></div>
+                </>}
+
+                {activeTab === 'gastos' && (() => {
+                    if (!activeCat) return (
+                        <>
+                            <div className="page-header"><h1>Gastos</h1><p>Selecciona una categoría para ver el detalle</p></div>
+                            <div className="sec-header">
+                                <span/>
+                                <div style={{display:'flex',gap:8}}>
+                                    {gastos.some(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0) && (
+                                        <button className="btn btn-glass" onClick={()=>setShowPagoRapidoModal(true)}>{I.dollar} Registrar Pago</button>
+                                    )}
+                                    <button className="btn btn-gold" onClick={()=>setShowGastoModal(true)}>{I.plus} Nuevo Gasto</button>
+                                </div>
+                            </div>
+                            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(148px,1fr))', gap:12}}>
+                                {CATEGORIAS.map(cat => {
+                                    const pendientes = gastos.filter(g=>g.categoria===cat&&g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0).length;
+                                    return (
+                                        <div key={cat} className="card glass"
+                                            style={{padding:'22px 18px', cursor:'pointer', transition:'transform var(--t-fast), box-shadow var(--t-fast)'}}
+                                            onClick={()=>setActiveCat(cat)}
+                                            onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.08)';}}
+                                            onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
+                                            <div style={{fontSize:'13.5px',fontWeight:'600',color:'var(--text)',marginBottom:pendientes?8:0}}>{cat}</div>
+                                            {pendientes>0 && <span className="badge badge-gold" style={{fontSize:'10px'}}><span className="badge-dot"/>{pendientes} crédito{pendientes>1?'s':''} pendiente{pendientes>1?'s':''}</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    );
+                    const catGastos   = gastos.filter(g=>g.categoria===activeCat);
+                    const catTotal    = catGastos.reduce((s,g)=>s+(g.monto||0),0);
+                    const catCreditos = catGastos.filter(g=>g.esCredito);
+                    const catPendiente= catCreditos.reduce((s,g)=>s+Math.max(0,(g.monto||0)-(g.montoAbonado||0)),0);
+                    return (
+                        <>
+                            <div className="page-header" style={{display:'flex',alignItems:'center',gap:14}}>
+                                <button className="btn btn-glass btn-sm" onClick={()=>setActiveCat(null)}>← Volver</button>
+                                <div>
+                                    <h1>{activeCat}</h1>
+                                    <p>{catGastos.length} gasto{catGastos.length!==1?'s':''} registrado{catGastos.length!==1?'s':''}</p>
+                                </div>
+                            </div>
+                            <div className="kpi-grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:20}}>
+                                <div className="kpi-card glass glass-mid">
+                                    <div className="kpi-top"><div className="kpi-label">Total</div><div className="kpi-icon white">{I.dollar}</div></div>
+                                    <div className="kpi-val">${catTotal.toFixed(0)}</div>
+                                    <div className="kpi-sub">{catGastos.length} gastos</div>
+                                </div>
+                                <div className="kpi-card glass">
+                                    <div className="kpi-top"><div className="kpi-label">En crédito</div><div className="kpi-icon gold">{I.invoice}</div></div>
+                                    <div className="kpi-val">${catCreditos.reduce((s,g)=>s+(g.monto||0),0).toFixed(0)}</div>
+                                    <div className="kpi-sub">{catCreditos.length} gasto{catCreditos.length!==1?'s':''}</div>
+                                </div>
+                                <div className="kpi-card glass glass-mid">
+                                    <div className="kpi-top"><div className="kpi-label">Por pagar</div><div className="kpi-icon gold">{I.dollar}</div></div>
+                                    <div className="kpi-val" style={{color: catPendiente>0?'var(--sand-dark)':'var(--text)'}}>${catPendiente.toFixed(0)}</div>
+                                    <div className="kpi-sub">{catCreditos.filter(g=>(g.monto||0)-(g.montoAbonado||0)>0).length} pendientes</div>
+                                </div>
+                            </div>
+                            <div className="card glass">
+                                {catGastos.length > 0 ? (
+                                    <table>
+                                        <thead><tr><th>Fecha</th><th>Descripción</th><th>Proveedor</th><th>Pago</th><th>Monto</th><th>Estado crédito</th><th>Historial abonos</th><th></th></tr></thead>
+                                        <tbody>
+                                            {catGastos.map((g,i)=>{
+                                                const restante  = Math.max(0,(g.monto||0)-(g.montoAbonado||0));
+                                                const sym       = g.moneda==='DOP'?'RD$':'$';
+                                                const historial = g.historialAbonos||[];
+                                                return (
+                                                    <tr key={i}>
+                                                        <td className="td-num" style={{color:'var(--text-dimmer)',fontSize:'12px'}}>{g.fecha?.toDate?.().toLocaleDateString('es-CO')||'—'}</td>
+                                                        <td><strong>{g.descripcion||'—'}</strong></td>
+                                                        <td style={{color:'var(--text-dim)'}}>{g.proveedor||'—'}</td>
+                                                        <td style={{fontSize:'12.5px'}}>{g.medioPago}{g.terminal?<span style={{color:'var(--text-dimmer)'}}> · {g.terminal}</span>:''}<br/><span style={{fontSize:'11px',color:'var(--text-dimmer)'}}>{g.propietario}</span></td>
+                                                        <td className="td-num"><strong>{sym}{(g.monto||0).toFixed(2)}</strong><br/><span style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{g.moneda||'USD'}</span></td>
+                                                        <td>
+                                                            {!g.esCredito
+                                                                ? <span className="badge badge-gray"><span className="badge-dot"/>Contado</span>
+                                                                : restante <= 0
+                                                                    ? <span className="badge badge-green"><span className="badge-dot"/>Pagado</span>
+                                                                    : (g.montoAbonado||0) > 0
+                                                                        ? <><span className="badge badge-gold"><span className="badge-dot"/>Abonado</span><br/><span style={{fontSize:'11px',color:'var(--sand-dark)',fontFamily:'Fira Code'}}>{sym}{restante.toFixed(0)} resta</span></>
+                                                                        : <span className="badge badge-gray"><span className="badge-dot"/>Pendiente</span>
+                                                            }
+                                                        </td>
+                                                        <td style={{fontSize:'11.5px',color:'var(--text-dim)',minWidth:'160px'}}>
+                                                            {historial.length > 0
+                                                                ? historial.map((a,ai)=>(
+                                                                    <div key={ai} style={{marginBottom:4,display:'flex',gap:6,alignItems:'center'}}>
+                                                                        <span style={{fontFamily:'Fira Code',fontWeight:'600',color:'var(--text)'}}>{sym}{(a.monto||0).toFixed(0)}</span>
+                                                                        <span style={{color:'var(--text-dimmer)',fontSize:'10.5px'}}>{new Date(a.fecha).toLocaleDateString('es-CO')}</span>
+                                                                        <button onClick={()=>revertirAbono(g,ai)} title="Eliminar este abono"
+                                                                            style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-dimmer)',fontSize:'13px',lineHeight:1,padding:'0 2px',borderRadius:'3px'}}
+                                                                            onMouseEnter={e=>e.currentTarget.style.color='#8B3535'}
+                                                                            onMouseLeave={e=>e.currentTarget.style.color='var(--text-dimmer)'}>×</button>
+                                                                    </div>
+                                                                ))
+                                                                : <span style={{color:'var(--text-dimmer)'}}>—</span>
+                                                            }
+                                                        </td>
+                                                        <td>{g.esCredito && restante > 0 && (
+                                                            <button className="btn btn-glass btn-sm" onClick={()=>{setSelectedGasto(g);setAbonoMonto('');setShowAbonoModal(true);}}>+ Abono</button>
+                                                        )}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <div className="empty">
+                                        <div className="empty-icon">{I.dollar}</div>
+                                        <h3>Sin gastos en {activeCat}</h3>
+                                        <p>Registra el primer gasto en esta categoría.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    );
+                })()}
+
+                {showModal && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
+                            <div className="modal-hd">
+                                <h2>Nuevo Vendedor</h2>
+                                <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Nombre completo</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                    ref={firstInputRef} value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Ej. Maria Lopez" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Correo electronico</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                    type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="maria@casabrumi.com" />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={() => setShowModal(false)}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={addVendedor} disabled={saving}>
+                                    {saving ? 'Guardando...' : <>{I.plus} Crear Vendedor</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showAbonoModal && selectedGasto && (
+                    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowAbonoModal(false);setSelectedGasto(null);setAbonoMonto('');}}}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:380}}>
+                            <div className="modal-hd">
+                                <h2>Registrar Abono</h2>
+                                <button className="modal-close" onClick={()=>{setShowAbonoModal(false);setSelectedGasto(null);setAbonoMonto('');}}>×</button>
+                            </div>
+                            <div style={{background:'var(--glass-bg-mid)',borderRadius:'var(--r-sm)',padding:'14px 16px',marginBottom:18,fontSize:'13px'}}>
+                                <div style={{fontWeight:'600',color:'var(--text)',marginBottom:6}}>{selectedGasto.descripcion}</div>
+                                <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                                    <span style={{color:'var(--text-dim)'}}>Total: <strong style={{color:'var(--text)'}}>${(selectedGasto.monto||0).toFixed(2)}</strong></span>
+                                    <span style={{color:'var(--text-dim)'}}>Abonado: <strong style={{color:'var(--text)'}}>${(selectedGasto.montoAbonado||0).toFixed(2)}</strong></span>
+                                    <span style={{color:'var(--text-dim)'}}>Resta: <strong style={{color:'var(--sand-dark)'}}>${Math.max(0,(selectedGasto.monto||0)-(selectedGasto.montoAbonado||0)).toFixed(2)}</strong></span>
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Monto del abono (USD)</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    type="number" min="0" step="0.01" inputMode="decimal" autoFocus
+                                    value={abonoMonto} onChange={e=>setAbonoMonto(e.target.value)} placeholder="0.00" />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={()=>{setShowAbonoModal(false);setSelectedGasto(null);setAbonoMonto('');}}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={handleAddAbono} style={{flex:1,justifyContent:'center'}}>Registrar Abono</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showPagoRapidoModal && (() => {
+                    const pendientes = gastos.filter(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0);
+                    const gastoSel   = pendientes.find(g=>g.id===pagoRapidoId);
+                    const sym        = gastoSel?.moneda==='DOP'?'RD$':'$';
+                    return (
+                        <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowPagoRapidoModal(false);setPagoRapidoId('');setAbonoMonto('');}}}>
+                            <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:420}}>
+                                <div className="modal-hd">
+                                    <h2>Registrar Pago</h2>
+                                    <button className="modal-close" onClick={()=>{setShowPagoRapidoModal(false);setPagoRapidoId('');setAbonoMonto('');}}>×</button>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Selecciona el gasto</label>
+                                    <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                        value={pagoRapidoId} onChange={e=>setPagoRapidoId(e.target.value)}>
+                                        <option value="">— Seleccionar —</option>
+                                        {pendientes.map(g=>{
+                                            const r = Math.max(0,(g.monto||0)-(g.montoAbonado||0));
+                                            const s = g.moneda==='DOP'?'RD$':'$';
+                                            return <option key={g.id} value={g.id}>{g.descripcion} · {g.categoria} · {s}{r.toFixed(0)} pendiente</option>;
+                                        })}
+                                    </select>
+                                </div>
+                                {gastoSel && (
+                                    <div style={{background:'var(--glass-bg-mid)',borderRadius:'var(--r-sm)',padding:'12px 14px',marginBottom:14,fontSize:'12.5px'}}>
+                                        <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                                            <span style={{color:'var(--text-dim)'}}>Total: <strong>{sym}{(gastoSel.monto||0).toFixed(2)}</strong></span>
+                                            <span style={{color:'var(--text-dim)'}}>Abonado: <strong>{sym}{(gastoSel.montoAbonado||0).toFixed(2)}</strong></span>
+                                            <span style={{color:'var(--text-dim)'}}>Resta: <strong style={{color:'var(--sand-dark)'}}>{sym}{Math.max(0,(gastoSel.monto||0)-(gastoSel.montoAbonado||0)).toFixed(2)}</strong></span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Monto del abono</label>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                        type="number" min="0" step="0.01" inputMode="decimal"
+                                        value={abonoMonto} onChange={e=>setAbonoMonto(e.target.value)} placeholder="0.00" />
+                                </div>
+                                <div className="modal-actions">
+                                    <button className="btn btn-glass" onClick={()=>{setShowPagoRapidoModal(false);setPagoRapidoId('');setAbonoMonto('');}}>Cancelar</button>
+                                    <button className="btn btn-gold" onClick={handlePagoRapido} disabled={!pagoRapidoId||!abonoMonto} style={{flex:1,justifyContent:'center'}}>Registrar Pago</button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {showGastoModal && (
+                    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)setShowGastoModal(false);}}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:480}}>
+                            <div className="modal-hd">
+                                <h2>Nuevo Gasto</h2>
+                                <button className="modal-close" onClick={()=>setShowGastoModal(false)}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Categoría</label>
+                                <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={gastoForm.categoria} onChange={e=>setGastoForm({...gastoForm,categoria:e.target.value})}>
+                                    {CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Descripción</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    ref={firstGastoRef} value={gastoForm.descripcion} onChange={e=>setGastoForm({...gastoForm,descripcion:e.target.value})}
+                                    placeholder="Ej. Flete desde Venezuela" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Proveedor</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={gastoForm.proveedor} onChange={e=>setGastoForm({...gastoForm,proveedor:e.target.value})}
+                                    placeholder="Nombre del proveedor o empresa" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Monto</label>
+                                <div style={{display:'flex',gap:8}}>
+                                    <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)',width:'100px',flexShrink:0}}
+                                        value={gastoForm.moneda} onChange={e=>setGastoForm({...gastoForm,moneda:e.target.value})}>
+                                        <option value="USD">USD $</option>
+                                        <option value="DOP">DOP RD$</option>
+                                    </select>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)',flex:1}}
+                                        type="number" min="0" step="0.01" inputMode="decimal"
+                                        value={gastoForm.monto} onChange={e=>setGastoForm({...gastoForm,monto:e.target.value})} placeholder="0.00" />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Medio de pago</label>
+                                <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={gastoForm.medioPago} onChange={e=>setGastoForm({...gastoForm,medioPago:e.target.value,terminal:''})}>
+                                    <option>Efectivo</option>
+                                    <option>Tarjeta</option>
+                                    <option>Transferencia</option>
+                                </select>
+                            </div>
+                            {gastoForm.medioPago === 'Tarjeta' && (
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Terminal / Banco</label>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                        value={gastoForm.terminal} onChange={e=>setGastoForm({...gastoForm,terminal:e.target.value})}
+                                        placeholder="Ej. Bancolombia, Davivienda..." />
+                                </div>
+                            )}
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Propietario</label>
+                                <select className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                    value={gastoForm.propietario} onChange={e=>setGastoForm({...gastoForm,propietario:e.target.value})}>
+                                    {PROPIETARIOS.map(p=><option key={p} value={p}>{p}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <button type="button"
+                                    style={{width:'100%',padding:'11px',border:`2px solid ${gastoForm.esCredito?'var(--text)':'var(--glass-border-h)'}`,borderRadius:'var(--r-sm)',background:gastoForm.esCredito?'var(--text)':'transparent',color:gastoForm.esCredito?'#FFFFFF':'var(--text-dim)',fontFamily:'inherit',fontWeight:'700',fontSize:'12px',letterSpacing:'1.5px',cursor:'pointer',transition:'all var(--t-fast)',textTransform:'uppercase'}}
+                                    onClick={()=>setGastoForm({...gastoForm,esCredito:!gastoForm.esCredito,montoAbonado:''})}>
+                                    {gastoForm.esCredito ? '✓ Crédito activo' : 'Crédito'}
+                                </button>
+                            </div>
+                            {gastoForm.esCredito && (
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Ya abonado (USD) — dejar en 0 si no has pagado nada</label>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                        type="number" min="0" step="0.01" inputMode="decimal"
+                                        value={gastoForm.montoAbonado} onChange={e=>setGastoForm({...gastoForm,montoAbonado:e.target.value})} placeholder="0.00" />
+                                </div>
+                            )}
+                            {gastoError && <div className="error-msg" style={{marginBottom:0,marginTop:4}}>{gastoError}</div>}
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={()=>{setShowGastoModal(false);setGastoError('');}}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={addGasto} disabled={savingGasto} style={{flex:1,justifyContent:'center'}}>
+                                    {savingGasto?'Guardando...':<>{I.plus} Registrar Gasto</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+}
+
+// ── VENDEDOR PANEL ──
+function VendedorPanel({ user, onLogout, onPhotoChange }) {
+    const [activeTab, setActiveTab] = useState('ventas');
+    const [ventas,    setVentas]    = useState([]);
+    const [form,      setForm]      = useState({ cliente: '', producto: '', monto: '' });
+    const [saving,    setSaving]    = useState(false);
+
+    useEffect(() => {
+        const unsub = db.collection('ventas').onSnapshot(snap => {
+            const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setVentas(all.filter(v => v.vendedorId === user.uid));
+        });
+        return unsub;
+    }, [user.uid]);
+
+    const addVenta = async () => {
+        if (!form.monto || saving) return;
+        setSaving(true);
+        await db.collection('ventas').add({
+            cliente:       form.cliente,
+            producto:      form.producto,
+            monto:         parseFloat(form.monto),
+            vendedorId:    user.uid,
+            vendedorEmail: user.email,
+            fecha:         firebase.firestore.FieldValue.serverTimestamp(),
+            estado:        'Pendiente',
+        });
+        setForm({ cliente: '', producto: '', monto: '' });
+        setActiveTab('ventas');
+        setSaving(false);
+    };
+
+    const total = ventas.reduce((s, v) => s + (v.monto || 0), 0);
+
+    const navSections = [
+        { label: 'Mi Trabajo', items: [
+            { key: 'ventas',   label: 'Mis Ventas',  icon: I.chart },
+            { key: 'registro', label: 'Nueva Venta', icon: I.plus  },
+        ]},
+    ];
+
+    return (
+        <div className="app-root">
+            <img src={LOGO} aria-hidden="true" style={{position:'fixed',top:'50%',left:'50%',transform:'translate(calc(-50% + 110px), -50%)',width:'520px',maxWidth:'55vw',opacity:0.055,filter:'brightness(0)',pointerEvents:'none',userSelect:'none',zIndex:0}} />
+            <Header user={user} onLogout={onLogout} activeTab={activeTab} navSections={navSections} onPhotoChange={onPhotoChange} />
+            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
+            <main className="main">
+                {activeTab === 'ventas' && <>
+                    <div className="kpi-grid" style={{gridTemplateColumns:'repeat(2,1fr)', maxWidth:460, marginBottom:20}}>
+                        <div className="kpi-card glass glass-mid">
+                            <div className="kpi-top"><div className="kpi-label">Registradas</div><div className="kpi-icon gold">{I.invoice}</div></div>
+                            <div className="kpi-val">{ventas.length}</div>
+                            <div className="kpi-sub">ventas en total</div>
+                        </div>
+                        <div className="kpi-card glass glass-mid">
+                            <div className="kpi-top"><div className="kpi-label">Monto total</div><div className="kpi-icon gold">{I.dollar}</div></div>
+                            <div className="kpi-val">${total.toFixed(0)}</div>
+                            <div className="kpi-sub">pendiente aprobacion</div>
+                        </div>
+                    </div>
+                    <div className="sec-header">
+                        <h2>Historial</h2>
+                        <button className="btn btn-gold" onClick={() => setActiveTab('registro')}>{I.plus} Nueva venta</button>
+                    </div>
+                    <div className="card glass">
+                        {ventas.length > 0 ? (
+                            <table>
+                                <thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Monto</th><th>Estado</th></tr></thead>
+                                <tbody>
+                                    {ventas.map((v, i) => (
+                                        <tr key={i}>
+                                            <td className="td-num" style={{color:'var(--text-dimmer)', fontSize:'12px'}}>
+                                                {v.fecha?.toDate?.().toLocaleDateString('es') || '—'}
+                                            </td>
+                                            <td><strong>{v.cliente || '—'}</strong></td>
+                                            <td style={{color:'var(--text-dim)'}}>{v.producto || '—'}</td>
+                                            <td className="td-num"><strong>${(v.monto||0).toFixed(2)}</strong></td>
+                                            <td><span className="badge badge-gray"><span className="badge-dot"/>{v.estado}</span></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="empty">
+                                <div className="empty-icon">{I.inbox}</div>
+                                <h3>Sin ventas aun</h3>
+                                <p>Registra tu primera venta y aparecera aqui.</p>
+                            </div>
+                        )}
+                    </div>
+                </>}
+
+                {activeTab === 'registro' && <>
+                    <div className="page-header"><h1>Nueva Venta</h1><p>Completa los datos de la venta</p></div>
+                    <div className="card glass card-body" style={{maxWidth:500, borderRadius:'var(--r)'}}>
+                        <div className="form-group">
+                            <label style={{color:'var(--text-dim)'}}>Cliente</label>
+                            <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                value={form.cliente} onChange={e => setForm({...form, cliente: e.target.value})} placeholder="Nombre del cliente" />
+                        </div>
+                        <div className="form-group">
+                            <label style={{color:'var(--text-dim)'}}>Producto</label>
+                            <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                value={form.producto} onChange={e => setForm({...form, producto: e.target.value})} placeholder="Descripcion del producto" />
+                        </div>
+                        <div className="form-group" style={{marginBottom:22}}>
+                            <label style={{color:'var(--text-dim)'}}>Monto (USD)</label>
+                            <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                type="number" min="0" step="0.01" inputMode="decimal"
+                                value={form.monto} onChange={e => setForm({...form, monto: e.target.value})} placeholder="0.00" />
+                        </div>
+                        <div style={{display:'flex', gap:10}}>
+                            <button className="btn btn-glass" onClick={() => setActiveTab('ventas')}>Cancelar</button>
+                            <button className="btn btn-gold" onClick={addVenta} disabled={saving} style={{flex:1, justifyContent:'center'}}>
+                                {saving ? 'Guardando...' : <>{I.plus} Registrar Venta</>}
+                            </button>
+                        </div>
+                    </div>
+                </>}
+            </main>
+        </div>
+    );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+</body>
+</html>
