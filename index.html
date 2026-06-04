@@ -601,7 +601,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setGastoError('');
         try {
             const abonoInicial = gastoForm.esCredito ? parseFloat(gastoForm.montoAbonado || 0) : 0;
-            await db.collection('gastos').add({
+            console.log('[addGasto] iniciando escritura...');
+            const ref = await db.collection('gastos').add({
                 categoria:       gastoForm.categoria,
                 descripcion:     gastoForm.descripcion,
                 monto:           parseFloat(gastoForm.monto),
@@ -615,9 +616,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 historialAbonos: abonoInicial > 0 ? [{ monto: abonoInicial, fecha: new Date().toISOString() }] : [],
                 fecha:           firebase.firestore.FieldValue.serverTimestamp(),
             });
+            console.log('[addGasto] confirmado por servidor, id:', ref.id);
             setGastoForm({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
             setShowGastoModal(false);
         } catch(e) {
+            console.error('[addGasto] error:', e);
             setGastoError('Error al guardar: ' + (e.message || e.code));
         }
         setSavingGasto(false);
@@ -1088,11 +1091,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 })()}
 
                 {showGastoModal && (
-                    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)setShowGastoModal(false);}}>
+                    <div className="modal-overlay" onClick={e=>{if(!savingGasto && e.target===e.currentTarget)setShowGastoModal(false);}}>
                         <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:480}}>
                             <div className="modal-hd">
                                 <h2>Nuevo Gasto</h2>
-                                <button className="modal-close" onClick={()=>setShowGastoModal(false)}>×</button>
+                                <button className="modal-close" onClick={()=>{ if(!savingGasto) setShowGastoModal(false); }} style={{opacity: savingGasto ? 0.3 : 1}}>×</button>
                             </div>
                             <div className="form-group">
                                 <label style={{color:'var(--text-dim)'}}>Categoría</label>
@@ -1167,7 +1170,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             )}
                             {gastoError && <div className="error-msg" style={{marginBottom:0,marginTop:4}}>{gastoError}</div>}
                             <div className="modal-actions">
-                                <button className="btn btn-glass" onClick={()=>{setShowGastoModal(false);setGastoError('');}}>Cancelar</button>
+                                <button className="btn btn-glass" onClick={()=>{setShowGastoModal(false);setGastoError('');}} disabled={savingGasto}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={addGasto} disabled={savingGasto} style={{flex:1,justifyContent:'center'}}>
                                     {savingGasto?'Guardando...':<>{I.plus} Registrar Gasto</>}
                                 </button>
