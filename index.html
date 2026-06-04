@@ -596,55 +596,50 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setSaving(false);
     };
 
-    const addGasto = async () => {
-        if (!gastoForm.descripcion || !gastoForm.monto || savingGasto) return;
-        setSavingGasto(true);
+    const addGasto = () => {
+        if (!gastoForm.descripcion || !gastoForm.monto) return;
+        const abonoInicial = gastoForm.esCredito ? parseFloat(gastoForm.montoAbonado || 0) : 0;
+        const data = {
+            categoria:       gastoForm.categoria,
+            descripcion:     gastoForm.descripcion,
+            monto:           parseFloat(gastoForm.monto),
+            moneda:          gastoForm.moneda || 'USD',
+            medioPago:       gastoForm.medioPago,
+            propietario:     gastoForm.propietario,
+            terminal:        gastoForm.medioPago === 'Tarjeta' ? gastoForm.terminal : '',
+            proveedor:       gastoForm.proveedor,
+            esCredito:       gastoForm.esCredito,
+            montoAbonado:    abonoInicial,
+            historialAbonos: abonoInicial > 0 ? [{ monto: abonoInicial, fecha: new Date().toISOString() }] : [],
+            fecha:           firebase.firestore.FieldValue.serverTimestamp(),
+        };
+        setGastoForm({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
         setGastoError('');
-        try {
-            const abonoInicial = gastoForm.esCredito ? parseFloat(gastoForm.montoAbonado || 0) : 0;
-            await db.collection('gastos').add({
-                categoria:       gastoForm.categoria,
-                descripcion:     gastoForm.descripcion,
-                monto:           parseFloat(gastoForm.monto),
-                moneda:          gastoForm.moneda || 'USD',
-                medioPago:       gastoForm.medioPago,
-                propietario:     gastoForm.propietario,
-                terminal:        gastoForm.medioPago === 'Tarjeta' ? gastoForm.terminal : '',
-                proveedor:       gastoForm.proveedor,
-                esCredito:       gastoForm.esCredito,
-                montoAbonado:    abonoInicial,
-                historialAbonos: abonoInicial > 0 ? [{ monto: abonoInicial, fecha: new Date().toISOString() }] : [],
-                fecha:           firebase.firestore.FieldValue.serverTimestamp(),
-            });
-            setGastoForm({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
-            setShowGastoModal(false);
-        } catch(e) {
-            setGastoError('Error: ' + (e.code === 'permission-denied' ? 'Sin permiso — revisa las reglas de Firestore.' : e.message || e.code));
-        }
-        setSavingGasto(false);
+        setShowGastoModal(false);
+        db.collection('gastos').add(data).catch(e => console.error('Error guardando gasto:', e));
     };
 
-    const addAbono = async (gastoRef, monto, historial) => {
+    const addAbono = (gastoRef, monto) => {
         if (!monto || parseFloat(monto) <= 0) return;
-        const nuevoTotal  = (gastoRef.montoAbonado || 0) + parseFloat(monto);
+        const nuevoTotal     = (gastoRef.montoAbonado || 0) + parseFloat(monto);
         const nuevoHistorial = [...(gastoRef.historialAbonos || []), { monto: parseFloat(monto), fecha: new Date().toISOString() }];
-        await db.collection('gastos').doc(gastoRef.id).update({ montoAbonado: nuevoTotal, historialAbonos: nuevoHistorial });
+        db.collection('gastos').doc(gastoRef.id).update({ montoAbonado: nuevoTotal, historialAbonos: nuevoHistorial }).catch(console.error);
     };
 
-    const handleAddAbono = async () => {
+    const handleAddAbono = () => {
         if (!abonoMonto || !selectedGasto) return;
         const latest = gastos.find(g => g.id === selectedGasto.id) || selectedGasto;
-        await addAbono(latest, abonoMonto, latest.historialAbonos);
+        addAbono(latest, abonoMonto);
         setAbonoMonto(''); setShowAbonoModal(false); setSelectedGasto(null);
     };
 
-    const revertirAbono = async (gasto, idx) => {
-        const latest    = gastos.find(g => g.id === gasto.id) || gasto;
-        const historial = [...(latest.historialAbonos || [])];
+    const revertirAbono = (gasto, idx) => {
+        const latest       = gastos.find(g => g.id === gasto.id) || gasto;
+        const historial    = [...(latest.historialAbonos || [])];
         const montoRetirar = historial[idx].monto || 0;
         historial.splice(idx, 1);
         const nuevoTotal = Math.max(0, (latest.montoAbonado || 0) - montoRetirar);
-        await db.collection('gastos').doc(latest.id).update({ montoAbonado: nuevoTotal, historialAbonos: historial });
+        db.collection('gastos').doc(latest.id).update({ montoAbonado: nuevoTotal, historialAbonos: historial }).catch(console.error);
     };
 
     const openEditGasto = (gasto) => {
@@ -664,10 +659,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setShowEditGastoModal(true);
     };
 
-    const saveEditGasto = async () => {
-        if (!editGastoForm.descripcion || !editGastoForm.monto || savingEditGasto || !editingGasto) return;
-        setSavingEditGasto(true);
-        setEditGastoError('');
+    const saveEditGasto = () => {
+        if (!editGastoForm.descripcion || !editGastoForm.monto || !editingGasto) return;
         const id   = editingGasto.id;
         const data = {
             categoria:   editGastoForm.categoria,
@@ -682,13 +675,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         };
         setShowEditGastoModal(false);
         setEditingGasto(null);
-        try {
-            await db.collection('gastos').doc(id).update(data);
-        } catch(e) {
-            setEditGastoError('Error: ' + e.message);
-            setShowEditGastoModal(true);
-        }
-        setSavingEditGasto(false);
+        db.collection('gastos').doc(id).update(data).catch(console.error);
     };
 
     const openEditAbono = (gasto, idx) => {
@@ -698,9 +685,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setShowEditAbonoModal(true);
     };
 
-    const saveEditAbono = async () => {
+    const saveEditAbono = () => {
         if (!editingAbonoMonto || editingAbonoGasto === null || editingAbonoIdx === null) return;
-        const latest   = gastos.find(g => g.id === editingAbonoGasto.id) || editingAbonoGasto;
+        const latest     = gastos.find(g => g.id === editingAbonoGasto.id) || editingAbonoGasto;
         const historial  = [...(latest.historialAbonos || [])];
         const montoViejo = historial[editingAbonoIdx]?.monto || 0;
         const montoNuevo = parseFloat(editingAbonoMonto);
@@ -711,16 +698,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setEditingAbonoGasto(null);
         setEditingAbonoIdx(null);
         setEditingAbonoMonto('');
-        try {
-            await db.collection('gastos').doc(id).update({ montoAbonado: nuevoTotal, historialAbonos: historial });
-        } catch(e) { console.error('Error al editar abono:', e); }
+        db.collection('gastos').doc(id).update({ montoAbonado: nuevoTotal, historialAbonos: historial }).catch(console.error);
     };
 
-    const handlePagoRapido = async () => {
+    const handlePagoRapido = () => {
         if (!pagoRapidoId || !abonoMonto) return;
         const g = gastos.find(x => x.id === pagoRapidoId);
         if (!g) return;
-        await addAbono(g, abonoMonto, g.historialAbonos);
+        addAbono(g, abonoMonto);
         setAbonoMonto(''); setPagoRapidoId(''); setShowPagoRapidoModal(false);
     };
 
@@ -1311,25 +1296,19 @@ function VendedorPanel({ user, onLogout, onPhotoChange }) {
         return unsub;
     }, [user.uid]);
 
-    const addVenta = async () => {
-        if (!form.monto || saving) return;
-        setSaving(true);
-        try {
-            await db.collection('ventas').add({
-                cliente:       form.cliente,
-                producto:      form.producto,
-                monto:         parseFloat(form.monto),
-                vendedorId:    user.uid,
-                vendedorEmail: user.email,
-                fecha:         firebase.firestore.FieldValue.serverTimestamp(),
-                estado:        'Pendiente',
-            });
-            setForm({ cliente: '', producto: '', monto: '' });
-            setActiveTab('ventas');
-        } catch(e) {
-            console.error('Error al registrar venta:', e);
-        }
-        setSaving(false);
+    const addVenta = () => {
+        if (!form.monto) return;
+        db.collection('ventas').add({
+            cliente:       form.cliente,
+            producto:      form.producto,
+            monto:         parseFloat(form.monto),
+            vendedorId:    user.uid,
+            vendedorEmail: user.email,
+            fecha:         firebase.firestore.FieldValue.serverTimestamp(),
+            estado:        'Pendiente',
+        }).catch(console.error);
+        setForm({ cliente: '', producto: '', monto: '' });
+        setActiveTab('ventas');
     };
 
     const total = ventas.reduce((s, v) => s + (v.monto || 0), 0);
