@@ -672,6 +672,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setShowEditGastoModal(true);
     };
 
+    const deleteGasto = async () => {
+        if (!editingGasto) return;
+        const id = editingGasto.id;
+        setShowEditGastoModal(false);
+        setEditingGasto(null);
+        await db.collection('gastos').doc(id).delete();
+    };
+
     const saveEditGasto = async () => {
         if (!editGastoForm.descripcion || !editGastoForm.monto || !editingGasto) return;
         const id   = editingGasto.id;
@@ -1258,6 +1266,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             {editGastoError && <div className="error-msg" style={{marginBottom:0,marginTop:4}}>{editGastoError}</div>}
                             <div className="modal-actions">
                                 <button className="btn btn-glass" onClick={()=>{setShowEditGastoModal(false);setEditingGasto(null);}}>Cancelar</button>
+                                <button className="btn btn-glass" onClick={deleteGasto}
+                                    style={{color:'#8B3535',borderColor:'rgba(160,56,56,0.3)'}}
+                                    onMouseEnter={e=>{e.currentTarget.style.background='rgba(160,56,56,0.08)';}}
+                                    onMouseLeave={e=>{e.currentTarget.style.background='transparent';}}>
+                                    Eliminar
+                                </button>
                                 <button className="btn btn-gold" onClick={saveEditGasto} disabled={savingEditGasto} style={{flex:1,justifyContent:'center'}}>
                                     {savingEditGasto?'Guardando...':<>{I.edit} Guardar Cambios</>}
                                 </button>
