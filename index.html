@@ -590,10 +590,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (!gastoForm.descripcion || !gastoForm.monto || savingGasto) return;
         setSavingGasto(true);
         setGastoError('');
-        const unlock = setTimeout(() => setSavingGasto(false), 30000);
         try {
             const abonoInicial = gastoForm.esCredito ? parseFloat(gastoForm.montoAbonado || 0) : 0;
-            await db.collection('gastos').add({
+            const data = {
                 categoria:       gastoForm.categoria,
                 descripcion:     gastoForm.descripcion,
                 monto:           parseFloat(gastoForm.monto),
@@ -606,13 +605,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 montoAbonado:    abonoInicial,
                 historialAbonos: abonoInicial > 0 ? [{ monto: abonoInicial, fecha: new Date().toISOString() }] : [],
                 fecha:           firebase.firestore.FieldValue.serverTimestamp(),
-            });
-            clearTimeout(unlock);
+            };
             setGastoForm({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
             setShowGastoModal(false);
+            await db.collection('gastos').add(data);
         } catch(e) {
-            clearTimeout(unlock);
             setGastoError('Error: ' + (e.code === 'permission-denied' ? 'Sin permiso — revisa las reglas de Firestore.' : e.message || e.code));
+            setShowGastoModal(true);
         }
         setSavingGasto(false);
     };
@@ -1119,7 +1118,7 @@ function VendedorPanel({ user, onLogout, onPhotoChange }) {
     const addVenta = async () => {
         if (!form.monto || saving) return;
         setSaving(true);
-        await db.collection('ventas').add({
+        const data = {
             cliente:       form.cliente,
             producto:      form.producto,
             monto:         parseFloat(form.monto),
@@ -1127,10 +1126,15 @@ function VendedorPanel({ user, onLogout, onPhotoChange }) {
             vendedorEmail: user.email,
             fecha:         firebase.firestore.FieldValue.serverTimestamp(),
             estado:        'Pendiente',
-        });
+        };
         setForm({ cliente: '', producto: '', monto: '' });
         setActiveTab('ventas');
         setSaving(false);
+        try {
+            await db.collection('ventas').add(data);
+        } catch(e) {
+            console.error('Error al registrar venta:', e);
+        }
     };
 
     const total = ventas.reduce((s, v) => s + (v.monto || 0), 0);
