@@ -533,7 +533,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     useEffect(() => {
         const unsub = db.collection('vendedores').orderBy('fechaAlta', 'desc').onSnapshot(
             snap => setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-            () => {}
+            err => console.error('Firestore error:', err)
         );
         return unsub;
     }, []);
@@ -541,7 +541,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     useEffect(() => {
         const unsub = db.collection('ventas').orderBy('fecha', 'desc').onSnapshot(
             snap => setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-            () => {}
+            err => console.error('Firestore error:', err)
         );
         return unsub;
     }, []);
@@ -549,7 +549,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     useEffect(() => {
         const unsub = db.collection('gastos').orderBy('fecha', 'desc').onSnapshot(
             snap => setGastos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-            () => {}
+            err => console.error('Firestore error:', err)
         );
         return unsub;
     }, []);
