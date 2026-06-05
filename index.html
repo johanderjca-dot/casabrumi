@@ -363,7 +363,7 @@ function App() {
                 ctx.drawImage(img, ox, oy, size, size, 0, 0, 80, 80);
                 const photoURL = canvas.toDataURL('image/jpeg', 0.8);
                 try {
-                    await db.collection('users').doc(auth.currentUser.uid).update({ photoURL });
+                    await db.collection('users').doc(auth.currentUser.uid).set({ photoURL }, { merge: true });
                     setUser(prev => ({ ...prev, photoURL }));
                 } catch(err) { console.error('Error guardando foto:', err); }
             };
