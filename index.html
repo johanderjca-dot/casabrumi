@@ -510,6 +510,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showGastoModal, setShowGastoModal] = useState(false);
     const [gastoForm,      setGastoForm]      = useState({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
     const [savingGasto,    setSavingGasto]    = useState(false);
+    const [gastoVista,          setGastoVista]          = useState('categoria'); // 'categoria' | 'pago'
+    const [activePago,          setActivePago]          = useState(null);
     const [activeCat,           setActiveCat]           = useState(null);
     const [showAbonoModal,      setShowAbonoModal]      = useState(false);
     const [selectedGasto,       setSelectedGasto]       = useState(null);
@@ -880,11 +882,99 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 </>}
 
                 {activeTab === 'gastos' && (() => {
+                    // ── Vista por medio de pago ──
+                    if (!activeCat && gastoVista === 'pago') {
+                        // Agrupa: { key: label, gastos: [...] }
+                        const grupos = {};
+                        gastos.forEach(g => {
+                            const key = g.medioPago === 'Tarjeta' && g.terminal
+                                ? `Tarjeta — ${g.terminal}`
+                                : g.medioPago || 'Efectivo';
+                            if (!grupos[key]) grupos[key] = [];
+                            grupos[key].push(g);
+                        });
+
+                        if (activePago) {
+                            const lista = grupos[activePago] || [];
+                            const total = lista.reduce((s,g)=>s+(g.monto||0),0);
+                            return (
+                                <>
+                                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:14}}>
+                                            <button className="btn btn-glass btn-sm" onClick={()=>setActivePago(null)}>← Volver</button>
+                                            <div><h1>{activePago}</h1><p>{lista.length} gasto{lista.length!==1?'s':''} · ${total.toFixed(2)} total</p></div>
+                                        </div>
+                                    </div>
+                                    <div className="card glass">
+                                        {lista.length > 0 ? (
+                                            <table>
+                                                <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Proveedor</th><th>Monto</th><th>Estado</th></tr></thead>
+                                                <tbody>
+                                                    {lista.map((g,i)=>{
+                                                        const sym = g.moneda==='DOP'?'RD$':'$';
+                                                        const restante = Math.max(0,(g.monto||0)-(g.montoAbonado||0));
+                                                        return (
+                                                            <tr key={i}>
+                                                                <td className="td-num" style={{color:'var(--text-dimmer)',fontSize:'12px'}}>{g.fecha?.toDate?.().toLocaleDateString('es-CO')||'—'}</td>
+                                                                <td><strong>{g.descripcion||'—'}</strong></td>
+                                                                <td><span className="badge badge-gray"><span className="badge-dot"/>{g.categoria}</span></td>
+                                                                <td style={{color:'var(--text-dim)'}}>{g.proveedor||'—'}</td>
+                                                                <td className="td-num"><strong>{sym}{(g.monto||0).toFixed(2)}</strong></td>
+                                                                <td>{!g.esCredito
+                                                                    ? <span className="badge badge-gray"><span className="badge-dot"/>Contado</span>
+                                                                    : restante<=0
+                                                                        ? <span className="badge badge-green"><span className="badge-dot"/>Pagado</span>
+                                                                        : <span className="badge badge-gold"><span className="badge-dot"/>Pendiente</span>}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        ) : <div className="empty"><div className="empty-icon">{I.dollar}</div><h3>Sin gastos</h3></div>}
+                                    </div>
+                                </>
+                            );
+                        }
+
+                        return (
+                            <>
+                                <div className="page-header"><h1>Gastos por pago</h1><p>Filtra por medio de pago o tarjeta</p></div>
+                                <div className="sec-header">
+                                    <button className="btn btn-glass btn-sm" onClick={()=>setGastoVista('categoria')}>← Ver por categoría</button>
+                                    <button className="btn btn-gold" onClick={()=>setShowGastoModal(true)}>{I.plus} Nuevo Gasto</button>
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:12}}>
+                                    {Object.entries(grupos).map(([key, lista]) => {
+                                        const total = lista.reduce((s,g)=>s+(g.monto||0),0);
+                                        const pendientes = lista.filter(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0).length;
+                                        return (
+                                            <div key={key} className="card glass"
+                                                style={{padding:'22px 18px',cursor:'pointer',transition:'transform var(--t-fast),box-shadow var(--t-fast)'}}
+                                                onClick={()=>setActivePago(key)}
+                                                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.08)';}}
+                                                onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
+                                                <div style={{fontSize:'13.5px',fontWeight:'600',color:'var(--text)',marginBottom:6}}>{key}</div>
+                                                <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'18px',color:'var(--text)',letterSpacing:'-0.5px',marginBottom:4}}>${total.toFixed(0)}</div>
+                                                <div style={{fontSize:'11px',color:'var(--text-dimmer)'}}>{lista.length} gasto{lista.length!==1?'s':''}</div>
+                                                {pendientes>0 && <span className="badge badge-gold" style={{fontSize:'10px',marginTop:8}}><span className="badge-dot"/>{pendientes} pendiente{pendientes>1?'s':''}</span>}
+                                            </div>
+                                        );
+                                    })}
+                                    {Object.keys(grupos).length === 0 && <div className="empty" style={{gridColumn:'1/-1'}}><div className="empty-icon">{I.dollar}</div><h3>Sin gastos aún</h3></div>}
+                                </div>
+                            </>
+                        );
+                    }
+
                     if (!activeCat) return (
                         <>
                             <div className="page-header"><h1>Gastos</h1><p>Selecciona una categoría para ver el detalle</p></div>
                             <div className="sec-header">
-                                <span/>
+                                <div style={{display:'flex',gap:8}}>
+                                    <button className={`btn ${gastoVista==='categoria'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('categoria')}>Por Categoría</button>
+                                    <button className={`btn ${gastoVista==='pago'?'btn-gold':'btn-glass'}`} onClick={()=>{setGastoVista('pago');setActivePago(null);}}>Por Tarjeta / Pago</button>
+                                </div>
                                 <div style={{display:'flex',gap:8}}>
                                     {gastos.some(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0) && (
                                         <button className="btn btn-glass" onClick={()=>setShowPagoRapidoModal(true)}>{I.dollar} Registrar Pago</button>
