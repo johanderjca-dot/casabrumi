@@ -348,17 +348,28 @@ function App() {
 
     const handleLogout = () => auth.signOut();
 
-    const handlePhotoChange = async (file) => {
+    const handlePhotoChange = (file) => {
         if (!file || !auth.currentUser) return;
-        try {
-            const stor     = firebase.storage();
-            const ref      = stor.ref(`avatars/${auth.currentUser.uid}`);
-            await ref.put(file);
-            const photoURL = await ref.getDownloadURL();
-            await auth.currentUser.updateProfile({ photoURL });
-            await db.collection('users').doc(auth.currentUser.uid).update({ photoURL });
-            setUser(prev => ({ ...prev, photoURL }));
-        } catch(e) { console.error('Error subiendo foto:', e); }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = async () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 80; canvas.height = 80;
+                const ctx = canvas.getContext('2d');
+                const size = Math.min(img.width, img.height);
+                const ox = (img.width  - size) / 2;
+                const oy = (img.height - size) / 2;
+                ctx.drawImage(img, ox, oy, size, size, 0, 0, 80, 80);
+                const photoURL = canvas.toDataURL('image/jpeg', 0.8);
+                try {
+                    await db.collection('users').doc(auth.currentUser.uid).update({ photoURL });
+                    setUser(prev => ({ ...prev, photoURL }));
+                } catch(err) { console.error('Error guardando foto:', err); }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
     };
 
     if (loading) return (
