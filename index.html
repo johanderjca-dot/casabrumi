@@ -270,25 +270,46 @@ function App() {
 
     const MASTER_EMAIL = 'johanderjca@gmail.com';
 
+    const ensureFirestoreDocs = (firebaseUser, isMaster) => {
+        const uid   = firebaseUser.uid;
+        const email = firebaseUser.email;
+        const role  = isMaster ? 'master' : 'vendedor';
+        db.collection('users').doc(uid).get().then(doc => {
+            if (!doc.exists) {
+                // Crea documento de usuario si no existe
+                db.collection('users').doc(uid).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(console.error);
+            } else {
+                setUser(prev => ({
+                    ...prev,
+                    role:     isMaster ? 'master' : (doc.data().role || prev.role),
+                    photoURL: doc.data().photoURL || prev.photoURL,
+                }));
+            }
+            // Si es vendedor, verifica que exista en colección vendedores
+            if (!isMaster) {
+                db.collection('vendedores').where('uid', '==', uid).get().then(snap => {
+                    if (snap.empty) {
+                        db.collection('vendedores').add({
+                            nombre:         email.split('@')[0],
+                            email,
+                            uid,
+                            activo:         true,
+                            autoRegistrado: true,
+                            fechaAlta:      firebase.firestore.FieldValue.serverTimestamp(),
+                        }).catch(console.error);
+                    }
+                }).catch(console.error);
+            }
+        }).catch(console.error);
+    };
+
     useEffect(() => {
         return auth.onAuthStateChanged(firebaseUser => {
             if (firebaseUser) {
                 const isMaster = firebaseUser.email === MASTER_EMAIL;
-                // Carga inmediata sin esperar Firestore
-                setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: isMaster ? 'master' : 'vendedor', photoURL: firebaseUser.photoURL || null });
+                setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: isMaster ? 'master' : 'vendedor', photoURL: null });
                 setLoading(false);
-                // Actualiza con datos de Firestore en segundo plano
-                db.collection('users').doc(firebaseUser.uid).get()
-                    .then(doc => {
-                        if (doc.exists) {
-                            setUser(prev => ({
-                                ...prev,
-                                role:     isMaster ? 'master' : (doc.data().role || prev.role),
-                                photoURL: doc.data().photoURL || prev.photoURL,
-                            }));
-                        }
-                    })
-                    .catch(() => {});
+                ensureFirestoreDocs(firebaseUser, isMaster);
             } else {
                 setUser(null);
                 setLoading(false);
@@ -305,29 +326,30 @@ function App() {
             } else {
                 const cred = await auth.createUserWithEmailAndPassword(email, password);
                 const role = email === 'johanderjca@gmail.com' ? 'master' : 'vendedor';
-                await db.collection('users').doc(cred.user.uid).set({
+                // Fire-and-forget: no bloquea el registro si Firestore tarda
+                db.collection('users').doc(cred.user.uid).set({
                     email, role,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                }).catch(console.error);
                 if (role === 'vendedor') {
-                    await db.collection('vendedores').add({
+                    db.collection('vendedores').add({
                         nombre:          email.split('@')[0],
                         email,
                         uid:             cred.user.uid,
                         activo:          true,
                         autoRegistrado:  true,
                         fechaAlta:       firebase.firestore.FieldValue.serverTimestamp(),
-                    });
+                    }).catch(console.error);
                 }
             }
         } catch (err) {
             const msgs = {
-                'auth/user-not-found':   'Usuario no encontrado.',
-                'auth/wrong-password':   'Contrasena incorrecta.',
+                'auth/user-not-found':       'Usuario no encontrado.',
+                'auth/wrong-password':       'Contrasena incorrecta.',
                 'auth/email-already-in-use': 'El correo ya esta registrado.',
-                'auth/invalid-email':    'Correo invalido.',
-                'auth/weak-password':    'La contrasena debe tener al menos 6 caracteres.',
-                'auth/invalid-credential': 'Credenciales incorrectas.',
+                'auth/invalid-email':        'Correo invalido.',
+                'auth/weak-password':        'La contrasena debe tener al menos 6 caracteres.',
+                'auth/invalid-credential':   'Credenciales incorrectas.',
             };
             setError(msgs[err.code] || err.message);
         }
