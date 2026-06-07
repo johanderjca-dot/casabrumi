@@ -551,6 +551,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [editingAbonoGasto,   setEditingAbonoGasto]   = useState(null);
     const [editingAbonoIdx,     setEditingAbonoIdx]     = useState(null);
     const [editingAbonoMonto,   setEditingAbonoMonto]   = useState('');
+    const [links,               setLinks]               = useState([]);
+    const [showLinkModal,       setShowLinkModal]       = useState(false);
+    const [linkForm,            setLinkForm]            = useState({ nombre:'', url:'', icono:'🔗' });
+    const [editingLink,         setEditingLink]         = useState(null);
+    const LINK_ICONOS = ['🔗','🛒','🏪','📦','🚚','💼','💰','📊','🌐','📱','💻','🎯','📋','📌','🏬','🛍️','🌍','📣','🔍','📸','🎨','📝','📞','📧','💬','🤝','🏆','⚡','🔔','📅','🗂️','📂','🖥️','🛠️','⚙️','🔐','👥','🏷️','💳','🏦','📈','📉','🎪','🧾','🔖'];
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -585,6 +590,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const unsub = db.collection('gastos').orderBy('fecha', 'desc').onSnapshot(
             snap => setGastos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             err => console.error('Firestore error:', err)
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('links').onSnapshot(
+            snap => setLinks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            err => console.error('Links error:', err)
         );
         return unsub;
     }, []);
@@ -765,7 +778,31 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setAbonoMonto(''); setPagoRapidoId(''); setShowPagoRapidoModal(false);
     };
 
+    const saveLink = () => {
+        if (!linkForm.nombre || !linkForm.url) return;
+        const url = linkForm.url.startsWith('http') ? linkForm.url : 'https://' + linkForm.url;
+        const data = { nombre: linkForm.nombre, url, icono: linkForm.icono || '🔗' };
+        if (editingLink) {
+            db.collection('links').doc(editingLink.id).update(data).catch(console.error);
+            setEditingLink(null);
+        } else {
+            db.collection('links').add({ ...data, creadoEn: firebase.firestore.FieldValue.serverTimestamp() }).catch(console.error);
+        }
+        setLinkForm({ nombre:'', url:'', icono:'🔗' });
+        setShowLinkModal(false);
+    };
+
+    const deleteLink = (id) => db.collection('links').doc(id).delete().catch(console.error);
+
+    const openEditLink = (link) => {
+        setEditingLink(link);
+        setLinkForm({ nombre: link.nombre, url: link.url, icono: link.icono || '🔗' });
+        setShowLinkModal(true);
+    };
+
     const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
+
+    const I_link = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
 
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
@@ -773,6 +810,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'vendedores',  label: 'Vendedores',  icon: I.users  },
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'gastos',      label: 'Gastos',      icon: I.dollar },
+        ]},
+        { label: 'Herramientas', items: [
+            { key: 'accesos', label: 'Accesos Rápidos', icon: I_link },
         ]},
     ];
 
@@ -901,6 +941,86 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 {activeTab === 'proveedores' && <>
                     <div className="page-header"><h1>Proveedores</h1><p>Gestion por pais de origen</p></div>
                     <div className="card glass"><div className="coming-soon"><div className="cs-icon">{I.truck}</div><h3>Modulo de Proveedores</h3><div className="cs-bar"/><p>Proxima fase — Republica Dominicana y Venezuela</p></div></div>
+                </>}
+
+                {activeTab === 'accesos' && <>
+                    <div className="page-header"><h1>Accesos Rápidos</h1><p>Tus links favoritos a un clic</p></div>
+                    <div className="sec-header">
+                        <h2>{links.length} acceso{links.length!==1?'s':''}</h2>
+                        <button className="btn btn-gold" onClick={()=>{setLinkForm({nombre:'',url:'',icono:'🔗'});setEditingLink(null);setShowLinkModal(true);}}>{I.plus} Agregar Link</button>
+                    </div>
+                    {links.length === 0 ? (
+                        <div className="card glass"><div className="empty">
+                            <div className="empty-icon" style={{fontSize:'24px',background:'none',border:'none'}}>🔗</div>
+                            <h3>Sin accesos aún</h3>
+                            <p>Agrega tu primer link para acceder rápidamente.</p>
+                        </div></div>
+                    ) : (
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:14}}>
+                            {links.map(link => (
+                                <div key={link.id} className="card glass" style={{position:'relative',overflow:'visible'}}>
+                                    <a href={link.url} target="_blank" rel="noopener noreferrer"
+                                        style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'24px 16px 20px',textDecoration:'none',gap:10}}>
+                                        <span style={{fontSize:'36px',lineHeight:1}}>{link.icono||'🔗'}</span>
+                                        <span style={{fontSize:'13px',fontWeight:'600',color:'var(--text)',textAlign:'center',wordBreak:'break-word'}}>{link.nombre}</span>
+                                        <span style={{fontSize:'10px',color:'var(--text-dimmer)',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'120px'}}>{link.url.replace(/^https?:\/\//,'')}</span>
+                                    </a>
+                                    <div style={{position:'absolute',top:8,right:8,display:'flex',gap:4}}>
+                                        <button onClick={()=>openEditLink(link)}
+                                            style={{background:'var(--glass-bg-mid)',border:'1px solid var(--glass-border)',borderRadius:'6px',cursor:'pointer',padding:'4px 6px',fontSize:'11px',color:'var(--text-dim)',lineHeight:1}}
+                                            title="Editar">✎</button>
+                                        <button onClick={()=>deleteLink(link.id)}
+                                            style={{background:'var(--glass-bg-mid)',border:'1px solid var(--glass-border)',borderRadius:'6px',cursor:'pointer',padding:'4px 6px',fontSize:'11px',color:'#8B3535',lineHeight:1}}
+                                            title="Eliminar">×</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {showLinkModal && (
+                        <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowLinkModal(false);setEditingLink(null);}}}>
+                            <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:460}}>
+                                <div className="modal-hd">
+                                    <h2>{editingLink?'Editar Link':'Nuevo Link'}</h2>
+                                    <button className="modal-close" onClick={()=>{setShowLinkModal(false);setEditingLink(null);}}>×</button>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Ícono</label>
+                                    <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:'10px',background:'var(--glass-bg-mid)',borderRadius:'var(--r-sm)',border:'1px solid var(--glass-border)',maxHeight:'140px',overflowY:'auto'}}>
+                                        {LINK_ICONOS.map(ico=>(
+                                            <button key={ico} onClick={()=>setLinkForm(f=>({...f,icono:ico}))}
+                                                style={{fontSize:'22px',padding:'4px',borderRadius:'6px',border:`2px solid ${linkForm.icono===ico?'var(--sand)':'transparent'}`,background:linkForm.icono===ico?'var(--sand-dim)':'transparent',cursor:'pointer',lineHeight:1,transition:'all var(--t-fast)'}}>
+                                                {ico}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Nombre</label>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                        autoFocus value={linkForm.nombre} onChange={e=>setLinkForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Facebook Marketplace" />
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>URL</label>
+                                    <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
+                                        value={linkForm.url} onChange={e=>setLinkForm(f=>({...f,url:e.target.value}))} placeholder="https://facebook.com/marketplace" />
+                                </div>
+                                <div style={{background:'var(--glass-bg-mid)',borderRadius:'var(--r-sm)',padding:'12px 14px',marginBottom:4,display:'flex',alignItems:'center',gap:12}}>
+                                    <span style={{fontSize:'28px'}}>{linkForm.icono||'🔗'}</span>
+                                    <div>
+                                        <div style={{fontWeight:'600',fontSize:'13px',color:'var(--text)'}}>{linkForm.nombre||'Nombre del link'}</div>
+                                        <div style={{fontSize:'11px',color:'var(--text-dimmer)'}}>{linkForm.url||'URL del link'}</div>
+                                    </div>
+                                </div>
+                                <div className="modal-actions">
+                                    <button className="btn btn-glass" onClick={()=>{setShowLinkModal(false);setEditingLink(null);}}>Cancelar</button>
+                                    <button className="btn btn-gold" onClick={saveLink} disabled={!linkForm.nombre||!linkForm.url} style={{flex:1,justifyContent:'center'}}>
+                                        {editingLink?<>{I.edit} Guardar</>:<>{I.plus} Agregar</>}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </>}
 
                 {activeTab === 'gastos' && (() => {
