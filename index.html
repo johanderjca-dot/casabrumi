@@ -532,8 +532,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showGastoModal, setShowGastoModal] = useState(false);
     const [gastoForm,      setGastoForm]      = useState({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
     const [savingGasto,    setSavingGasto]    = useState(false);
-    const [gastoVista,          setGastoVista]          = useState('categoria'); // 'categoria' | 'pago'
+    const [gastoVista,          setGastoVista]          = useState('categoria'); // 'categoria' | 'pago' | 'mensual'
     const [activePago,          setActivePago]          = useState(null);
+    const [mesSeleccionado,     setMesSeleccionado]     = useState(() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; });
     const [activeCat,           setActiveCat]           = useState(null);
     const [showAbonoModal,      setShowAbonoModal]      = useState(false);
     const [selectedGasto,       setSelectedGasto]       = useState(null);
@@ -1024,6 +1025,147 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 </>}
 
                 {activeTab === 'gastos' && (() => {
+                    // ── Vista mensual ──
+                    if (!activeCat && gastoVista === 'mensual') {
+                        const mesLabel = key => { const [y,m]=key.split('-'); return new Date(parseInt(y),parseInt(m)-1,1).toLocaleDateString('es-CO',{month:'long',year:'numeric'}); };
+                        const navMes = delta => {
+                            const [y,m] = mesSeleccionado.split('-').map(Number);
+                            const d = new Date(y, m-1+delta, 1);
+                            setMesSeleccionado(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+                        };
+                        const keyOf = g => { const d=g.fecha?.toDate?.(); if(!d) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+                        const gastosDelMes   = gastos.filter(g => keyOf(g) === mesSeleccionado);
+                        const gastosAnteriores = gastos.filter(g => keyOf(g) < mesSeleccionado && keyOf(g) !== '');
+                        const totalMes       = gastosDelMes.reduce((s,g)=>s+(g.monto||0),0);
+                        const creditosMes    = gastosDelMes.filter(g=>g.esCredito);
+                        const pendienteMes   = creditosMes.reduce((s,g)=>s+Math.max(0,(g.monto||0)-(g.montoAbonado||0)),0);
+                        const arrastre       = gastosAnteriores.filter(g=>g.esCredito).reduce((s,g)=>s+Math.max(0,(g.monto||0)-(g.montoAbonado||0)),0);
+                        const totalRegularizar = pendienteMes + arrastre;
+
+                        return (
+                            <>
+                                <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                    <h1>Gastos — {mesLabel(mesSeleccionado)}</h1>
+                                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                        <button className="btn btn-glass btn-sm" onClick={()=>navMes(-1)}>← Anterior</button>
+                                        <button className="btn btn-glass btn-sm" onClick={()=>navMes(1)}>Siguiente →</button>
+                                        <button className="btn btn-gold" onClick={()=>setShowGastoModal(true)}>{I.plus} Nuevo Gasto</button>
+                                    </div>
+                                </div>
+
+                                <div className="kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
+                                    <div className="kpi-card glass glass-mid">
+                                        <div className="kpi-top"><div className="kpi-label">Gastado este mes</div><div className="kpi-icon white">{I.dollar}</div></div>
+                                        <div className="kpi-val">${totalMes.toFixed(0)}</div>
+                                        <div className="kpi-sub">{gastosDelMes.length} gasto{gastosDelMes.length!==1?'s':''}</div>
+                                    </div>
+                                    <div className="kpi-card glass">
+                                        <div className="kpi-top"><div className="kpi-label">Crédito del mes</div><div className="kpi-icon gold">{I.invoice}</div></div>
+                                        <div className="kpi-val">${creditosMes.reduce((s,g)=>s+(g.monto||0),0).toFixed(0)}</div>
+                                        <div className="kpi-sub">{creditosMes.length} en crédito</div>
+                                    </div>
+                                    <div className="kpi-card glass glass-mid" style={{borderTop: pendienteMes>0?'2px solid var(--sand)':''}}>
+                                        <div className="kpi-top"><div className="kpi-label">Por pagar este mes</div><div className="kpi-icon gold">{I.dollar}</div></div>
+                                        <div className="kpi-val" style={{color:pendienteMes>0?'var(--sand-dark)':'var(--text)'}}>${pendienteMes.toFixed(0)}</div>
+                                        <div className="kpi-sub">pendiente del mes</div>
+                                    </div>
+                                    <div className="kpi-card glass" style={{borderTop: arrastre>0?'2px solid #8B3535':''}}>
+                                        <div className="kpi-top"><div className="kpi-label">Arrastre anterior</div><div className="kpi-icon white">{I.chart}</div></div>
+                                        <div className="kpi-val" style={{color:arrastre>0?'#8B3535':'var(--text)'}}>${arrastre.toFixed(0)}</div>
+                                        <div className="kpi-sub">saldo meses previos</div>
+                                    </div>
+                                </div>
+
+                                {totalRegularizar > 0 && (
+                                    <div style={{background:'rgba(139,53,53,0.07)',border:'1px solid rgba(139,53,53,0.2)',borderRadius:'var(--r)',padding:'14px 20px',marginBottom:20,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                        <div>
+                                            <div style={{fontWeight:'700',color:'#8B3535',fontSize:'13px'}}>Total a regularizar</div>
+                                            <div style={{fontSize:'11.5px',color:'var(--text-dim)',marginTop:2}}>
+                                                ${pendienteMes.toFixed(0)} de este mes + ${arrastre.toFixed(0)} de arrastre
+                                            </div>
+                                        </div>
+                                        <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'22px',color:'#8B3535'}}>${totalRegularizar.toFixed(2)}</div>
+                                    </div>
+                                )}
+
+                                <div className="card glass">
+                                    {gastosDelMes.length > 0 ? (
+                                        <table>
+                                            <thead><tr><th>Categoría</th><th>Descripción</th><th>Proveedor</th><th>Pago</th><th>Monto</th><th>Estado crédito</th><th></th></tr></thead>
+                                            <tbody>
+                                                {gastosDelMes.map((g,i)=>{
+                                                    const sym = g.moneda==='DOP'?'RD$':'$';
+                                                    const restante = Math.max(0,(g.monto||0)-(g.montoAbonado||0));
+                                                    return (
+                                                        <tr key={i}>
+                                                            <td><span className="badge badge-gray"><span className="badge-dot"/>{g.categoria}</span></td>
+                                                            <td><strong>{g.descripcion||'—'}</strong></td>
+                                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{g.proveedor||'—'}</td>
+                                                            <td style={{fontSize:'12px'}}>{g.medioPago}{g.terminal?` · ${g.terminal}`:''}<br/><span style={{color:'var(--text-dimmer)',fontSize:'10.5px'}}>{g.propietario}</span></td>
+                                                            <td className="td-num"><strong>{sym}{(g.monto||0).toFixed(2)}</strong></td>
+                                                            <td>
+                                                                {!g.esCredito
+                                                                    ? <span className="badge badge-gray"><span className="badge-dot"/>Contado</span>
+                                                                    : restante<=0
+                                                                        ? <span className="badge badge-green"><span className="badge-dot"/>Pagado</span>
+                                                                        : (g.montoAbonado||0)>0
+                                                                            ? <><span className="badge badge-gold"><span className="badge-dot"/>Abonado</span><br/><span style={{fontSize:'11px',color:'var(--sand-dark)',fontFamily:'Fira Code'}}>{sym}{restante.toFixed(0)} resta</span></>
+                                                                            : <span className="badge badge-gray"><span className="badge-dot"/>Pendiente</span>}
+                                                            </td>
+                                                            <td>
+                                                                <div style={{display:'flex',gap:6}}>
+                                                                    <button className="btn btn-glass btn-sm" onClick={()=>openEditGasto(g)}>{I.edit} Editar</button>
+                                                                    {g.esCredito&&restante>0&&<button className="btn btn-glass btn-sm" onClick={()=>{setSelectedGasto(g);setAbonoMonto('');setShowAbonoModal(true);}}>+ Abono</button>}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <div className="empty">
+                                            <div className="empty-icon">{I.dollar}</div>
+                                            <h3>Sin gastos en {mesLabel(mesSeleccionado)}</h3>
+                                            <p>Registra el primer gasto de este mes.</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {arrastre > 0 && gastosAnteriores.filter(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0).length > 0 && (
+                                    <>
+                                        <div className="sec-header" style={{marginTop:24}}>
+                                            <h2 style={{color:'#8B3535'}}>Saldo arrastrado de meses anteriores</h2>
+                                        </div>
+                                        <div className="card glass">
+                                            <table>
+                                                <thead><tr><th>Mes</th><th>Descripción</th><th>Categoría</th><th>Total</th><th>Abonado</th><th>Pendiente</th><th></th></tr></thead>
+                                                <tbody>
+                                                    {gastosAnteriores.filter(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0).map((g,i)=>{
+                                                        const sym=g.moneda==='DOP'?'RD$':'$';
+                                                        const restante=Math.max(0,(g.monto||0)-(g.montoAbonado||0));
+                                                        const d=g.fecha?.toDate?.();
+                                                        return (
+                                                            <tr key={i}>
+                                                                <td style={{fontSize:'12px',color:'var(--text-dimmer)',fontFamily:'Fira Code'}}>{d?d.toLocaleDateString('es-CO',{month:'short',year:'numeric'}):'—'}</td>
+                                                                <td><strong>{g.descripcion||'—'}</strong></td>
+                                                                <td><span className="badge badge-gray"><span className="badge-dot"/>{g.categoria}</span></td>
+                                                                <td className="td-num">{sym}{(g.monto||0).toFixed(0)}</td>
+                                                                <td className="td-num" style={{color:'var(--text-dim)'}}>{sym}{(g.montoAbonado||0).toFixed(0)}</td>
+                                                                <td className="td-num" style={{color:'#8B3535',fontWeight:'700'}}>{sym}{restante.toFixed(0)}</td>
+                                                                <td><button className="btn btn-glass btn-sm" onClick={()=>{setSelectedGasto(g);setAbonoMonto('');setShowAbonoModal(true);}}>+ Abono</button></td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        );
+                    }
+
                     // ── Vista por medio de pago ──
                     if (!activeCat && gastoVista === 'pago') {
                         // Agrupa: { key: label, gastos: [...] }
@@ -1115,7 +1257,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             <div className="sec-header">
                                 <div style={{display:'flex',gap:8}}>
                                     <button className={`btn ${gastoVista==='categoria'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('categoria')}>Por Categoría</button>
-                                    <button className={`btn ${gastoVista==='pago'?'btn-gold':'btn-glass'}`} onClick={()=>{setGastoVista('pago');setActivePago(null);}}>Por Tarjeta / Pago</button>
+                                    <button className={`btn ${gastoVista==='pago'?'btn-gold':'btn-glass'}`} onClick={()=>{setGastoVista('pago');setActivePago(null);}}>Por Tarjeta</button>
+                                    <button className={`btn ${gastoVista==='mensual'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('mensual')}>Por Mes</button>
                                 </div>
                                 <div style={{display:'flex',gap:8}}>
                                     {gastos.some(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0) && (
