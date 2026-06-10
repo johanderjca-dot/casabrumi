@@ -1390,9 +1390,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             <div className="sec-header">
                                 <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                                     <button className={`btn ${gastoVista==='dashboard'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('dashboard')}>Dashboard</button>
-                                    <button className={`btn ${gastoVista==='categoria'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('categoria')}>Por Categoría</button>
-                                    <button className={`btn ${gastoVista==='pago'?'btn-gold':'btn-glass'}`} onClick={()=>{setGastoVista('pago');setActivePago(null);}}>Por Tarjeta</button>
-                                    <button className={`btn ${gastoVista==='mensual'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('mensual')}>Por Mes</button>
+                                    <button className={`btn ${gastoVista==='categoria'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('categoria')}>Categorías</button>
+                                    <button className={`btn ${gastoVista==='pago'?'btn-gold':'btn-glass'}`} onClick={()=>{setGastoVista('pago');setActivePago(null);}}>Tarjetas</button>
+                                    <button className={`btn ${gastoVista==='mensual'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('mensual')}>Meses</button>
                                 </div>
                                 <div style={{display:'flex',gap:8}}>
                                     {gastos.some(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0) && (
@@ -1419,6 +1419,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         </>
                     );
                     // ── Dashboard por categoría ──
+                    const navBarCat = (
+                        <div className="sec-header" style={{marginBottom:20}}>
+                            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                                <button className="btn btn-glass" onClick={()=>{setActiveCat(null);setGastoVista('dashboard');}}>Dashboard</button>
+                                <button className="btn btn-gold" onClick={()=>setActiveCat(null)}>← Categorías</button>
+                                <button className="btn btn-glass" onClick={()=>{setActiveCat(null);setGastoVista('pago');setActivePago(null);}}>Tarjetas</button>
+                                <button className="btn btn-glass" onClick={()=>{setActiveCat(null);setGastoVista('mensual');}}>Meses</button>
+                            </div>
+                            <div style={{display:'flex',gap:8}}>
+                                {gastos.some(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0) && (
+                                    <button className="btn btn-glass" onClick={()=>setShowPagoRapidoModal(true)}>{I.dollar} Registrar Pago</button>
+                                )}
+                                <button className="btn btn-gold" onClick={()=>{setGastoForm(f=>({...f,categoria:activeCat}));setShowGastoModal(true);}}>{I.plus} Nuevo Gasto</button>
+                            </div>
+                        </div>
+                    );
                     const catDesdeD = new Date(catDesde + 'T00:00:00');
                     const catHastaD = new Date(catHasta + 'T23:59:59');
                     const setCatAtajo = (d,h) => { setCatDesde(d); setCatHasta(h); };
@@ -1431,13 +1447,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const caUSD = pendUSD(catAnteriores), caDOP = pendDOP(catAnteriores);
                     return (
                         <>
+                            {navBarCat}
                             {/* Header */}
-                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
-                                <div style={{display:'flex',alignItems:'center',gap:12}}>
-                                    <button className="btn btn-glass btn-sm" onClick={()=>setActiveCat(null)}>← Volver</button>
-                                    <div><h1>{activeCat}</h1><p>{todosLosDeLaCat.length} gastos registrados en total</p></div>
-                                </div>
-                                <button className="btn btn-gold" onClick={()=>{setGastoForm(f=>({...f,categoria:activeCat}));setShowGastoModal(true);}}>{I.plus} Nuevo Gasto</button>
+                            <div className="page-header">
+                                <h1>{activeCat}</h1>
+                                <p>{todosLosDeLaCat.length} gastos registrados en total</p>
                             </div>
 
                             {/* Selector de fechas */}
