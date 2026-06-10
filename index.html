@@ -532,11 +532,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showGastoModal, setShowGastoModal] = useState(false);
     const [gastoForm,      setGastoForm]      = useState({ categoria:'Operacional', descripcion:'', monto:'', moneda:'USD', medioPago:'Efectivo', propietario:'Johander', terminal:'', proveedor:'', esCredito:false, montoAbonado:'' });
     const [savingGasto,    setSavingGasto]    = useState(false);
-    const [gastoVista,          setGastoVista]          = useState('dashboard'); // 'dashboard' | 'categoria' | 'pago' | 'mensual'
+    const [gastoVista,          setGastoVista]          = useState('categoria'); // 'dashboard' | 'categoria' | 'pago' | 'mensual'
     const [activePago,          setActivePago]          = useState(null);
     const [mesSeleccionado,     setMesSeleccionado]     = useState(() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; });
     const [dashDesde,           setDashDesde]           = useState(() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`; });
     const [dashHasta,           setDashHasta]           = useState(() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; });
+    const [catDesde,            setCatDesde]            = useState(() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`; });
+    const [catHasta,            setCatHasta]            = useState(() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; });
     const [activeCat,           setActiveCat]           = useState(null);
     const [showAbonoModal,      setShowAbonoModal]      = useState(false);
     const [selectedGasto,       setSelectedGasto]       = useState(null);
@@ -1416,103 +1418,107 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         </>
                     );
-                    const catGastos   = gastos.filter(g=>g.categoria===activeCat);
-                    const catTotal    = catGastos.reduce((s,g)=>s+(g.monto||0),0);
-                    const catCreditos = catGastos.filter(g=>g.esCredito);
-                    const catPendiente= catCreditos.reduce((s,g)=>s+Math.max(0,(g.monto||0)-(g.montoAbonado||0)),0);
+                    // ── Dashboard por categoría ──
+                    const catDesdeD = new Date(catDesde + 'T00:00:00');
+                    const catHastaD = new Date(catHasta + 'T23:59:59');
+                    const setCatAtajo = (d,h) => { setCatDesde(d); setCatHasta(h); };
+                    const hoy = new Date();
+                    const todosLosDeLaCat = gastos.filter(g=>g.categoria===activeCat);
+                    const catEnRango = todosLosDeLaCat.filter(g=>{ const d=g.fecha?.toDate?.(); return d&&d>=catDesdeD&&d<=catHastaD; });
+                    const catAnteriores = todosLosDeLaCat.filter(g=>{ const d=g.fecha?.toDate?.(); return d&&d<catDesdeD; });
+                    const cUSD = sumUSD(catEnRango), cDOP = sumDOP(catEnRango);
+                    const cpUSD = pendUSD(catEnRango), cpDOP = pendDOP(catEnRango);
+                    const caUSD = pendUSD(catAnteriores), caDOP = pendDOP(catAnteriores);
                     return (
                         <>
-                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                                <div style={{display:'flex',alignItems:'center',gap:14}}>
-                                <button className="btn btn-glass btn-sm" onClick={()=>setActiveCat(null)}>← Volver</button>
-                                <div>
-                                    <h1>{activeCat}</h1>
-                                    <p>{catGastos.length} gasto{catGastos.length!==1?'s':''} registrado{catGastos.length!==1?'s':''}</p>
-                                </div>
+                            {/* Header */}
+                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+                                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                    <button className="btn btn-glass btn-sm" onClick={()=>setActiveCat(null)}>← Volver</button>
+                                    <div><h1>{activeCat}</h1><p>{todosLosDeLaCat.length} gastos registrados en total</p></div>
                                 </div>
                                 <button className="btn btn-gold" onClick={()=>{setGastoForm(f=>({...f,categoria:activeCat}));setShowGastoModal(true);}}>{I.plus} Nuevo Gasto</button>
                             </div>
-                            <div className="kpi-grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:20}}>
-                                <div className="kpi-card glass glass-mid">
-                                    <div className="kpi-top"><div className="kpi-label">Total</div><div className="kpi-icon white">{I.dollar}</div></div>
-                                    <div className="kpi-val">${catTotal.toFixed(0)}</div>
-                                    <div className="kpi-sub">{catGastos.length} gastos</div>
+
+                            {/* Selector de fechas */}
+                            <div className="card glass" style={{padding:'14px 18px',marginBottom:18,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+                                <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:'220px'}}>
+                                    <label style={{fontSize:'10.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',whiteSpace:'nowrap'}}>Desde</label>
+                                    <input type="date" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',padding:'7px 10px',fontSize:'12.5px',flex:1}} value={catDesde} onChange={e=>setCatDesde(e.target.value)} />
                                 </div>
-                                <div className="kpi-card glass">
-                                    <div className="kpi-top"><div className="kpi-label">En crédito</div><div className="kpi-icon gold">{I.invoice}</div></div>
-                                    <div className="kpi-val">${catCreditos.reduce((s,g)=>s+(g.monto||0),0).toFixed(0)}</div>
-                                    <div className="kpi-sub">{catCreditos.length} gasto{catCreditos.length!==1?'s':''}</div>
+                                <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:'220px'}}>
+                                    <label style={{fontSize:'10.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',whiteSpace:'nowrap'}}>Hasta</label>
+                                    <input type="date" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',padding:'7px 10px',fontSize:'12.5px',flex:1}} value={catHasta} onChange={e=>setCatHasta(e.target.value)} />
                                 </div>
-                                <div className="kpi-card glass glass-mid">
-                                    <div className="kpi-top"><div className="kpi-label">Por pagar</div><div className="kpi-icon gold">{I.dollar}</div></div>
-                                    <div className="kpi-val" style={{color: catPendiente>0?'var(--sand-dark)':'var(--text)'}}>${catPendiente.toFixed(0)}</div>
-                                    <div className="kpi-sub">{catCreditos.filter(g=>(g.monto||0)-(g.montoAbonado||0)>0).length} pendientes</div>
+                                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                    {[
+                                        {label:'Este mes', fn:()=>setCatAtajo(`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-01`,`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`)},
+                                        {label:'Mes anterior', fn:()=>{ const p=new Date(hoy.getFullYear(),hoy.getMonth()-1,1); const u=new Date(hoy.getFullYear(),hoy.getMonth(),0); setCatAtajo(`${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,'0')}-01`,`${u.getFullYear()}-${String(u.getMonth()+1).padStart(2,'0')}-${String(u.getDate()).padStart(2,'0')}`); }},
+                                        {label:'Este año', fn:()=>setCatAtajo(`${hoy.getFullYear()}-01-01`,`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`)},
+                                        {label:'Todo', fn:()=>setCatAtajo('2000-01-01',`${hoy.getFullYear()}-12-31`)},
+                                    ].map(({label,fn})=>(
+                                        <button key={label} className="btn btn-glass btn-sm" onClick={fn}>{label}</button>
+                                    ))}
                                 </div>
                             </div>
+
+                            {/* KPIs separados por moneda */}
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:18}}>
+                                {[
+                                    {label:'Total USD',     val:`$${cUSD.toFixed(2)}`,    sub:`${catEnRango.filter(g=>g.moneda!=='DOP').length} gastos`, v:'gold'},
+                                    {label:'Total DOP',     val:`RD$${cDOP.toFixed(0)}`,  sub:`${catEnRango.filter(g=>g.moneda==='DOP').length} gastos`,  v:'white'},
+                                    {label:'Pend. USD',     val:`$${cpUSD.toFixed(2)}`,   sub:'créditos sin pagar',  v: cpUSD>0?'gold':'white'},
+                                    {label:'Pend. DOP',     val:`RD$${cpDOP.toFixed(0)}`, sub:'créditos sin pagar',  v: cpDOP>0?'gold':'white'},
+                                    ...(caUSD>0?[{label:'Arrastre USD', val:`$${caUSD.toFixed(0)}`,   sub:'meses anteriores', v:'white', rojo:true}]:[]),
+                                    ...(caDOP>0?[{label:'Arrastre DOP', val:`RD$${caDOP.toFixed(0)}`, sub:'meses anteriores', v:'white', rojo:true}]:[]),
+                                ].map((k,i)=>(
+                                    <div key={i} className={`kpi-card glass ${i%2===0?'glass-mid':''}`} style={k.rojo?{borderTop:'2px solid #8B3535'}:{}}>
+                                        <div className="kpi-top"><div className="kpi-label">{k.label}</div><div className={`kpi-icon ${k.v}`}>{I.dollar}</div></div>
+                                        <div className="kpi-val" style={{fontSize:'18px',color:k.rojo?'#8B3535':'var(--text)'}}>{k.val}</div>
+                                        <div className="kpi-sub">{k.sub}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Tabla filtrada */}
                             <div className="card glass">
-                                {catGastos.length > 0 ? (
+                                {catEnRango.length > 0 ? (
                                     <table>
-                                        <thead><tr><th>Fecha</th><th>Descripción</th><th>Proveedor</th><th>Pago</th><th>Monto</th><th>Estado crédito</th><th>Historial abonos</th><th></th></tr></thead>
+                                        <thead><tr><th>Fecha</th><th>Descripción</th><th>Proveedor</th><th>Pago</th><th>Monto</th><th>Estado</th><th>Abonos</th><th></th></tr></thead>
                                         <tbody>
-                                            {catGastos.map((g,i)=>{
-                                                const restante  = Math.max(0,(g.monto||0)-(g.montoAbonado||0));
-                                                const sym       = g.moneda==='DOP'?'RD$':'$';
-                                                const historial = g.historialAbonos||[];
+                                            {catEnRango.map((g,i)=>{
+                                                const restante=Math.max(0,(g.monto||0)-(g.montoAbonado||0));
+                                                const sym=g.moneda==='DOP'?'RD$':'$';
+                                                const historial=g.historialAbonos||[];
                                                 return (
                                                     <tr key={i}>
                                                         <td className="td-num" style={{color:'var(--text-dimmer)',fontSize:'12px'}}>{g.fecha?.toDate?.().toLocaleDateString('es-CO')||'—'}</td>
                                                         <td><strong>{g.descripcion||'—'}</strong></td>
                                                         <td style={{color:'var(--text-dim)'}}>{g.proveedor||'—'}</td>
-                                                        <td style={{fontSize:'12.5px'}}>{g.medioPago}{g.terminal?<span style={{color:'var(--text-dimmer)'}}> · {g.terminal}</span>:''}<br/><span style={{fontSize:'11px',color:'var(--text-dimmer)'}}>{g.propietario}</span></td>
+                                                        <td style={{fontSize:'12px'}}>{g.medioPago}{g.terminal?<span style={{color:'var(--text-dimmer)'}}> · {g.terminal}</span>:''}<br/><span style={{fontSize:'11px',color:'var(--text-dimmer)'}}>{g.propietario}</span></td>
                                                         <td className="td-num"><strong>{sym}{(g.monto||0).toFixed(2)}</strong><br/><span style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{g.moneda||'USD'}</span></td>
-                                                        <td>
-                                                            {!g.esCredito
-                                                                ? <span className="badge badge-gray"><span className="badge-dot"/>Contado</span>
-                                                                : restante <= 0
-                                                                    ? <span className="badge badge-green"><span className="badge-dot"/>Pagado</span>
-                                                                    : (g.montoAbonado||0) > 0
-                                                                        ? <><span className="badge badge-gold"><span className="badge-dot"/>Abonado</span><br/><span style={{fontSize:'11px',color:'var(--sand-dark)',fontFamily:'Fira Code'}}>{sym}{restante.toFixed(0)} resta</span></>
-                                                                        : <span className="badge badge-gray"><span className="badge-dot"/>Pendiente</span>
-                                                            }
+                                                        <td>{!g.esCredito?<span className="badge badge-gray"><span className="badge-dot"/>Contado</span>:restante<=0?<span className="badge badge-green"><span className="badge-dot"/>Pagado</span>:(g.montoAbonado||0)>0?<><span className="badge badge-gold"><span className="badge-dot"/>Abonado</span><br/><span style={{fontSize:'11px',color:'var(--sand-dark)',fontFamily:'Fira Code'}}>{sym}{restante.toFixed(0)} resta</span></>:<span className="badge badge-gray"><span className="badge-dot"/>Pendiente</span>}</td>
+                                                        <td style={{fontSize:'11.5px',minWidth:'140px'}}>
+                                                            {historial.length>0?historial.map((a,ai)=>(
+                                                                <div key={ai} style={{marginBottom:4,display:'flex',gap:4,alignItems:'center'}}>
+                                                                    <span style={{fontFamily:'Fira Code',fontWeight:'600',color:'var(--text)'}}>{sym}{(a.monto||0).toFixed(0)}</span>
+                                                                    <span style={{color:'var(--text-dimmer)',fontSize:'10px'}}>{new Date(a.fecha).toLocaleDateString('es-CO')}</span>
+                                                                    <button onClick={()=>openEditAbono(g,ai)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-dimmer)',fontSize:'12px',lineHeight:1,padding:'0 2px'}} onMouseEnter={e=>e.currentTarget.style.color='var(--sand-dark)'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-dimmer)'}>✎</button>
+                                                                    <button onClick={()=>revertirAbono(g,ai)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-dimmer)',fontSize:'13px',lineHeight:1,padding:'0 2px'}} onMouseEnter={e=>e.currentTarget.style.color='#8B3535'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-dimmer)'}>×</button>
+                                                                </div>
+                                                            )):<span style={{color:'var(--text-dimmer)'}}>—</span>}
                                                         </td>
-                                                        <td style={{fontSize:'11.5px',color:'var(--text-dim)',minWidth:'160px'}}>
-                                                            {historial.length > 0
-                                                                ? historial.map((a,ai)=>(
-                                                                    <div key={ai} style={{marginBottom:4,display:'flex',gap:4,alignItems:'center'}}>
-                                                                        <span style={{fontFamily:'Fira Code',fontWeight:'600',color:'var(--text)'}}>{sym}{(a.monto||0).toFixed(0)}</span>
-                                                                        <span style={{color:'var(--text-dimmer)',fontSize:'10.5px'}}>{new Date(a.fecha).toLocaleDateString('es-CO')}</span>
-                                                                        <button onClick={()=>openEditAbono(g,ai)} title="Editar abono"
-                                                                            style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-dimmer)',fontSize:'12px',lineHeight:1,padding:'0 2px',borderRadius:'3px'}}
-                                                                            onMouseEnter={e=>e.currentTarget.style.color='var(--sand-dark)'}
-                                                                            onMouseLeave={e=>e.currentTarget.style.color='var(--text-dimmer)'}>✎</button>
-                                                                        <button onClick={()=>revertirAbono(g,ai)} title="Eliminar abono"
-                                                                            style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-dimmer)',fontSize:'13px',lineHeight:1,padding:'0 2px',borderRadius:'3px'}}
-                                                                            onMouseEnter={e=>e.currentTarget.style.color='#8B3535'}
-                                                                            onMouseLeave={e=>e.currentTarget.style.color='var(--text-dimmer)'}>×</button>
-                                                                    </div>
-                                                                ))
-                                                                : <span style={{color:'var(--text-dimmer)'}}>—</span>
-                                                            }
-                                                        </td>
-                                                        <td>
-                                                            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                                                                <button className="btn btn-glass btn-sm" onClick={()=>openEditGasto(g)}>{I.edit} Editar</button>
-                                                                {g.esCredito && restante > 0 && (
-                                                                    <button className="btn btn-glass btn-sm" onClick={()=>{setSelectedGasto(g);setAbonoMonto('');setShowAbonoModal(true);}}>+ Abono</button>
-                                                                )}
-                                                            </div>
-                                                        </td>
+                                                        <td><div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                            <button className="btn btn-glass btn-sm" onClick={()=>openEditGasto(g)}>{I.edit} Editar</button>
+                                                            {g.esCredito&&restante>0&&<button className="btn btn-glass btn-sm" onClick={()=>{setSelectedGasto(g);setAbonoMonto('');setShowAbonoModal(true);}}>+ Abono</button>}
+                                                        </div></td>
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
                                     </table>
-                                ) : (
-                                    <div className="empty">
-                                        <div className="empty-icon">{I.dollar}</div>
-                                        <h3>Sin gastos en {activeCat}</h3>
-                                        <p>Registra el primer gasto en esta categoría.</p>
-                                    </div>
+                                ):(
+                                    <div className="empty"><div className="empty-icon">{I.dollar}</div><h3>Sin gastos en este período</h3><p>Ajusta las fechas o agrega un nuevo gasto.</p></div>
                                 )}
                             </div>
                         </>
