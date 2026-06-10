@@ -526,7 +526,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const firstGastoRef  = useRef(null);
     const chartRef       = useRef(null);
     const chartInst      = useRef(null);
-    const CATEGORIAS     = ['Operacional','Importación','GROWTH','Logística','Personal','Impuestos','Almacenamiento'];
+    const CATEGORIAS     = ['Operacional','Importación','Capacitación','Logística','Personal','Impuestos','Almacenamiento'];
     const PROPIETARIOS   = ['Johander','Germán'];
     const [gastos,         setGastos]         = useState([]);
     const [showGastoModal, setShowGastoModal] = useState(false);
@@ -1054,7 +1054,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                         return (
                             <>
-                                <div className="page-header"><h1>Dashboard de Gastos</h1><p>Resumen financiero por período</p></div>
+                                <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                    <div><h1>Dashboard de Gastos</h1><p>Resumen financiero por período</p></div>
+                                    <div style={{display:'flex',gap:8}}>
+                                        {gastos.some(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0) && (
+                                            <button className="btn btn-glass" onClick={()=>setShowPagoRapidoModal(true)}>{I.dollar} Registrar Pago</button>
+                                        )}
+                                        <button className="btn btn-gold" onClick={()=>setShowGastoModal(true)}>{I.plus} Nuevo Gasto</button>
+                                    </div>
+                                </div>
 
                                 {/* Selector de fechas */}
                                 <div className="card glass" style={{padding:'16px 20px',marginBottom:20,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
