@@ -1276,7 +1276,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     )}
                                 </div>
 
-                                {arrastre > 0 && gastosAnteriores.filter(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0).length > 0 && (
+                                {(arrUSD+arrDOP) > 0 && gastosAnteriores.filter(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0).length > 0 && (
                                     <>
                                         <div className="sec-header" style={{marginTop:24}}>
                                             <h2 style={{color:'#8B3535'}}>Saldo arrastrado de meses anteriores</h2>
