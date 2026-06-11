@@ -892,7 +892,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (chartInst.current) chartInst.current.destroy();
         chartInst.current = new Chart(chartRef.current, {
             type: 'bar',
-            data: { labels, datasets: [{ data, backgroundColor:'rgba(28,24,20,0.82)', hoverBackgroundColor:'#B8A48C', borderRadius:6, borderSkipped:false }] },
+            data: { labels, datasets: [{ data, backgroundColor: labels.map((_,i)=>i===labels.length-1?'#C85C1A':'rgba(92,61,30,0.55)'), hoverBackgroundColor:'#D97340', borderRadius:6, borderSkipped:false }] },
             options: {
                 responsive:true, maintainAspectRatio:false,
                 plugins: {
@@ -901,8 +901,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         callbacks:{ label: ctx => ` $${ctx.raw.toFixed(2)}` } }
                 },
                 scales: {
-                    y: { grid:{ color:'rgba(28,24,20,0.05)' }, ticks:{ color:'rgba(28,24,20,0.35)', font:{family:'Fira Code',size:11} }, border:{ display:false } },
-                    x: { grid:{ display:false }, ticks:{ color:'rgba(28,24,20,0.45)', font:{size:11} }, border:{ display:false } }
+                    y: { grid:{ color:'rgba(92,61,30,0.07)' }, ticks:{ color:'rgba(92,61,30,0.38)', font:{family:'Fira Code',size:11} }, border:{ display:false } },
+                    x: { grid:{ display:false }, ticks:{ color:'rgba(92,61,30,0.45)', font:{size:11} }, border:{ display:false } }
                 }
             }
         });
@@ -1200,68 +1200,98 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             <main className="main">
 
                 {activeTab === 'dashboard' && <>
-                    <div className="hero">
-                        <div style={{position:'relative',zIndex:1}}>
-                            <h2>Hola, {(user.email||'').split('@')[0]} 👋</h2>
-                            <p>Resumen ejecutivo · Casa Brumi Importaciones</p>
+                    <div style={{position:'relative',marginBottom:'24px'}}>
+                        {/* Ambient orange glow */}
+                        <div style={{position:'absolute',top:'-80px',right:'-80px',width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle, rgba(200,92,26,0.12) 0%, transparent 65%)',pointerEvents:'none',zIndex:0}} />
+
+                        {/* Greeting */}
+                        <div style={{marginBottom:'18px',position:'relative',zIndex:1,display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
+                            <div>
+                                <p style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:'4px'}}>Panel de control</p>
+                                <h1 style={{fontSize:'26px',fontWeight:'800',letterSpacing:'-0.8px',color:'var(--text)',lineHeight:1.1}}>
+                                    Buenos días, <span style={{color:'var(--orange)'}}>{(user.email||'').split('@')[0]}</span>
+                                </h1>
+                            </div>
+                            <p style={{fontSize:'11px',color:'var(--text-dimmer)',textAlign:'right',lineHeight:1.6}}>
+                                {new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'})}
+                            </p>
                         </div>
-                        <div className="hero-stats" style={{position:'relative',zIndex:1}}>
-                            <div className="hero-stat">
-                                <div className="hero-stat-val"><KpiVal value={`$${gastoMesUSD.toFixed(0)}`} /></div>
-                                <div className="hero-stat-label">Gasto del mes</div>
-                            </div>
-                            <div className="hero-stat">
-                                <div className="hero-stat-val"><KpiVal value={`$${deudaUSD.toFixed(0)}`} /></div>
-                                <div className="hero-stat-label">Deuda USD</div>
-                            </div>
-                            <div className="hero-stat">
-                                <div className="hero-stat-val"><KpiVal value={`RD$${deudaDOP.toFixed(0)}`} /></div>
-                                <div className="hero-stat-label">Deuda DOP</div>
-                            </div>
-                            <div className="hero-stat">
-                                <div className="hero-stat-val"><KpiVal value={nGanadores} /></div>
-                                <div className="hero-stat-label">Ganadores</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="kpi-grid">
-                        {[
-                            { label: 'Monto ventas',   val: `$${totalVentas.toFixed(0)}`, sub: 'total acumulado', icon: I.dollar, v: 'gold' },
-                            { label: 'Vendedores',     val: vendedores.length,        sub: 'registrados',   icon: I.users,   v: 'white' },
-                            { label: 'Ventas hoy',     val: ventas.filter(v => { const d=v.fecha?.toDate?.(); return d&&d.toDateString()===new Date().toDateString(); }).length, sub: 'hoy', icon: I.invoice, v: 'white' },
-                            { label: 'Gasto mes USD',  val: `$${gastoMesUSD.toFixed(0)}`,   sub: `${_gastosMes.filter(g=>g.moneda!=='DOP').length} gastos este mes`, icon: I.dollar, v: 'gold' },
-                            { label: 'Gasto mes DOP',  val: `RD$${gastoMesDOP.toFixed(0)}`, sub: `${_gastosMes.filter(g=>g.moneda==='DOP').length} gastos`, icon: I.dollar, v: 'white' },
-                            { label: 'Productos',      val: productos.length,         sub: `${nGanadores} ganador${nGanadores!==1?'es':''}`, icon: I.chart, v: 'gold' },
-                        ].map((k, i) => (
-                            <div className="kpi-card" key={i}>
-                                <div className="kpi-top"><div className="kpi-label">{k.label}</div><div className={`kpi-icon ${k.v}`}>{k.icon}</div></div>
-                                <div className="kpi-val"><KpiVal value={k.val} /></div>
-                                <div className="kpi-sub">{k.sub}</div>
-                            </div>
-                        ))}
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 320px',gap:14,marginBottom:20}}>
-                        <div className="card glass" style={{padding:'22px 24px'}}>
-                            <div className="sec-header" style={{marginBottom:16}}><h2>Ventas — últimos 7 días</h2></div>
-                            <div style={{height:'200px'}}><canvas ref={chartRef}></canvas></div>
-                        </div>
-                        <div className="card glass" style={{padding:'22px 24px'}}>
-                            <div className="sec-header" style={{marginBottom:14}}><h2>Resumen</h2></div>
-                            {[
-                                { label:'Total acumulado', val:`$${totalVentas.toFixed(0)}`, icon:I.dollar },
-                                { label:'Vendedores activos', val:vendedores.length, icon:I.users },
-                                { label:'Ventas registradas', val:ventas.length, icon:I.chart },
-                            ].map((r,i)=>(
-                                <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:i<2?'1px solid var(--glass-border)':'none'}}>
-                                    <div className="kpi-icon gold">{r.icon}</div>
-                                    <div style={{flex:1}}>
-                                        <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'0.8px',fontWeight:'700'}}>{r.label}</div>
-                                        <div style={{fontSize:'18px',fontWeight:'700',fontFamily:'Fira Code',color:'var(--text)',letterSpacing:'-0.5px',marginTop:2}}>{r.val}</div>
+
+                        {/* BENTO GRID */}
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1.4fr',gridAutoRows:'min-content',gap:'12px',position:'relative',zIndex:1}}>
+
+                            {/* ── FEATURE CARD — naranja, col 4, filas 1-3 ── */}
+                            <div style={{gridColumn:'4',gridRow:'1/4',borderRadius:'16px',padding:'26px',background:'var(--orange)',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',position:'relative',boxShadow:'0 16px 40px -10px rgba(200,92,26,0.45)'}}>
+                                <div style={{position:'absolute',top:'-40px',left:'-40px',width:'180px',height:'180px',borderRadius:'50%',background:'rgba(255,255,255,0.08)',pointerEvents:'none'}} />
+                                <div style={{position:'absolute',bottom:'-30px',right:'-30px',width:'140px',height:'140px',borderRadius:'50%',background:'rgba(0,0,0,0.10)',pointerEvents:'none'}} />
+                                <div style={{position:'relative',zIndex:1}}>
+                                    <p style={{fontSize:'9px',fontWeight:'800',color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'2.5px',marginBottom:'16px'}}>Monto total ventas</p>
+                                    <div style={{fontSize:'44px',fontWeight:'800',fontFamily:"'Fira Code',monospace",letterSpacing:'-2px',color:'#FFFFFF',lineHeight:1,marginBottom:'6px'}}>
+                                        <KpiVal value={`$${totalVentas.toFixed(0)}`} />
                                     </div>
+                                    <p style={{fontSize:'11px',color:'rgba(255,255,255,0.55)'}}>acumulado histórico</p>
                                 </div>
-                            ))}
+                                <div style={{position:'relative',zIndex:1,display:'flex',flexDirection:'column',gap:'8px'}}>
+                                    {[
+                                        {l:'Registros',v:ventas.length},
+                                        {l:'Hoy',v:ventas.filter(v=>{const d=v.fecha?.toDate?.();return d&&d.toDateString()===new Date().toDateString();}).length},
+                                    ].map((r,i)=>(
+                                        <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'rgba(255,255,255,0.13)',borderRadius:'8px'}}>
+                                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.70)',fontWeight:'600'}}>{r.l}</span>
+                                            <span style={{fontSize:'13px',fontWeight:'800',fontFamily:"'Fira Code',monospace",color:'#FFFFFF'}}>{r.v}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── ROW 1 — 3 stat cards ── */}
+                            <div style={{gridColumn:'1',borderRadius:'14px',padding:'18px 20px',background:'var(--earth)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px',boxShadow:'0 8px 24px -8px rgba(92,61,30,0.30)'}}>
+                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'rgba(247,242,234,0.45)',textTransform:'uppercase',letterSpacing:'2px'}}>Gasto mes USD</p>
+                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:'var(--cream)',lineHeight:1}}><KpiVal value={`$${gastoMesUSD.toFixed(0)}`}/></div>
+                                <p style={{fontSize:'10px',color:'rgba(247,242,234,0.38)'}}>{_gastosMes.filter(g=>g.moneda!=='DOP').length} gastos registrados</p>
+                            </div>
+                            <div style={{gridColumn:'2',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
+                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Vendedores</p>
+                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:'var(--text)',lineHeight:1}}><KpiVal value={vendedores.length}/></div>
+                                <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>en el equipo</p>
+                            </div>
+                            <div style={{gridColumn:'3',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
+                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Deuda USD</p>
+                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:deudaUSD>0?'var(--orange)':'var(--text)',lineHeight:1}}><KpiVal value={`$${deudaUSD.toFixed(0)}`}/></div>
+                                <p style={{fontSize:'10px',color:deudaUSD>0?'var(--orange)':'var(--text-dimmer)',opacity:0.7}}>pendiente de pago</p>
+                            </div>
+
+                            {/* ── ROW 2 — 3 stat cards ── */}
+                            <div style={{gridColumn:'1',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px'}}>
+                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Gasto mes DOP</p>
+                                <div style={{fontSize:'24px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--text)',lineHeight:1}}><KpiVal value={`RD$${gastoMesDOP.toFixed(0)}`}/></div>
+                                <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{_gastosMes.filter(g=>g.moneda==='DOP').length} gastos</p>
+                            </div>
+                            <div style={{gridColumn:'2',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px'}}>
+                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Productos</p>
+                                <div style={{fontSize:'24px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--text)',lineHeight:1}}><KpiVal value={productos.length}/></div>
+                                <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{nGanadores} ganadores</p>
+                            </div>
+                            <div style={{gridColumn:'3',borderRadius:'14px',padding:'18px 20px',background:'var(--orange-dim)',border:'1px solid var(--orange-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px'}}>
+                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--orange)',textTransform:'uppercase',letterSpacing:'2px'}}>Ventas hoy</p>
+                                <div style={{fontSize:'24px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--orange)',lineHeight:1}}>
+                                    <KpiVal value={ventas.filter(v=>{const d=v.fecha?.toDate?.();return d&&d.toDateString()===new Date().toDateString();}).length}/>
+                                </div>
+                                <p style={{fontSize:'10px',color:'var(--orange)',opacity:0.7}}>registradas hoy</p>
+                            </div>
+
+                            {/* ── ROW 3 — Chart spans cols 1-3 ── */}
+                            <div style={{gridColumn:'1/4',borderRadius:'14px',padding:'20px 22px',background:'var(--surface-2)',border:'1px solid var(--glass-border)'}}>
+                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
+                                    <p style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Ventas — últimos 7 días</p>
+                                    <span style={{fontSize:'11px',color:'var(--text-dimmer)'}}>USD</span>
+                                </div>
+                                <div style={{height:'140px'}}><canvas ref={chartRef}></canvas></div>
+                            </div>
                         </div>
                     </div>
+
+                    {/* Últimas ventas */}
                     {ventas.length > 0 && (
                         <>
                             <div className="sec-header" style={{marginTop:4}}><h2>Últimas ventas</h2></div>
