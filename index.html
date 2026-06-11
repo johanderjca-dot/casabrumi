@@ -1081,6 +1081,56 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     })}
                                 </div>
                             )}
+                            {/* Modal agregar/editar producto */}
+                            {showProdModal && (
+                                <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowProdModal(false);setEditingProducto(null);}}}>
+                                    <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:460}}>
+                                        <div className="modal-hd">
+                                            <h2>{editingProducto?'Editar Producto':'Nuevo Producto'}</h2>
+                                            <button className="modal-close" onClick={()=>{setShowProdModal(false);setEditingProducto(null);}}>×</button>
+                                        </div>
+                                        <div className="form-group" style={{textAlign:'center'}}>
+                                            <div style={{width:'120px',height:'120px',borderRadius:'var(--r)',background:'var(--glass-bg-mid)',border:'2px dashed var(--glass-border)',margin:'0 auto 10px',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',cursor:'pointer'}}
+                                                onClick={()=>document.getElementById('prod-img-input').click()}>
+                                                {prodForm.imagen ? <img src={prodForm.imagen} style={{width:'100%',height:'100%',objectFit:'cover'}} alt="" /> : <span style={{fontSize:'36px'}}>📸</span>}
+                                            </div>
+                                            <input id="prod-img-input" type="file" accept="image/*" style={{display:'none'}}
+                                                onChange={e=>{ if(e.target.files[0]) handleProdImage(e.target.files[0], url=>setProdForm(f=>({...f,imagen:url}))); e.target.value=''; }} />
+                                            <button className="btn btn-glass btn-sm" onClick={()=>document.getElementById('prod-img-input').click()}>📷 Cambiar imagen</button>
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Nombre del producto</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                autoFocus value={prodForm.nombre} onChange={e=>setProdForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Masajeador portátil" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Proveedor</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.proveedor} onChange={e=>setProdForm(f=>({...f,proveedor:e.target.value}))} placeholder="Nombre del proveedor" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Estado inicial</label>
+                                            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                {PROD_ESTADOS.map(e=>(
+                                                    <button key={e} className={`btn btn-sm ${prodForm.estado===e?'btn-gold':'btn-glass'}`}
+                                                        onClick={()=>setProdForm(f=>({...f,estado:e}))}>{e}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Descripción</label>
+                                            <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'80px',resize:'vertical'}}
+                                                value={prodForm.descripcion} onChange={e=>setProdForm(f=>({...f,descripcion:e.target.value}))} placeholder="Descripción del producto..." />
+                                        </div>
+                                        <div className="modal-actions">
+                                            <button className="btn btn-glass" onClick={()=>{setShowProdModal(false);setEditingProducto(null);}}>Cancelar</button>
+                                            <button className="btn btn-gold" onClick={saveProd} disabled={!prodForm.nombre||savingProd} style={{flex:1,justifyContent:'center'}}>
+                                                {editingProducto?<>{I.edit} Guardar</>:<>{I.plus} Crear Producto</>}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     );
 
