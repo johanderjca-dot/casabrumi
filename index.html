@@ -358,17 +358,28 @@ function App() {
                 }));
             }
             // Si es vendedor, verifica que exista en colección vendedores
+            // Busca por uid O por email (por si el master lo registró manualmente sin uid)
             if (!isMaster) {
-                db.collection('vendedores').where('uid', '==', uid).get().then(snap => {
-                    if (snap.empty) {
+                db.collection('vendedores').get().then(snap => {
+                    const emailNorm = (email || '').toLowerCase().trim();
+                    const matches = snap.docs.filter(d => {
+                        const v = d.data();
+                        return v.uid === uid || (v.email || '').toLowerCase().trim() === emailNorm;
+                    });
+                    if (matches.length === 0) {
                         db.collection('vendedores').add({
                             nombre:         email.split('@')[0],
-                            email,
+                            email:          emailNorm,
                             uid,
                             activo:         true,
                             autoRegistrado: true,
                             fechaAlta:      firebase.firestore.FieldValue.serverTimestamp(),
                         }).catch(console.error);
+                    } else {
+                        // Vincula el uid al registro manual del master si aún no lo tiene
+                        matches.forEach(d => {
+                            if (!d.data().uid) d.ref.update({ uid }).catch(console.error);
+                        });
                     }
                 }).catch(console.error);
             }
@@ -398,21 +409,13 @@ function App() {
             } else {
                 const cred = await auth.createUserWithEmailAndPassword(email, password);
                 const role = email === 'johanderjca@gmail.com' ? 'master' : 'vendedor';
-                // Fire-and-forget: no bloquea el registro si Firestore tarda
+                // Fire-and-forget: no bloquea el registro si Firestore tarda.
+                // El alta en 'vendedores' la hace ensureFirestoreDocs (onAuthStateChanged)
+                // para evitar duplicados por doble escritura.
                 db.collection('users').doc(cred.user.uid).set({
                     email, role,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).catch(console.error);
-                if (role === 'vendedor') {
-                    db.collection('vendedores').add({
-                        nombre:          email.split('@')[0],
-                        email,
-                        uid:             cred.user.uid,
-                        activo:          true,
-                        autoRegistrado:  true,
-                        fechaAlta:       firebase.firestore.FieldValue.serverTimestamp(),
-                    }).catch(console.error);
-                }
             }
         } catch (err) {
             const msgs = {
@@ -658,7 +661,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
             snap => setUsuarios(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-            () => {} // ignora error de permisos
+            err => console.error('Firestore users:', err)
         );
         return unsub;
     }, []);
@@ -788,8 +791,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setSaving(true);
         try {
             await db.collection('vendedores').add({
-                nombre: form.nombre,
-                email:  form.email,
+                nombre: form.nombre.trim(),
+                email:  form.email.toLowerCase().trim(),
                 activo: true,
                 fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
             });
@@ -1159,19 +1162,34 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     )}
                 </>}
 
-                {activeTab === 'vendedores' && <>
+                {activeTab === 'vendedores' && (() => {
+                    // Une 'vendedores' con las cuentas de 'users' (rol vendedor) y deduplica por email.
+                    // Así cualquier persona registrada aparece aunque su alta en 'vendedores' haya fallado.
+                    const norm = e => (e || '').toLowerCase().trim();
+                    const porEmail = {};
+                    vendedores.forEach(v => {
+                        const k = norm(v.email) || v.id;
+                        if (!porEmail[k] || (v.uid && !porEmail[k].uid)) porEmail[k] = v;
+                    });
+                    usuarios.filter(u => u.role !== 'master' && norm(u.email) !== norm(user.email)).forEach(u => {
+                        const k = norm(u.email) || u.id;
+                        if (!porEmail[k]) porEmail[k] = { id: u.id, nombre: (u.email || '').split('@')[0], email: u.email, uid: u.id, autoRegistrado: true, fechaAlta: u.createdAt };
+                        else if (!porEmail[k].uid) porEmail[k] = { ...porEmail[k], uid: u.id };
+                    });
+                    const lista = Object.values(porEmail).sort((a, b) => (b.fechaAlta?.toDate?.()?.getTime() || 0) - (a.fechaAlta?.toDate?.()?.getTime() || 0));
+                    return <>
                     <div className="page-header"><h1>Vendedores</h1><p>Equipo de ventas y control de acceso</p></div>
                     <div className="sec-header">
-                        <h2>{vendedores.length} vendedor{vendedores.length !== 1 ? 'es' : ''} registrado{vendedores.length !== 1 ? 's' : ''}</h2>
+                        <h2>{lista.length} vendedor{lista.length !== 1 ? 'es' : ''} registrado{lista.length !== 1 ? 's' : ''}</h2>
                         <button className="btn btn-gold" onClick={() => setShowModal(true)}>{I.plus} Agregar vendedor</button>
                     </div>
                     <div className="card glass">
-                        {vendedores.length > 0 ? (
+                        {lista.length > 0 ? (
                             <table>
                                 <thead><tr><th>Nombre</th><th>Correo</th><th>Alta</th><th>Cuenta</th><th>Herramientas / Rol</th></tr></thead>
                                 <tbody>
-                                    {vendedores.map((v, i) => {
-                                        const userDoc = usuarios.find(u => u.email === v.email || (v.uid && u.id === v.uid));
+                                    {lista.map((v, i) => {
+                                        const userDoc = usuarios.find(u => norm(u.email) === norm(v.email) || (v.uid && u.id === v.uid));
                                         return (
                                             <tr key={i}>
                                                 <td>
@@ -1212,7 +1230,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         )}
                     </div>
-                </>}
+                    </>;
+                })()}
 
                 {activeTab === 'proveedores' && <>
                     <div className="page-header"><h1>Proveedores</h1><p>Gestion por pais de origen</p></div>
