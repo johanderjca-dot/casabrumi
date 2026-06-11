@@ -607,6 +607,18 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         return unsub;
     }, []);
 
+    // Migración: renombrar categoria GROWTH → Capacitación
+    useEffect(() => {
+        db.collection('gastos').where('categoria', '==', 'GROWTH').get()
+            .then(snap => {
+                if (snap.empty) return;
+                const batch = db.batch();
+                snap.docs.forEach(doc => batch.update(doc.ref, { categoria: 'Capacitación' }));
+                return batch.commit();
+            })
+            .catch(console.error);
+    }, []);
+
     useEffect(() => { if (showModal      && firstInputRef.current) firstInputRef.current.focus(); }, [showModal]);
     useEffect(() => { if (showGastoModal && firstGastoRef.current) firstGastoRef.current.focus(); }, [showGastoModal]);
 
