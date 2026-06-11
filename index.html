@@ -78,9 +78,9 @@
         .scene::after  { content: ''; position: absolute; width: 50vw; height: 50vw; bottom: -22vw; left: -12vw; border-radius: 50%; background: radial-gradient(circle, rgba(169,136,81,0.20) 0%, rgba(169,136,81,0.07) 42%, transparent 68%); animation: drift2 32s ease-in-out infinite alternate; }
         @keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(-7vw,6vh) scale(1.14); } }
         @keyframes drift2 { from { transform: translate(0,0) scale(1); } to { transform: translate(6vw,-5vh) scale(1.10); } }
-        @keyframes rise   { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        @keyframes rise   { from { opacity: 0; transform: translateY(18px); filter: blur(5px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
         @keyframes fadeIn { from { opacity: 0; } }
-        @keyframes pop    { from { opacity: 0; transform: scale(0.93) translateY(12px); } }
+        @keyframes pop    { from { opacity: 0; transform: scale(0.95) translateY(10px); filter: blur(3px); } }
 
         .glass { background: var(--glass-bg); border: 1px solid rgba(255,255,255,0.70); box-shadow: var(--glass-shadow); position: relative; backdrop-filter: blur(16px) saturate(1.35); -webkit-backdrop-filter: blur(16px) saturate(1.35); }
         .glass::before { display: none; }
@@ -190,9 +190,8 @@
         .kpi-grid .kpi-card:nth-child(4) { animation-delay: 0.19s; }
         .kpi-grid .kpi-card:nth-child(5) { animation-delay: 0.24s; }
         .kpi-grid .kpi-card:nth-child(6) { animation-delay: 0.29s; }
-        .kpi-card::after { content: ''; position: absolute; top: 0; left: 24px; right: 24px; height: 2.5px; border-radius: 0 0 4px 4px; background: var(--grad-gold); opacity: 0; transition: opacity var(--t-normal); }
-        .kpi-card:hover { transform: translateY(-4px) scale(1.015); box-shadow: 0 18px 36px -10px rgba(96,76,52,0.22); }
-        .kpi-card:hover::after { opacity: 1; }
+        .kpi-card::after { content: ''; position: absolute; top: 0; left: 24px; right: 24px; height: 2px; border-radius: 0 0 3px 3px; background: var(--grad-gold); opacity: 0; transition: opacity var(--t-normal); }
+        @media (hover: hover) and (pointer: fine) { .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 20px 44px -12px rgba(96,76,52,0.28); } .kpi-card:hover::after { opacity: 1; } }
 
         /* HERO */
         .hero { border-radius: 22px; padding: 30px 34px; margin-bottom: 22px; background: linear-gradient(125deg, #241C12 0%, #382B1A 52%, #4E3D24 100%); border: 1px solid rgba(212,184,134,0.28); box-shadow: 0 28px 56px -18px rgba(42,34,24,0.50), inset 0 1px 0 rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; overflow: hidden; position: relative; }
@@ -253,13 +252,14 @@
         .td-num { font-family: 'Fira Code', monospace; font-weight: 500; }
 
         .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 100px; font-size: 10.5px; font-weight: 600; }
-        .badge-dot { width: 4px; height: 4px; border-radius: 50%; }
+        .badge-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
         .badge-gold  { background: var(--sand-dim); border: 1px solid var(--sand-border); color: var(--sand-dark); }
         .badge-gold .badge-dot  { background: var(--sand); }
         .badge-green { background: rgba(74,120,89,0.10); border: 1px solid rgba(74,120,89,0.22); color: #3D6646; }
-        .badge-green .badge-dot { background: #4A7859; }
+        .badge-green .badge-dot { background: #4A7859; animation: pulse-dot 2.4s ease-in-out infinite; }
         .badge-gray  { background: rgba(28,24,20,0.06); border: 1px solid var(--glass-border); color: var(--text-dim); }
         .badge-gray .badge-dot  { background: var(--text-dimmer); }
+        @keyframes pulse-dot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.7); opacity: 0.45; } }
 
         .empty { padding: 56px 40px; text-align: center; }
         .empty-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--glass-bg-mid); border: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
@@ -288,6 +288,23 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         select.form-input { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 32px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(28%2C24%2C20%2C0.35)' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
         select.form-input option { background: #FFFFFF; color: #1C1814; }
+
+        /* TABLE ROW REVEAL */
+        .tr-animate { opacity: 0; transform: translateX(-10px); }
+        .tr-animate.tr-in { opacity: 1; transform: none; transition: opacity 300ms ease-out var(--tr-d,0ms), transform 320ms cubic-bezier(0.23,1,0.32,1) var(--tr-d,0ms); }
+
+        /* AUTH LEFT — PANEL PREMIUM */
+        .auth-left-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 40px; max-width: 360px; }
+        .auth-brand-name { font-size: 11px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 6px; }
+        .auth-headline { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.8px; line-height: 1.18; }
+        .auth-headline em { font-style: normal; color: var(--bronze); }
+        .auth-divider { width: 32px; height: 1.5px; background: var(--sand); border-radius: 2px; opacity: 0.6; }
+        .auth-live-stats { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        .auth-stat-pill { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 14px; background: rgba(255,255,255,0.55); border: 1px solid rgba(28,24,20,0.06); backdrop-filter: blur(8px); }
+        .auth-stat-pill-label { font-size: 11px; font-weight: 600; color: var(--text-dim); display: flex; align-items: center; gap: 7px; }
+        .auth-stat-pill-label span { width: 6px; height: 6px; border-radius: 50%; background: var(--sand); display: inline-block; animation: pulse-dot 2.4s ease-in-out infinite; }
+        .auth-stat-pill-val { font-size: 13px; font-weight: 700; font-family: 'Fira Code', monospace; color: var(--text); letter-spacing: -0.3px; }
+        .auth-tagline { font-size: 12px; color: var(--text-dimmer); line-height: 1.6; max-width: 280px; }
     </style>
 </head>
 <body>
@@ -331,6 +348,54 @@ const I = {
     lock:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
     key:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
 };
+
+// ── COUNTER ANIMATION ──
+function KpiVal({ value }) {
+    const elRef = useRef(null);
+    const raf = useRef(null);
+
+    useEffect(() => {
+        const el = elRef.current;
+        if (!el) return;
+        const str = String(value);
+        const m = str.match(/^([^0-9]*)([0-9]+(?:\.[0-9]+)?)([^0-9]*)$/);
+        if (!m) { el.textContent = str; return; }
+        const prefix = m[1], num = parseFloat(m[2]), suffix = m[3];
+        const isDecimal = m[2].includes('.');
+        const start = performance.now();
+        const dur = Math.min(900, 400 + num * 0.4);
+        cancelAnimationFrame(raf.current);
+        const tick = (now) => {
+            const p = Math.min((now - start) / dur, 1);
+            const e = 1 - Math.pow(1 - p, 3);
+            const cur = num * e;
+            el.textContent = prefix + (isDecimal ? cur.toFixed(0) : Math.floor(cur)) + suffix;
+            if (p < 1) raf.current = requestAnimationFrame(tick);
+            else el.textContent = str;
+        };
+        raf.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf.current);
+    }, [value]);
+
+    return <span ref={elRef}>{value}</span>;
+}
+
+// ── TABLE ROW REVEAL ──
+function RevealTable({ children, className, style }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const rows = el.querySelectorAll('tbody tr');
+        rows.forEach((r, i) => { r.classList.add('tr-animate'); r.style.setProperty('--tr-d', `${i * 45}ms`); });
+        const obs = new IntersectionObserver(entries => {
+            entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('tr-in'); obs.unobserve(e.target); } });
+        }, { threshold: 0.05, rootMargin: '0px 0px -16px 0px' });
+        rows.forEach(r => obs.observe(r));
+        return () => obs.disconnect();
+    }, [children]);
+    return <div ref={ref} className={className} style={style}>{children}</div>;
+}
 
 // ── APP ──
 function App() {
@@ -481,9 +546,30 @@ function App() {
     if (!user) return (
         <div className="auth-wrap">
             <div className="auth-left">
-                <div className="auth-left-glow" />
-                <div className="auth-logo-wrap">
-                    <img src={LOGO} alt="Casa Brumi Importaciones" />
+                <div className="auth-left-content">
+                    <div className="auth-logo-wrap" style={{marginBottom:0}}>
+                        <img src={LOGO} alt="Casa Brumi Importaciones" style={{width:'clamp(140px,45%,200px)', filter:'brightness(0)', opacity:0.85}} />
+                    </div>
+                    <div>
+                        <p className="auth-brand-name">Sistema de Gestión</p>
+                        <h1 className="auth-headline">Control total<br/>de tu operación<br/><em>importadora.</em></h1>
+                    </div>
+                    <div className="auth-divider" />
+                    <div className="auth-live-stats">
+                        <div className="auth-stat-pill">
+                            <span className="auth-stat-pill-label"><span/>Módulos activos</span>
+                            <span className="auth-stat-pill-val">Ventas · Gastos · Productos</span>
+                        </div>
+                        <div className="auth-stat-pill">
+                            <span className="auth-stat-pill-label"><span/>Sincronización</span>
+                            <span className="auth-stat-pill-val">En tiempo real</span>
+                        </div>
+                        <div className="auth-stat-pill">
+                            <span className="auth-stat-pill-label"><span/>Acceso seguro</span>
+                            <span className="auth-stat-pill-val">Firebase Auth</span>
+                        </div>
+                    </div>
+                    <p className="auth-tagline">Gestiona vendedores, registra gastos, analiza productos ganadores y toma decisiones con datos reales.</p>
                 </div>
             </div>
             <div className="auth-right">
@@ -1087,19 +1173,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         </div>
                         <div className="hero-stats" style={{position:'relative',zIndex:1}}>
                             <div className="hero-stat">
-                                <div className="hero-stat-val">${gastoMesUSD.toFixed(0)}</div>
+                                <div className="hero-stat-val"><KpiVal value={`$${gastoMesUSD.toFixed(0)}`} /></div>
                                 <div className="hero-stat-label">Gasto del mes</div>
                             </div>
                             <div className="hero-stat">
-                                <div className="hero-stat-val">${deudaUSD.toFixed(0)}</div>
+                                <div className="hero-stat-val"><KpiVal value={`$${deudaUSD.toFixed(0)}`} /></div>
                                 <div className="hero-stat-label">Deuda USD</div>
                             </div>
                             <div className="hero-stat">
-                                <div className="hero-stat-val">RD${deudaDOP.toFixed(0)}</div>
+                                <div className="hero-stat-val"><KpiVal value={`RD$${deudaDOP.toFixed(0)}`} /></div>
                                 <div className="hero-stat-label">Deuda DOP</div>
                             </div>
                             <div className="hero-stat">
-                                <div className="hero-stat-val">{nGanadores}</div>
+                                <div className="hero-stat-val"><KpiVal value={nGanadores} /></div>
                                 <div className="hero-stat-label">Ganadores</div>
                             </div>
                         </div>
@@ -1115,7 +1201,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         ].map((k, i) => (
                             <div className={`kpi-card glass ${i%2===0?'glass-mid':''}`} key={i}>
                                 <div className="kpi-top"><div className="kpi-label">{k.label}</div><div className={`kpi-icon ${k.v}`}>{k.icon}</div></div>
-                                <div className="kpi-val">{k.val}</div>
+                                <div className="kpi-val"><KpiVal value={k.val} /></div>
                                 <div className="kpi-sub">{k.sub}</div>
                             </div>
                         ))}
@@ -1145,7 +1231,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     {ventas.length > 0 && (
                         <>
                             <div className="sec-header" style={{marginTop:4}}><h2>Últimas ventas</h2></div>
-                            <div className="card glass">
+                            <RevealTable className="card glass">
                                 <table>
                                     <thead><tr><th>Vendedor</th><th>Cliente</th><th>Producto</th><th>Monto</th><th>Estado</th></tr></thead>
                                     <tbody>
@@ -1155,12 +1241,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 <td><strong>{v.cliente || '—'}</strong></td>
                                                 <td style={{color:'var(--text-dim)'}}>{v.producto || '—'}</td>
                                                 <td className="td-num"><strong>${(v.monto||0).toFixed(2)}</strong></td>
-                                                <td><span className="badge badge-gray"><span className="badge-dot"/>{v.estado || 'Pendiente'}</span></td>
+                                                <td><span className="badge badge-green"><span className="badge-dot"/>{v.estado || 'Completada'}</span></td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
+                            </RevealTable>
                         </>
                     )}
                 </>}
