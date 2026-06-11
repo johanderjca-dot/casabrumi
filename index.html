@@ -589,9 +589,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     };
 
     useEffect(() => {
-        const unsub = db.collection('vendedores').orderBy('fechaAlta', 'desc').onSnapshot(
-            snap => setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-            err => console.error('Firestore error:', err)
+        const unsub = db.collection('vendedores').onSnapshot(
+            snap => {
+                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                docs.sort((a, b) => (b.fechaAlta?.toDate?.()?.getTime()||0) - (a.fechaAlta?.toDate?.()?.getTime()||0));
+                setVendedores(docs);
+            },
+            err => console.error('Firestore vendedores:', err)
         );
         return unsub;
     }, []);
@@ -671,15 +675,20 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const addVendedor = async () => {
         if (!form.nombre || !form.email || saving) return;
         setSaving(true);
-        await db.collection('vendedores').add({
-            nombre: form.nombre,
-            email:  form.email,
-            activo: true,
-            fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-        setForm({ nombre: '', email: '' });
-        setShowModal(false);
-        setSaving(false);
+        try {
+            await db.collection('vendedores').add({
+                nombre: form.nombre,
+                email:  form.email,
+                activo: true,
+                fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            setForm({ nombre: '', email: '' });
+            setShowModal(false);
+        } catch(err) {
+            console.error('Error guardando vendedor:', err);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const addGasto = async () => {
