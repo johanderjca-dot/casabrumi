@@ -25,11 +25,18 @@
             *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
         }
         :root {
-            --sand:        #B8A48C;
-            --sand-light:  #CFC0A8;
+            --sand:        #C2A878;
+            --sand-light:  #D9C9AC;
             --sand-dark:   #8A7660;
-            --sand-dim:    rgba(184,164,140,0.13);
-            --sand-border: rgba(184,164,140,0.32);
+            --sand-dim:    rgba(194,168,120,0.14);
+            --sand-border: rgba(194,168,120,0.36);
+
+            --ink:         #181410;
+            --ink-2:       #221D17;
+            --ink-border:  rgba(255,255,255,0.07);
+            --on-ink:      #F2EDE5;
+            --on-ink-dim:  rgba(242,237,229,0.55);
+            --on-ink-dimmer: rgba(242,237,229,0.32);
 
             --glass-bg:      #FFFFFF;
             --glass-bg-mid:  #F9F6F2;
@@ -44,7 +51,7 @@
             --text-dimmer: rgba(28,24,20,0.28);
 
             --bg:          #F4F0EA;
-            --sidebar-bg:  #EDE8E1;
+            --sidebar-bg:  #181410;
 
             --header-h:  58px;
             --sidebar-w: 220px;
@@ -102,27 +109,34 @@
         .app-root { position: relative; z-index: 1; display: flex; min-height: 100vh; }
 
         /* HEADER */
-        .app-header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); z-index: 200; display: flex; align-items: center; background: #FFFFFF; border-bottom: 1px solid var(--glass-border); box-shadow: 0 1px 0 rgba(28,24,20,0.04); }
-        .app-header-logo { width: var(--sidebar-w); flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: 100%; border-right: 1px solid var(--glass-border); padding: 0 18px; }
-        .app-header-logo img { height: 22px; filter: brightness(0); opacity: 0.8; object-fit: contain; }
+        .app-header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); z-index: 200; display: flex; align-items: center; background: var(--ink); border-bottom: 1px solid var(--ink-border); }
+        .app-header-logo { width: var(--sidebar-w); flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: 100%; border-right: 1px solid var(--ink-border); padding: 0 18px; }
+        .app-header-logo img { height: 22px; filter: brightness(0) invert(1); opacity: 0.92; object-fit: contain; }
         .app-header-title { flex: 1; padding: 0 28px; }
-        .app-header-title strong { display: block; font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
-        .app-header-title span { font-size: 11px; color: var(--text-dimmer); text-transform: capitalize; }
+        .app-header-title strong { display: block; font-size: 14px; font-weight: 700; color: var(--on-ink); letter-spacing: -0.2px; }
+        .app-header-title span { font-size: 11px; color: var(--on-ink-dimmer); text-transform: capitalize; }
         .app-header-right { display: flex; align-items: center; gap: 12px; padding-right: 24px; }
-        .app-header-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--text); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--bg); flex-shrink: 0; }
-        .app-header-divider { width: 1px; height: 22px; background: var(--glass-border); }
+        .app-header-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--sand); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--ink); flex-shrink: 0; border: 1px solid rgba(255,255,255,0.18); }
+        .app-header-divider { width: 1px; height: 22px; background: var(--ink-border); }
+        .app-header .btn-logout { color: var(--on-ink-dimmer); }
+        .app-header .btn-logout:hover { color: #E58A8A; background: rgba(229,138,138,0.12); }
+        .hdr-role  { font-size: 9px; font-weight: 700; color: var(--sand); text-transform: uppercase; letter-spacing: 1.2px; }
+        .hdr-email { font-size: 11px; color: var(--on-ink-dim); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cmdk-hint { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--ink-border); color: var(--on-ink-dim); font-size: 11.5px; font-family: inherit; cursor: pointer; transition: background var(--t-fast), color var(--t-fast); }
+        .cmdk-hint:hover { background: rgba(255,255,255,0.10); color: var(--on-ink); }
+        .cmdk-hint kbd { font-family: 'Fira Code', monospace; font-size: 10px; background: rgba(255,255,255,0.10); border: 1px solid var(--ink-border); border-radius: 4px; padding: 1px 5px; color: var(--on-ink-dim); }
 
         /* SIDEBAR */
-        .sidebar { width: var(--sidebar-w); position: fixed; top: var(--header-h); left: 0; bottom: 0; z-index: 100; display: flex; flex-direction: column; background: var(--sidebar-bg); border-right: 1px solid var(--glass-border); overflow-y: auto; }
-        .sidebar-nav { flex: 1; padding: 14px 10px; }
-        .nav-label { font-size: 9px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 2.5px; padding: 0 10px; margin: 16px 0 5px; }
+        .sidebar { width: var(--sidebar-w); position: fixed; top: var(--header-h); left: 0; bottom: 0; z-index: 100; display: flex; flex-direction: column; background: var(--sidebar-bg); border-right: 1px solid var(--ink-border); overflow-y: auto; }
+        .sidebar-nav { flex: 1; padding: 16px 10px; }
+        .nav-label { font-size: 9px; font-weight: 700; color: var(--on-ink-dimmer); text-transform: uppercase; letter-spacing: 2.5px; padding: 0 10px; margin: 18px 0 6px; }
         .nav-label:first-child { margin-top: 0; }
-        .nav-item { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-dim); transition: background var(--t-fast), color var(--t-fast); margin-bottom: 1px; position: relative; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--on-ink-dim); transition: background var(--t-fast), color var(--t-fast); margin-bottom: 2px; position: relative; }
         .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
-        .nav-item:hover { background: rgba(28,24,20,0.06); color: var(--text); }
-        .nav-item.active { background: var(--sand-dim); color: var(--sand-dark); font-weight: 600; border: 1px solid var(--sand-border); }
-        .nav-item.active::before { content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 2px; border-radius: 2px; background: var(--sand); }
-        .sidebar-footer { padding: 10px; border-top: 1px solid var(--glass-border); }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: var(--on-ink); }
+        .nav-item.active { background: rgba(194,168,120,0.14); color: var(--sand-light); font-weight: 600; }
+        .nav-item.active::before { content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 2.5px; border-radius: 2px; background: var(--sand); box-shadow: 0 0 10px rgba(194,168,120,0.5); }
+        .sidebar-footer { padding: 10px; border-top: 1px solid var(--ink-border); }
         .user-tile { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; }
         .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--text); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--bg); flex-shrink: 0; }
         .user-tile-info { flex: 1; min-width: 0; }
@@ -146,8 +160,33 @@
         .banner-stat-label { font-size: 9px; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; margin-top: 3px; }
 
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 12px; margin-bottom: 24px; }
-        .kpi-card { border-radius: var(--r); padding: 20px 22px; transition: transform var(--t-normal), box-shadow var(--t-normal); cursor: default; }
+        .kpi-card { border-radius: var(--r); padding: 20px 22px; transition: transform var(--t-normal), box-shadow var(--t-normal); cursor: default; position: relative; }
+        .kpi-card::after { content: ''; position: absolute; top: 0; left: 22px; right: 22px; height: 2px; border-radius: 0 0 3px 3px; background: linear-gradient(90deg, var(--sand), transparent); opacity: 0; transition: opacity var(--t-normal); }
         .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.07); }
+        .kpi-card:hover::after { opacity: 1; }
+
+        /* HERO */
+        .hero { border-radius: var(--r); padding: 26px 30px; margin-bottom: 20px; background: linear-gradient(120deg, var(--ink) 0%, #2A231B 100%); border: 1px solid rgba(194,168,120,0.18); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; overflow: hidden; position: relative; }
+        .hero::before { content: ''; position: absolute; top: -60%; right: -5%; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(194,168,120,0.16), transparent 70%); pointer-events: none; }
+        .hero h2 { font-size: 19px; font-weight: 700; color: var(--on-ink); letter-spacing: -0.4px; margin-bottom: 4px; }
+        .hero p { font-size: 12.5px; color: var(--on-ink-dim); }
+        .hero-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+        .hero-stat { border-radius: 10px; padding: 12px 18px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); min-width: 100px; }
+        .hero-stat-val { font-size: 19px; font-weight: 700; color: var(--sand-light); letter-spacing: -0.6px; font-family: 'Fira Code', monospace; }
+        .hero-stat-label { font-size: 9px; color: var(--on-ink-dimmer); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; margin-top: 3px; }
+
+        /* COMMAND PALETTE */
+        .cmdk-overlay { position: fixed; inset: 0; background: rgba(20,16,12,0.45); backdrop-filter: blur(5px); display: flex; align-items: flex-start; justify-content: center; z-index: 2000; padding: 12vh 20px 20px; }
+        .cmdk { width: 100%; max-width: 520px; background: #FFFFFF; border-radius: 14px; box-shadow: 0 24px 64px rgba(0,0,0,0.28); overflow: hidden; border: 1px solid var(--glass-border); }
+        .cmdk-input { width: 100%; padding: 17px 20px; font-size: 15px; font-family: inherit; border: none; outline: none; color: var(--text); background: transparent; border-bottom: 1px solid var(--glass-border); }
+        .cmdk-input::placeholder { color: var(--text-dimmer); }
+        .cmdk-list { max-height: 320px; overflow-y: auto; padding: 8px; }
+        .cmdk-group { font-size: 9.5px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1.8px; padding: 10px 12px 4px; }
+        .cmdk-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--text); transition: background var(--t-fast); }
+        .cmdk-item:hover, .cmdk-item.sel { background: var(--sand-dim); }
+        .cmdk-item svg { width: 15px; height: 15px; color: var(--sand-dark); flex-shrink: 0; }
+        .cmdk-item .cmdk-kind { margin-left: auto; font-size: 10px; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1px; }
+        .cmdk-empty { padding: 28px; text-align: center; font-size: 13px; color: var(--text-dim); }
         .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .kpi-label { font-size: 10px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1px; }
         .kpi-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
@@ -456,10 +495,11 @@ function App() {
 }
 
 // ── HEADER ──
-function Header({ user, onLogout, activeTab, navSections, onPhotoChange }) {
+function Header({ user, onLogout, activeTab, navSections, onPhotoChange, onCmdK }) {
     const fileRef = React.useRef(null);
     const current = navSections.flatMap(s=>s.items).find(i=>i.key===activeTab);
     const today   = new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const isMac   = navigator.platform.toUpperCase().includes('MAC');
     return (
         <header className="app-header">
             <div className="app-header-logo">
@@ -470,6 +510,11 @@ function Header({ user, onLogout, activeTab, navSections, onPhotoChange }) {
                 <span>{today}</span>
             </div>
             <div className="app-header-right">
+                {onCmdK && (
+                    <button className="cmdk-hint" onClick={onCmdK}>
+                        Buscar… <kbd>{isMac ? '⌘' : 'Ctrl'} K</kbd>
+                    </button>
+                )}
                 <div className="app-header-divider" />
                 <div className="app-header-avatar"
                     onClick={() => fileRef.current?.click()}
@@ -483,8 +528,8 @@ function Header({ user, onLogout, activeTab, navSections, onPhotoChange }) {
                         onChange={e => { if(e.target.files[0]) onPhotoChange(e.target.files[0]); e.target.value=''; }} />
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                    <span style={{fontSize:'9px',fontWeight:'700',color:'var(--sand-dark)',textTransform:'uppercase',letterSpacing:'1.2px'}}>{user.role}</span>
-                    <span style={{fontSize:'11px',color:'var(--text-dimmer)',maxWidth:'160px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email}</span>
+                    <span className="hdr-role">{user.role}</span>
+                    <span className="hdr-email">{user.email}</span>
                 </div>
                 <button className="btn-logout" onClick={onLogout} aria-label="Cerrar sesion">{I.logout}</button>
             </div>
@@ -522,6 +567,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showModal,  setShowModal]  = useState(false);
     const [form,       setForm]       = useState({ nombre: '', email: '' });
     const [saving,     setSaving]     = useState(false);
+    const [showCmdK,   setShowCmdK]   = useState(false);
+    const [cmdQuery,   setCmdQuery]   = useState('');
     const firstInputRef  = useRef(null);
     const firstGastoRef  = useRef(null);
     const chartRef       = useRef(null);
@@ -631,6 +678,37 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         );
         return unsub;
     }, []);
+
+    // Atajo ⌘K / Ctrl+K — paleta de comandos
+    useEffect(() => {
+        const h = e => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdQuery(''); setShowCmdK(v => !v); }
+            if (e.key === 'Escape') setShowCmdK(false);
+        };
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+    }, []);
+
+    const exportGastosCSV = () => {
+        const rows = [['Fecha','Descripción','Categoría','Medio de pago','Terminal','Moneda','Monto','Abonado','Pendiente','Crédito']];
+        gastos.forEach(g => {
+            const d = g.fecha?.toDate?.();
+            rows.push([
+                d ? d.toLocaleDateString('es') : '',
+                g.descripcion || '', g.categoria || '', g.medioPago || 'Efectivo', g.terminal || '',
+                g.moneda || 'USD', g.monto || 0, g.montoAbonado || 0,
+                g.esCredito ? Math.max(0, (g.monto||0) - (g.montoAbonado||0)) : 0,
+                g.esCredito ? 'Sí' : 'No',
+            ]);
+        });
+        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `gastos-casabrumi-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    };
 
     // Migración: renombrar categoria GROWTH → Capacitación
     useEffect(() => {
@@ -917,20 +995,84 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ]},
     ];
 
+    // Métricas ejecutivas para el dashboard
+    const _hoy = new Date();
+    const _gastosMes = gastos.filter(g => { const d = g.fecha?.toDate?.(); return d && d.getMonth() === _hoy.getMonth() && d.getFullYear() === _hoy.getFullYear(); });
+    const gastoMesUSD = _gastosMes.filter(g => g.moneda !== 'DOP').reduce((s,g) => s + (g.monto||0), 0);
+    const gastoMesDOP = _gastosMes.filter(g => g.moneda === 'DOP').reduce((s,g) => s + (g.monto||0), 0);
+    const deudaUSD = gastos.filter(g => g.esCredito && g.moneda !== 'DOP').reduce((s,g) => s + Math.max(0, (g.monto||0) - (g.montoAbonado||0)), 0);
+    const deudaDOP = gastos.filter(g => g.esCredito && g.moneda === 'DOP').reduce((s,g) => s + Math.max(0, (g.monto||0) - (g.montoAbonado||0)), 0);
+    const nGanadores = productos.filter(p => p.estado === 'Ganador').length;
+
     return (
         <div className="app-root">
             <img src={LOGO} aria-hidden="true" style={{position:'fixed',top:'50%',left:'50%',transform:'translate(calc(-50% + 110px), -50%)',width:'520px',maxWidth:'55vw',opacity:0.055,filter:'brightness(0)',pointerEvents:'none',userSelect:'none',zIndex:0}} />
-            <Header user={user} onLogout={onLogout} activeTab={activeTab} navSections={navSections} onPhotoChange={onPhotoChange} />
+            <Header user={user} onLogout={onLogout} activeTab={activeTab} navSections={navSections} onPhotoChange={onPhotoChange} onCmdK={() => { setCmdQuery(''); setShowCmdK(true); }} />
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
+            {showCmdK && (() => {
+                const acciones = [
+                    { label: 'Nuevo gasto',            icon: I.dollar, kind: 'Acción', run: () => { setActiveTab('gastos'); setShowGastoModal(true); } },
+                    { label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Testeando',proveedor:'',imagen:''}); setShowProdModal(true); } },
+                    { label: 'Nuevo vendedor',         icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
+                    { label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
+                    { label: 'Exportar gastos a CSV',  icon: I.chart,  kind: 'Acción', run: exportGastosCSV },
+                ];
+                const navCmds = navSections.flatMap(s => s.items).map(i => ({ label: i.label, icon: i.icon, kind: 'Ir a', run: () => { setActiveTab(i.key); if (i.key === 'ganadores') setActiveProducto(null); } }));
+                const q = cmdQuery.trim().toLowerCase();
+                const filtered = [...acciones, ...navCmds].filter(c => !q || c.label.toLowerCase().includes(q));
+                return (
+                    <div className="cmdk-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCmdK(false); }}>
+                        <div className="cmdk">
+                            <input className="cmdk-input" autoFocus placeholder="Buscar acciones o secciones…" value={cmdQuery}
+                                onChange={e => setCmdQuery(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && filtered[0]) { filtered[0].run(); setShowCmdK(false); } }} />
+                            <div className="cmdk-list">
+                                {filtered.length === 0 && <div className="cmdk-empty">Sin resultados para “{cmdQuery}”</div>}
+                                {filtered.map((c, i) => (
+                                    <div key={i} className={`cmdk-item ${i === 0 ? 'sel' : ''}`} onClick={() => { c.run(); setShowCmdK(false); }}>
+                                        {c.icon}{c.label}<span className="cmdk-kind">{c.kind}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
             <main className="main">
 
                 {activeTab === 'dashboard' && <>
+                    <div className="hero">
+                        <div style={{position:'relative',zIndex:1}}>
+                            <h2>Hola, {(user.email||'').split('@')[0]} 👋</h2>
+                            <p>Resumen ejecutivo · Casa Brumi Importaciones</p>
+                        </div>
+                        <div className="hero-stats" style={{position:'relative',zIndex:1}}>
+                            <div className="hero-stat">
+                                <div className="hero-stat-val">${gastoMesUSD.toFixed(0)}</div>
+                                <div className="hero-stat-label">Gasto del mes</div>
+                            </div>
+                            <div className="hero-stat">
+                                <div className="hero-stat-val">${deudaUSD.toFixed(0)}</div>
+                                <div className="hero-stat-label">Deuda USD</div>
+                            </div>
+                            <div className="hero-stat">
+                                <div className="hero-stat-val">RD${deudaDOP.toFixed(0)}</div>
+                                <div className="hero-stat-label">Deuda DOP</div>
+                            </div>
+                            <div className="hero-stat">
+                                <div className="hero-stat-val">{nGanadores}</div>
+                                <div className="hero-stat-label">Ganadores</div>
+                            </div>
+                        </div>
+                    </div>
                     <div className="kpi-grid">
                         {[
-                            { label: 'Vendedores',    val: vendedores.length,        sub: 'registrados',   icon: I.users,   v: 'gold'  },
-                            { label: 'Ventas hoy',    val: ventas.filter(v => { const d=v.fecha?.toDate?.(); return d&&d.toDateString()===new Date().toDateString(); }).length, sub: 'registradas hoy', icon: I.invoice, v: 'white' },
-                            { label: 'Total ventas',  val: ventas.length,            sub: 'en el sistema', icon: I.chart,   v: 'white' },
-                            { label: 'Monto total',   val: `$${totalVentas.toFixed(0)}`, sub: 'acumulado', icon: I.dollar,  v: 'gold'  },
+                            { label: 'Vendedores',     val: vendedores.length,        sub: 'registrados',   icon: I.users,   v: 'gold'  },
+                            { label: 'Ventas hoy',     val: ventas.filter(v => { const d=v.fecha?.toDate?.(); return d&&d.toDateString()===new Date().toDateString(); }).length, sub: 'registradas hoy', icon: I.invoice, v: 'white' },
+                            { label: 'Gasto mes USD',  val: `$${gastoMesUSD.toFixed(0)}`,   sub: `${_gastosMes.filter(g=>g.moneda!=='DOP').length} gastos este mes`, icon: I.dollar, v: 'gold' },
+                            { label: 'Gasto mes DOP',  val: `RD$${gastoMesDOP.toFixed(0)}`, sub: `${_gastosMes.filter(g=>g.moneda==='DOP').length} gastos este mes`, icon: I.dollar, v: 'white' },
+                            { label: 'Productos',      val: productos.length,         sub: `${nGanadores} ganador${nGanadores!==1?'es':''}`, icon: I.chart, v: 'gold' },
+                            { label: 'Monto ventas',   val: `$${totalVentas.toFixed(0)}`, sub: 'acumulado', icon: I.dollar,  v: 'white'  },
                         ].map((k, i) => (
                             <div className={`kpi-card glass ${i%2===0?'glass-mid':''}`} key={i}>
                                 <div className="kpi-top"><div className="kpi-label">{k.label}</div><div className={`kpi-icon ${k.v}`}>{k.icon}</div></div>
@@ -1549,6 +1691,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <button className={`btn ${gastoVista==='mensual'?'btn-gold':'btn-glass'}`} onClick={()=>setGastoVista('mensual')}>Meses</button>
                             </div>
                             <div style={{display:'flex',gap:8}}>
+                                {gastos.length > 0 && (
+                                    <button className="btn btn-glass" onClick={exportGastosCSV} title="Descargar todos los gastos en CSV">⬇ CSV</button>
+                                )}
                                 {gastos.some(g=>g.esCredito&&(g.monto||0)-(g.montoAbonado||0)>0) && (
                                     <button className="btn btn-glass" onClick={()=>setShowPagoRapidoModal(true)}>{I.dollar} Registrar Pago</button>
                                 )}
