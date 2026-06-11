@@ -478,9 +478,14 @@ function App() {
                             fechaAlta:      firebase.firestore.FieldValue.serverTimestamp(),
                         }).catch(console.error);
                     } else {
-                        // Vincula el uid al registro manual del master si aún no lo tiene
+                        // Vincula uid + normaliza email en el registro manual del master
                         matches.forEach(d => {
-                            if (!d.data().uid) d.ref.update({ uid }).catch(console.error);
+                            const data = d.data();
+                            const updates = {};
+                            if (!data.uid) updates.uid = uid;
+                            // Normalizar email a lowercase si estaba con mayúsculas
+                            if (data.email && data.email !== emailNorm) updates.email = emailNorm;
+                            if (Object.keys(updates).length > 0) d.ref.update(updates).catch(console.error);
                         });
                     }
                 }).catch(console.error);
@@ -1316,19 +1321,57 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 </>}
 
                 {activeTab === 'vendedores' && (() => {
-                    // Une 'vendedores' con las cuentas de 'users' (rol vendedor) y deduplica por email.
-                    // Así cualquier persona registrada aparece aunque su alta en 'vendedores' haya fallado.
+                    // Deduplicación por email normalizado Y uid para evitar duplicados
+                    // cuando el mismo usuario aparece como entrada manual + auto-registrado.
                     const norm = e => (e || '').toLowerCase().trim();
-                    const porEmail = {};
+                    const byEmail = {}; // clave: email normalizado o docId
+                    const byUid   = {}; // uid → clave en byEmail
+
+                    const mergeVendedor = (existing, incoming) => {
+                        // Preferir nombre del registro manual (no autoRegistrado)
+                        const nombre = (!existing.autoRegistrado && existing.nombre) ? existing.nombre
+                                     : (!incoming.autoRegistrado && incoming.nombre)  ? incoming.nombre
+                                     : existing.nombre || incoming.nombre;
+                        const email  = norm(existing.email || incoming.email);
+                        const uid    = existing.uid || incoming.uid;
+                        return { ...existing, ...incoming, nombre, email, uid };
+                    };
+
                     vendedores.forEach(v => {
-                        const k = norm(v.email) || v.id;
-                        if (!porEmail[k] || (v.uid && !porEmail[k].uid)) porEmail[k] = v;
+                        const ek = norm(v.email);
+                        const uk = v.uid;
+                        // Buscar entrada existente por uid primero, luego por email
+                        let existingKey = (uk && byUid[uk]) ? byUid[uk] : (ek || null);
+                        if (existingKey && byEmail[existingKey]) {
+                            byEmail[existingKey] = mergeVendedor(byEmail[existingKey], v);
+                        } else {
+                            const key = ek || v.id;
+                            byEmail[key] = { ...v, email: ek || v.email };
+                            if (uk) byUid[uk] = key;
+                        }
+                        // Registrar uid en índice si el doc lo tiene
+                        if (uk && !byUid[uk]) byUid[uk] = ek || v.id;
                     });
+
+                    // Incorporar cuentas de Firebase Auth que no estén en vendedores
                     usuarios.filter(u => u.role !== 'master' && norm(u.email) !== norm(user.email)).forEach(u => {
-                        const k = norm(u.email) || u.id;
-                        if (!porEmail[k]) porEmail[k] = { id: u.id, nombre: (u.email || '').split('@')[0], email: u.email, uid: u.id, autoRegistrado: true, fechaAlta: u.createdAt };
-                        else if (!porEmail[k].uid) porEmail[k] = { ...porEmail[k], uid: u.id };
+                        const ek = norm(u.email);
+                        const uk = u.id; // uid del usuario de Auth
+                        const existingKey = (byUid[uk]) ? byUid[uk] : (ek || null);
+                        if (!existingKey || !byEmail[existingKey]) {
+                            // No existe ni por uid ni por email → crear sintético
+                            const key = ek || u.id;
+                            byEmail[key] = { id: u.id, nombre: (u.email || '').split('@')[0], email: u.email, uid: u.id, autoRegistrado: true, fechaAlta: u.createdAt };
+                            byUid[uk] = key;
+                        } else {
+                            // Existe → vincular uid si faltaba
+                            if (!byEmail[existingKey].uid) {
+                                byEmail[existingKey] = { ...byEmail[existingKey], uid: uk };
+                                byUid[uk] = existingKey;
+                            }
+                        }
                     });
+                    const porEmail = byEmail; // alias para compatibilidad con código de renderizado siguiente
                     const lista = Object.values(porEmail).sort((a, b) => (b.fechaAlta?.toDate?.()?.getTime() || 0) - (a.fechaAlta?.toDate?.()?.getTime() || 0));
                     return <>
                     <div className="page-header"><h1>Vendedores</h1><p>Equipo de ventas y control de acceso</p></div>
