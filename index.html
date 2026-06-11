@@ -561,6 +561,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [linkForm,            setLinkForm]            = useState({ nombre:'', url:'', icono:'🔗' });
     const [editingLink,         setEditingLink]         = useState(null);
     const LINK_ICONOS = ['🔗','🛒','🏪','📦','🚚','💼','💰','📊','🌐','📱','💻','🎯','📋','📌','🏬','🛍️','🌍','📣','🔍','📸','🎨','📝','📞','📧','💬','🤝','🏆','⚡','🔔','📅','🗂️','📂','🖥️','🛠️','⚙️','🔐','👥','🏷️','💳','🏦','📈','📉','🎪','🧾','🔖'];
+    const PROD_ESTADOS = ['Testeando','Ganador','Activo','Pausado','Descartado'];
+    const PROD_ESTADO_COLOR = { Ganador:'badge-green', Testeando:'badge-gold', Activo:'badge-gold', Pausado:'badge-gray', Descartado:'badge-gray' };
+    const [productos,          setProductos]          = useState([]);
+    const [activeProducto,     setActiveProducto]     = useState(null);
+    const [productoTab,        setProductoTab]        = useState('general');
+    const [showProdModal,      setShowProdModal]      = useState(false);
+    const [editingProducto,    setEditingProducto]    = useState(null);
+    const [savingProd,         setSavingProd]         = useState(false);
+    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Testeando', proveedor:'', imagen:'' });
+    const [editSeccion,        setEditSeccion]        = useState(null); // 'facebook'|'testeo'|'inventario'
+    const [fbForm,             setFbForm]             = useState({ gastoAds:'', cpm:'', ctr:'', cpc:'', roas:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
+    const [testeoForm,         setTesteoForm]         = useState({ resultado:'Pendiente', plataformas:'', notas:'', fecha:'' });
+    const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', unidadesVendidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -595,6 +608,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const unsub = db.collection('gastos').orderBy('fecha', 'desc').onSnapshot(
             snap => setGastos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             err => console.error('Firestore error:', err)
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('productos').orderBy('creadoEn','desc').onSnapshot(
+            snap => setProductos(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Productos:', err)
         );
         return unsub;
     }, []);
@@ -795,6 +816,58 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setAbonoMonto(''); setPagoRapidoId(''); setShowPagoRapidoModal(false);
     };
 
+    const handleProdImage = (file, cb) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX = 600; const ratio = Math.min(MAX/img.width, MAX/img.height);
+                canvas.width = img.width*ratio; canvas.height = img.height*ratio;
+                canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+                cb(canvas.toDataURL('image/jpeg', 0.82));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const saveProd = () => {
+        if (!prodForm.nombre) return;
+        const data = {
+            nombre: prodForm.nombre, descripcion: prodForm.descripcion,
+            estado: prodForm.estado, proveedor: prodForm.proveedor,
+            imagen: prodForm.imagen,
+            facebook: editingProducto?.facebook || {}, testeo: editingProducto?.testeo || {}, inventario: editingProducto?.inventario || {},
+        };
+        if (editingProducto) {
+            db.collection('productos').doc(editingProducto.id).update(data).catch(console.error);
+            setActiveProducto(p => p?.id===editingProducto.id ? {...p,...data} : p);
+        } else {
+            db.collection('productos').add({...data, creadoEn: firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
+        }
+        setProdForm({nombre:'',descripcion:'',estado:'Testeando',proveedor:'',imagen:''});
+        setEditingProducto(null); setShowProdModal(false);
+    };
+
+    const deleteProd = (id) => {
+        db.collection('productos').doc(id).delete().catch(console.error);
+        setActiveProducto(null);
+    };
+
+    const openEditProd = (p) => {
+        setEditingProducto(p);
+        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Testeando', proveedor:p.proveedor||'', imagen:p.imagen||''});
+        setShowProdModal(true);
+    };
+
+    const saveSeccion = (id, seccion, data) => {
+        db.collection('productos').doc(id).update({[seccion]: data}).catch(console.error);
+        setActiveProducto(p => p ? {...p, [seccion]: data} : p);
+        setEditSeccion(null);
+    };
+
     const saveLink = () => {
         if (!linkForm.nombre || !linkForm.url) return;
         const url = linkForm.url.startsWith('http') ? linkForm.url : 'https://' + linkForm.url;
@@ -820,6 +893,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
 
     const I_link = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
+    const I_star = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
 
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
@@ -827,6 +901,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'vendedores',  label: 'Vendedores',  icon: I.users  },
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'gastos',      label: 'Gastos',      icon: I.dollar },
+            { key: 'ganadores',   label: 'Prod. Ganadores', icon: I_star },
         ]},
         { label: 'Herramientas', items: [
             { key: 'accesos', label: 'Accesos Rápidos', icon: I_link },
@@ -959,6 +1034,364 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     <div className="page-header"><h1>Proveedores</h1><p>Gestion por pais de origen</p></div>
                     <div className="card glass"><div className="coming-soon"><div className="cs-icon">{I.truck}</div><h3>Modulo de Proveedores</h3><div className="cs-bar"/><p>Proxima fase — Republica Dominicana y Venezuela</p></div></div>
                 </>}
+
+                {activeTab === 'ganadores' && (() => {
+                    const fmtNum = v => v ? parseFloat(v).toLocaleString('es-CO') : '—';
+                    // ── Lista de productos ──
+                    if (!activeProducto) return (
+                        <>
+                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                <div><h1>Productos Ganadores</h1><p>Gestiona y analiza tus mejores productos</p></div>
+                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeando',proveedor:'',imagen:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
+                            </div>
+                            {productos.length===0 ? (
+                                <div className="card glass"><div className="empty">
+                                    <div style={{fontSize:'40px',marginBottom:14}}>⭐</div>
+                                    <h3>Sin productos aún</h3><p>Agrega tu primer producto ganador.</p>
+                                </div></div>
+                            ) : (
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:16}}>
+                                    {productos.map(p => {
+                                        const inv = p.inventario||{}; const fb = p.facebook||{};
+                                        const vendido = parseFloat(inv.unidadesVendidas||0);
+                                        const pedido  = parseFloat(inv.unidadesPedidas||0);
+                                        return (
+                                            <div key={p.id} className="card glass" style={{cursor:'pointer',transition:'transform var(--t-fast),box-shadow var(--t-fast)',overflow:'visible'}}
+                                                onClick={()=>{setActiveProducto(p);setProductoTab('general');setEditSeccion(null);}}
+                                                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)';}}
+                                                onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
+                                                <div style={{height:'160px',background:'var(--glass-bg-mid)',borderRadius:'var(--r) var(--r) 0 0',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative'}}>
+                                                    {p.imagen
+                                                        ? <img src={p.imagen} alt={p.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                                                        : <span style={{fontSize:'48px'}}>📦</span>}
+                                                    <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`} style={{position:'absolute',top:8,right:8,fontSize:'10px'}}>
+                                                        <span className="badge-dot"/>{p.estado||'Sin estado'}
+                                                    </span>
+                                                </div>
+                                                <div style={{padding:'14px 16px'}}>
+                                                    <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
+                                                    {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8}}>{p.proveedor}</div>}
+                                                    <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+                                                        {pedido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span>/{pedido} vendidos</div>}
+                                                        {fb.roas&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}>ROAS <span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--sand-dark)'}}>{fb.roas}x</span></div>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </>
+                    );
+
+                    // ── Detalle de producto ──
+                    const p = productos.find(x=>x.id===activeProducto.id) || activeProducto;
+                    const fb = p.facebook||{}; const testeo = p.testeo||{}; const inv = p.inventario||{};
+                    const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
+                    const gananciaTotal = gananciaUnit * parseFloat(inv.unidadesVendidas||0);
+                    const TABS = ['General','Facebook','Testeo','Inventario'];
+                    return (
+                        <>
+                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+                                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                    <button className="btn btn-glass btn-sm" onClick={()=>{setActiveProducto(null);setEditSeccion(null);}}>← Productos</button>
+                                    <div>
+                                        <h1 style={{display:'flex',alignItems:'center',gap:10}}>{p.nombre} <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`}><span className="badge-dot"/>{p.estado}</span></h1>
+                                        {p.proveedor&&<p>{p.proveedor}</p>}
+                                    </div>
+                                </div>
+                                <div style={{display:'flex',gap:8}}>
+                                    <button className="btn btn-glass" onClick={()=>openEditProd(p)}>{I.edit} Editar</button>
+                                    <button className="btn btn-glass" onClick={()=>{ if(confirm('¿Eliminar este producto?')) deleteProd(p.id); }} style={{color:'#8B3535'}}>Eliminar</button>
+                                </div>
+                            </div>
+
+                            {/* Tabs */}
+                            <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
+                                {TABS.map(t=>(
+                                    <button key={t} className={`btn ${productoTab===t.toLowerCase()?'btn-gold':'btn-glass'}`}
+                                        onClick={()=>{setProductoTab(t.toLowerCase());setEditSeccion(null);}}>{t}</button>
+                                ))}
+                            </div>
+
+                            {/* ── Tab General ── */}
+                            {productoTab==='general' && (
+                                <div style={{display:'grid',gridTemplateColumns:'300px 1fr',gap:20,alignItems:'start'}}>
+                                    <div className="card glass" style={{overflow:'hidden'}}>
+                                        <div style={{height:'260px',background:'var(--glass-bg-mid)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                                            {p.imagen ? <img src={p.imagen} alt={p.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} /> : <span style={{fontSize:'64px'}}>📦</span>}
+                                        </div>
+                                        <div style={{padding:'14px 16px'}}>
+                                            <div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:6,textTransform:'uppercase',letterSpacing:'1px',fontWeight:'700'}}>Estado</div>
+                                            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                {PROD_ESTADOS.map(e=>(
+                                                    <button key={e} onClick={()=>{ db.collection('productos').doc(p.id).update({estado:e}).catch(console.error); setActiveProducto(prev=>({...prev,estado:e})); }}
+                                                        className={`btn btn-sm ${p.estado===e?'btn-gold':'btn-glass'}`}>{e}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                                        <div className="card glass" style={{padding:'20px'}}>
+                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Descripción</div>
+                                            <div style={{fontSize:'14px',color:'var(--text)',lineHeight:'1.6'}}>{p.descripcion||<span style={{color:'var(--text-dimmer)'}}>Sin descripción — edita el producto para agregarla.</span>}</div>
+                                        </div>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                                            {[
+                                                {label:'Unidades pedidas', val: inv.unidadesPedidas||'—'},
+                                                {label:'Unidades vendidas', val: inv.unidadesVendidas||'—'},
+                                                {label:'ROAS', val: fb.roas ? `${fb.roas}x` : '—'},
+                                                {label:'Gasto en Ads', val: fb.gastoAds ? `$${fb.gastoAds}` : '—'},
+                                            ].map(({label,val})=>(
+                                                <div key={label} className="kpi-card glass glass-mid" style={{padding:'16px'}}>
+                                                    <div className="kpi-label">{label}</div>
+                                                    <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'20px',color:'var(--text)',marginTop:6}}>{val}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Tab Facebook ── */}
+                            {productoTab==='facebook' && (
+                                <>
+                                    <div style={{background:'rgba(24,119,242,0.06)',border:'1px solid rgba(24,119,242,0.18)',borderRadius:'var(--r)',padding:'14px 18px',marginBottom:16,display:'flex',alignItems:'center',gap:12}}>
+                                        <span style={{fontSize:'20px'}}>📘</span>
+                                        <div style={{fontSize:'12.5px',color:'var(--text-dim)'}}>
+                                            Métricas de campaña en Facebook Ads. <strong style={{color:'var(--text)'}}>Próximamente:</strong> conexión directa con Meta Marketing API para actualización en tiempo real.
+                                        </div>
+                                    </div>
+                                    {editSeccion==='facebook' ? (
+                                        <div className="card glass" style={{padding:'24px'}}>
+                                            <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar métricas de Facebook</div>
+                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                                                {[
+                                                    {key:'gastoAds',label:'Gasto en Ads (USD)',ph:'0.00'},
+                                                    {key:'roas',label:'ROAS',ph:'Ej. 3.5'},
+                                                    {key:'cpm',label:'CPM',ph:'Costo por mil'},
+                                                    {key:'cpc',label:'CPC',ph:'Costo por clic'},
+                                                    {key:'ctr',label:'CTR (%)',ph:'Ej. 2.4'},
+                                                    {key:'alcance',label:'Alcance',ph:'0'},
+                                                    {key:'impresiones',label:'Impresiones',ph:'0'},
+                                                    {key:'conversiones',label:'Conversiones',ph:'0'},
+                                                ].map(({key,label,ph})=>(
+                                                    <div key={key} className="form-group" style={{marginBottom:0}}>
+                                                        <label style={{color:'var(--text-dim)'}}>{label}</label>
+                                                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                            type="number" placeholder={ph} value={fbForm[key]||''}
+                                                            onChange={e=>setFbForm(f=>({...f,[key]:e.target.value}))} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div style={{display:'flex',gap:10,marginTop:20}}>
+                                                <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
+                                                <button className="btn btn-gold" onClick={()=>saveSeccion(p.id,'facebook',fbForm)}>Guardar Métricas</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="card glass">
+                                            <div style={{padding:'16px 20px',display:'flex',justifyContent:'space-between',borderBottom:'1px solid var(--glass-border)'}}>
+                                                <span style={{fontWeight:'700',fontSize:'13px'}}>Métricas de campaña</span>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>{setFbForm({gastoAds:fb.gastoAds||'',roas:fb.roas||'',cpm:fb.cpm||'',cpc:fb.cpc||'',ctr:fb.ctr||'',alcance:fb.alcance||'',impresiones:fb.impresiones||'',conversiones:fb.conversiones||''});setEditSeccion('facebook');}}>✎ Editar</button>
+                                            </div>
+                                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:0}}>
+                                                {[
+                                                    {label:'Gasto Ads', val:fb.gastoAds?`$${fb.gastoAds}`:'—', highlight:false},
+                                                    {label:'ROAS',       val:fb.roas?`${fb.roas}x`:'—', highlight:!!fb.roas},
+                                                    {label:'CPM',        val:fb.cpm?`$${fb.cpm}`:'—', highlight:false},
+                                                    {label:'CPC',        val:fb.cpc?`$${fb.cpc}`:'—', highlight:false},
+                                                    {label:'CTR',        val:fb.ctr?`${fb.ctr}%`:'—', highlight:false},
+                                                    {label:'Alcance',    val:fb.alcance?fmtNum(fb.alcance):'—', highlight:false},
+                                                    {label:'Impresiones',val:fb.impresiones?fmtNum(fb.impresiones):'—', highlight:false},
+                                                    {label:'Conversiones',val:fb.conversiones?fmtNum(fb.conversiones):'—', highlight:false},
+                                                ].map(({label,val,highlight})=>(
+                                                    <div key={label} style={{padding:'18px 20px',borderBottom:'1px solid var(--glass-border)',borderRight:'1px solid var(--glass-border)'}}>
+                                                        <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:6}}>{label}</div>
+                                                        <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'18px',color:highlight?'var(--sand-dark)':'var(--text)'}}>{val}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* ── Tab Testeo ── */}
+                            {productoTab==='testeo' && (
+                                editSeccion==='testeo' ? (
+                                    <div className="card glass" style={{padding:'24px'}}>
+                                        <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar resultado de testeo</div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Resultado</label>
+                                            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                                                {['Pendiente','Exitoso','Parcial','Fallido'].map(r=>(
+                                                    <button key={r} className={`btn btn-sm ${testeoForm.resultado===r?'btn-gold':'btn-glass'}`}
+                                                        onClick={()=>setTesteoForm(f=>({...f,resultado:r}))}>{r}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Plataformas testeadas</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={testeoForm.plataformas||''} onChange={e=>setTesteoForm(f=>({...f,plataformas:e.target.value}))} placeholder="Ej. Facebook, TikTok, Instagram" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Fecha del testeo</label>
+                                            <input type="date" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={testeoForm.fecha||''} onChange={e=>setTesteoForm(f=>({...f,fecha:e.target.value}))} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Notas del testeo</label>
+                                            <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'100px',resize:'vertical'}}
+                                                value={testeoForm.notas||''} onChange={e=>setTesteoForm(f=>({...f,notas:e.target.value}))} placeholder="Observaciones, resultados, aprendizajes..." />
+                                        </div>
+                                        <div style={{display:'flex',gap:10,marginTop:4}}>
+                                            <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
+                                            <button className="btn btn-gold" onClick={()=>saveSeccion(p.id,'testeo',testeoForm)}>Guardar Testeo</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="card glass">
+                                        <div style={{padding:'16px 20px',display:'flex',justifyContent:'space-between',borderBottom:'1px solid var(--glass-border)'}}>
+                                            <span style={{fontWeight:'700',fontSize:'13px'}}>Resultado del testeo en redes</span>
+                                            <button className="btn btn-glass btn-sm" onClick={()=>{setTesteoForm({resultado:testeo.resultado||'Pendiente',plataformas:testeo.plataformas||'',notas:testeo.notas||'',fecha:testeo.fecha||''});setEditSeccion('testeo');}}>✎ Editar</button>
+                                        </div>
+                                        <div style={{padding:'24px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+                                            <div>
+                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Resultado</div>
+                                                <span className={`badge ${testeo.resultado==='Exitoso'?'badge-green':testeo.resultado==='Fallido'?'badge-gray':testeo.resultado==='Parcial'?'badge-gold':'badge-gray'}`} style={{fontSize:'13px',padding:'4px 12px'}}>
+                                                    <span className="badge-dot"/>{testeo.resultado||'Sin registrar'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Plataformas</div>
+                                                <div style={{fontSize:'13px',color:'var(--text)'}}>{testeo.plataformas||'—'}</div>
+                                            </div>
+                                            {testeo.fecha&&<div>
+                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Fecha</div>
+                                                <div style={{fontFamily:'Fira Code',fontSize:'13px',color:'var(--text)'}}>{testeo.fecha}</div>
+                                            </div>}
+                                            {testeo.notas&&<div style={{gridColumn:'1/-1'}}>
+                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Notas</div>
+                                                <div style={{fontSize:'13px',color:'var(--text)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{testeo.notas}</div>
+                                            </div>}
+                                        </div>
+                                    </div>
+                                )
+                            )}
+
+                            {/* ── Tab Inventario ── */}
+                            {productoTab==='inventario' && (
+                                editSeccion==='inventario' ? (
+                                    <div className="card glass" style={{padding:'24px'}}>
+                                        <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar inventario y ventas</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                                            {[
+                                                {key:'unidadesPedidas', label:'Unidades pedidas', ph:'0'},
+                                                {key:'unidadesVendidas', label:'Unidades vendidas', ph:'0'},
+                                                {key:'precioCompra', label:'Precio de compra', ph:'0.00'},
+                                                {key:'precioVenta', label:'Precio de venta', ph:'0.00'},
+                                            ].map(({key,label,ph})=>(
+                                                <div key={key} className="form-group" style={{marginBottom:0}}>
+                                                    <label style={{color:'var(--text-dim)'}}>{label}</label>
+                                                    <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                        type="number" placeholder={ph} value={invForm[key]||''}
+                                                        onChange={e=>setInvForm(f=>({...f,[key]:e.target.value}))} />
+                                                </div>
+                                            ))}
+                                            <div className="form-group" style={{marginBottom:0}}>
+                                                <label style={{color:'var(--text-dim)'}}>Moneda</label>
+                                                <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                    value={invForm.moneda||'USD'} onChange={e=>setInvForm(f=>({...f,moneda:e.target.value}))}>
+                                                    <option value="USD">USD $</option><option value="DOP">DOP RD$</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div style={{display:'flex',gap:10,marginTop:20}}>
+                                            <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
+                                            <button className="btn btn-gold" onClick={()=>saveSeccion(p.id,'inventario',invForm)}>Guardar Inventario</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:16}}>
+                                            {[
+                                                {label:'Pedidos', val:inv.unidadesPedidas||'0', sub:'unidades'},
+                                                {label:'Vendidos', val:inv.unidadesVendidas||'0', sub:'unidades', ok:true},
+                                                {label:'Stock disponible', val:Math.max(0,(parseFloat(inv.unidadesPedidas||0)-parseFloat(inv.unidadesVendidas||0))).toString(), sub:'unidades'},
+                                                {label:'Ganancia unitaria', val:gananciaUnit>0?`${inv.moneda==='DOP'?'RD$':'$'}${gananciaUnit.toFixed(2)}`:'—', sub:'por unidad', ok:gananciaUnit>0},
+                                                {label:'Ganancia total', val:gananciaTotal>0?`${inv.moneda==='DOP'?'RD$':'$'}${gananciaTotal.toFixed(2)}`:'—', sub:'acumulada', ok:gananciaTotal>0},
+                                                {label:'Precio venta', val:inv.precioVenta?`${inv.moneda==='DOP'?'RD$':'$'}${inv.precioVenta}`:'—', sub:'por unidad'},
+                                            ].map(({label,val,sub,ok})=>(
+                                                <div key={label} className="kpi-card glass glass-mid">
+                                                    <div className="kpi-top"><div className="kpi-label">{label}</div><div className={`kpi-icon ${ok?'gold':'white'}`}>{I.dollar}</div></div>
+                                                    <div className="kpi-val" style={{fontSize:'20px',color:ok?'var(--sand-dark)':'var(--text)'}}>{val}</div>
+                                                    <div className="kpi-sub">{sub}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div style={{textAlign:'right'}}>
+                                            <button className="btn btn-glass" onClick={()=>{setInvForm({unidadesPedidas:inv.unidadesPedidas||'',unidadesVendidas:inv.unidadesVendidas||'',precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||'',moneda:inv.moneda||'USD'});setEditSeccion('inventario');}}>✎ Editar Inventario</button>
+                                        </div>
+                                    </>
+                                )
+                            )}
+
+                            {/* Modal edición producto */}
+                            {showProdModal && (
+                                <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowProdModal(false);setEditingProducto(null);}}}>
+                                    <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:460}}>
+                                        <div className="modal-hd">
+                                            <h2>{editingProducto?'Editar Producto':'Nuevo Producto'}</h2>
+                                            <button className="modal-close" onClick={()=>{setShowProdModal(false);setEditingProducto(null);}}>×</button>
+                                        </div>
+                                        {/* Imagen */}
+                                        <div className="form-group" style={{textAlign:'center'}}>
+                                            <div style={{width:'120px',height:'120px',borderRadius:'var(--r)',background:'var(--glass-bg-mid)',border:'2px dashed var(--glass-border)',margin:'0 auto 10px',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',cursor:'pointer',position:'relative'}}
+                                                onClick={()=>document.getElementById('prod-img-input').click()}>
+                                                {prodForm.imagen ? <img src={prodForm.imagen} style={{width:'100%',height:'100%',objectFit:'cover'}} alt="" /> : <span style={{fontSize:'36px'}}>📸</span>}
+                                            </div>
+                                            <input id="prod-img-input" type="file" accept="image/*" style={{display:'none'}}
+                                                onChange={e=>{ if(e.target.files[0]) handleProdImage(e.target.files[0], url=>setProdForm(f=>({...f,imagen:url}))); e.target.value=''; }} />
+                                            <button className="btn btn-glass btn-sm" onClick={()=>document.getElementById('prod-img-input').click()}>📷 Cambiar imagen</button>
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Nombre del producto</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                autoFocus value={prodForm.nombre} onChange={e=>setProdForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Masajeador portátil" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Proveedor</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.proveedor} onChange={e=>setProdForm(f=>({...f,proveedor:e.target.value}))} placeholder="Nombre del proveedor" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Estado inicial</label>
+                                            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                {PROD_ESTADOS.map(e=>(
+                                                    <button key={e} className={`btn btn-sm ${prodForm.estado===e?'btn-gold':'btn-glass'}`}
+                                                        onClick={()=>setProdForm(f=>({...f,estado:e}))}>{e}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Descripción</label>
+                                            <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'80px',resize:'vertical'}}
+                                                value={prodForm.descripcion} onChange={e=>setProdForm(f=>({...f,descripcion:e.target.value}))} placeholder="Descripción del producto..." />
+                                        </div>
+                                        <div className="modal-actions">
+                                            <button className="btn btn-glass" onClick={()=>{setShowProdModal(false);setEditingProducto(null);}}>Cancelar</button>
+                                            <button className="btn btn-gold" onClick={saveProd} disabled={!prodForm.nombre||savingProd} style={{flex:1,justifyContent:'center'}}>
+                                                {editingProducto?<>{I.edit} Guardar</>:<>{I.plus} Crear Producto</>}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    );
+                })()}
 
                 {activeTab === 'accesos' && <>
                     <div className="page-header"><h1>Accesos Rápidos</h1><p>Tus links favoritos a un clic</p></div>
