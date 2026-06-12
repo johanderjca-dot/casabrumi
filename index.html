@@ -277,9 +277,9 @@
         thead th { padding: 10px 16px; text-align: left; font-size: 9px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1.5px solid var(--stone); background: var(--cream-dark); white-space: nowrap; }
         tbody td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid rgba(92,61,30,0.06); color: var(--text); transition: background 120ms ease; }
         tbody tr:last-child td { border-bottom: none; }
-        tbody tr { position: relative; }
-        tbody tr::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2.5px; background: var(--orange); opacity: 0; transition: opacity 150ms ease; }
-        @media (hover: hover) and (pointer: fine) { tbody tr:hover td { background: rgba(200,92,26,0.04); } tbody tr:hover::before { opacity: 1; } }
+        tbody td:first-child { position: relative; }
+        tbody td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2.5px; background: var(--orange); opacity: 0; transition: opacity 150ms ease; }
+        @media (hover: hover) and (pointer: fine) { tbody tr:hover td { background: rgba(200,92,26,0.04); } tbody tr:hover td:first-child::before { opacity: 1; } }
         .td-num { font-family: 'Fira Code', monospace; font-weight: 600; color: var(--earth-2); }
 
         /* ========= BADGES ========= */
@@ -453,10 +453,16 @@ function App() {
                 // Crea documento de usuario si no existe
                 db.collection('users').doc(uid).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(console.error);
             } else {
+                // Repara docs incompletos (ej. creados solo con photoURL): rellena email/role faltantes
+                const data = doc.data();
+                const fix = {};
+                if (!data.email) fix.email = email;
+                if (!data.role)  fix.role = role;
+                if (Object.keys(fix).length > 0) doc.ref.set(fix, { merge: true }).catch(console.error);
                 setUser(prev => ({
                     ...prev,
-                    role:     isMaster ? 'master' : (doc.data().role || prev.role),
-                    photoURL: doc.data().photoURL || prev.photoURL,
+                    role:     isMaster ? 'master' : (data.role || prev.role),
+                    photoURL: data.photoURL || prev.photoURL,
                 }));
             }
             // Si es vendedor, verifica que exista en colección vendedores
@@ -1357,11 +1363,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     usuarios.filter(u => u.role !== 'master' && norm(u.email) !== norm(user.email)).forEach(u => {
                         const ek = norm(u.email);
                         const uk = u.id; // uid del usuario de Auth
-                        const existingKey = (byUid[uk]) ? byUid[uk] : (ek || null);
+                        let existingKey = (byUid[uk]) ? byUid[uk] : (ek || null);
+                        // Cuenta sin email (doc incompleto): vincular al único vendedor sin uid si es inequívoco
+                        if (!ek && (!existingKey || !byEmail[existingKey])) {
+                            const sinUid = Object.keys(byEmail).filter(k => !byEmail[k].uid);
+                            if (sinUid.length === 1) existingKey = sinUid[0];
+                        }
                         if (!existingKey || !byEmail[existingKey]) {
                             // No existe ni por uid ni por email → crear sintético
                             const key = ek || u.id;
-                            byEmail[key] = { id: u.id, nombre: (u.email || '').split('@')[0], email: u.email, uid: u.id, autoRegistrado: true, fechaAlta: u.createdAt };
+                            byEmail[key] = { id: u.id, nombre: ek ? ek.split('@')[0] : 'Cuenta registrada', email: u.email || '', uid: u.id, autoRegistrado: true, fechaAlta: u.createdAt, cuentaIncompleta: !ek };
                             byUid[uk] = key;
                         } else {
                             // Existe → vincular uid si faltaba
@@ -1385,7 +1396,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <thead><tr><th>Nombre</th><th>Correo</th><th>Alta</th><th>Cuenta</th><th>Herramientas / Rol</th></tr></thead>
                                 <tbody>
                                     {lista.map((v, i) => {
-                                        const userDoc = usuarios.find(u => norm(u.email) === norm(v.email) || (v.uid && u.id === v.uid));
+                                        const userDoc = usuarios.find(u => (norm(u.email) && norm(u.email) === norm(v.email)) || (v.uid && u.id === v.uid));
                                         return (
                                             <tr key={i}>
                                                 <td>
