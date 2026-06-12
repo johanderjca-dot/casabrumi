@@ -802,8 +802,28 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const cambiarRol = async (uid, nuevoRol) => {
         if (!uid) return;
-        await db.collection('users').doc(uid).update({ role: nuevoRol });
+        await db.collection('users').doc(uid).set({ role: nuevoRol }, { merge: true });
     };
+
+    // Reparación puntual: cuenta de Stephanie con users doc incompleto/inexistente.
+    // Crea su doc en 'users' y vincula su uid al registro manual en 'vendedores'.
+    useEffect(() => {
+        const UID = 'fXK8WNCRW8YW82sJYVPPqzGxUg63';
+        const EMAIL = 'macariaj18@gmail.com';
+        db.collection('users').doc(UID).get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const fix = {};
+            if (!data.email) fix.email = EMAIL;
+            if (!data.role)  fix.role = 'vendedor';
+            if (Object.keys(fix).length > 0) db.collection('users').doc(UID).set(fix, { merge: true }).catch(console.error);
+        }).catch(console.error);
+        db.collection('vendedores').get().then(snap => {
+            snap.docs.forEach(d => {
+                const v = d.data();
+                if ((v.email || '').toLowerCase().trim() === EMAIL && !v.uid) d.ref.update({ uid: UID }).catch(console.error);
+            });
+        }).catch(console.error);
+    }, []);
 
     useEffect(() => {
         const unsub = db.collection('vendedores').onSnapshot(
