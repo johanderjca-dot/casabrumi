@@ -739,6 +739,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [saving,     setSaving]     = useState(false);
     const [showCmdK,   setShowCmdK]   = useState(false);
     const [cmdQuery,   setCmdQuery]   = useState('');
+    const COSTEO_DEFAULTS = { precioProveedor:'200', fleteBase:'400', fulfillment:'0', admin:'0', pctEntregaFlete:'100', cpaManager:'215', pctEntregaCpa:'80', impuestos:'0', pctUtilidad:'60', pctComparacion:'40', tasaCambio:'61' };
+    const [costeo, setCosteo] = useState(() => {
+        try { return { ...COSTEO_DEFAULTS, ...JSON.parse(localStorage.getItem('costeoCalc') || '{}') }; }
+        catch { return COSTEO_DEFAULTS; }
+    });
+    useEffect(() => { try { localStorage.setItem('costeoCalc', JSON.stringify(costeo)); } catch {} }, [costeo]);
     const firstInputRef  = useRef(null);
     const firstGastoRef  = useRef(null);
     const chartRef       = useRef(null);
@@ -1171,6 +1177,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const I_link = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
     const I_star = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+    const I_calc = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/><line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="12" y1="15" x2="12" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="8" y1="19" x2="16" y2="19"/></svg>;
 
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
@@ -1181,6 +1188,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'ganadores',   label: 'Prod. Ganadores', icon: I_star },
         ]},
         { label: 'Herramientas', items: [
+            { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
             { key: 'accesos', label: 'Accesos Rápidos', icon: I_link },
         ]},
     ];
@@ -1871,6 +1879,98 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             )}
                         </>
                     );
+                })()}
+
+                {activeTab === 'costeo' && (() => {
+                    const n = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+                    const pct = v => Math.min(Math.max(n(v), 1), 100) / 100; // evita división entre 0
+                    const tasa = Math.max(n(costeo.tasaCambio), 1);
+                    const fleteConDev   = n(costeo.fleteBase) / pct(costeo.pctEntregaFlete);
+                    const cpaReal       = n(costeo.cpaManager) / pct(costeo.pctEntregaCpa);
+                    const costosTotales = n(costeo.precioProveedor) + fleteConDev + n(costeo.fulfillment) + n(costeo.admin) + cpaReal + n(costeo.impuestos);
+                    const utilidad      = costosTotales * n(costeo.pctUtilidad) / 100;
+                    const precioVenta   = costosTotales + utilidad;
+                    const precioComp    = n(costeo.pctComparacion) < 100 ? precioVenta / (1 - n(costeo.pctComparacion) / 100) : precioVenta;
+                    const margen        = precioVenta > 0 ? (utilidad / precioVenta) * 100 : 0;
+                    const set = (k) => (e) => setCosteo(c => ({ ...c, [k]: e.target.value }));
+                    const fmt = (v, dec=0) => v.toLocaleString('es-DO', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+                    const campo = (k, label, hint, suffix) => (
+                        <div className="form-group" style={{marginBottom:14}}>
+                            <label style={{color:'var(--text-dim)'}}>{label}{suffix && <span style={{color:'var(--text-dimmer)',fontWeight:'500',textTransform:'none',letterSpacing:0}}> · {suffix}</span>}</label>
+                            <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                value={costeo[k]} onChange={set(k)} />
+                            {hint && <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',marginTop:4,lineHeight:1.5}}>{hint}</div>}
+                        </div>
+                    );
+                    return <>
+                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+                        <div><h1>Calculadora de Costeo 🇩🇴</h1><p>Costea tus productos contra entrega — basada en tu plantilla de República Dominicana</p></div>
+                        <button className="btn btn-glass" onClick={()=>setCosteo({...COSTEO_DEFAULTS})}>Restablecer valores</button>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'minmax(300px,420px) 1fr',gap:20,alignItems:'start'}}>
+                        <div className="card glass" style={{padding:'24px'}}>
+                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:16}}>Datos del producto</div>
+                            {campo('precioProveedor','Precio proveedor','Lo que te cobra el proveedor por unidad.','RD$')}
+                            {campo('fleteBase','Flete base','Costo de envío por pedido. Si haces fulfillment, súmalo aquí (ej. 350 + 60 = 410).','RD$')}
+                            {campo('pctEntregaFlete','% entrega (flete)','Pon 100 si tu transportadora NO cobra devoluciones. Si te las cobra, pon tu % de entrega real (ej. 70).','%')}
+                            {campo('fulfillment','Fulfillment','Costo por preparar/empacar cada pedido, si no lo sumaste al flete.','RD$')}
+                            {campo('admin','Costos administrativos','Empaque, comisiones, otros costos por pedido.','RD$')}
+                            <div style={{height:1,background:'var(--glass-border)',margin:'18px 0'}}/>
+                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:16}}>Publicidad (CPA)</div>
+                            {campo('cpaManager','CPA del Ads Manager','Lo que Facebook dice que te cuesta cada pedido (costo por compra).','RD$')}
+                            {campo('pctEntregaCpa','% de entrega de pedidos','De cada 10 pedidos, ¿cuántos entregas? 8 de 10 = 80. Facebook cobra por TODOS los pedidos, pero solo cobras los entregados.','%')}
+                            {campo('impuestos','Impuestos','Monto fijo de impuestos por pedido (déjalo en 0 si no aplica).','RD$')}
+                            <div style={{height:1,background:'var(--glass-border)',margin:'18px 0'}}/>
+                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:16}}>Estrategia</div>
+                            {campo('pctUtilidad','% de utilidad deseada','El video recomienda ganar mínimo ~RD$500 por venta. Sube este % hasta lograrlo.','%')}
+                            {campo('pctComparacion','% descuento de comparación','Para el precio "tachado" en tu tienda (40 = el cliente ve 40% de descuento).','%')}
+                            {campo('tasaCambio','Tasa de cambio DOP/USD','Para ver tu CPA en dólares como en el Ads Manager.','RD$/US$')}
+                        </div>
+                        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                            <div className="card glass" style={{padding:'26px 28px',background:'var(--grad-ink)',border:'none'}}>
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:18}}>
+                                    <div>
+                                        <div style={{fontSize:'9.5px',fontWeight:'700',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:8}}>Precio de venta sugerido</div>
+                                        <div style={{fontSize:'34px',fontWeight:'800',fontFamily:'Fira Code',color:'#FFFFFF',letterSpacing:'-1.5px',lineHeight:1}}>RD${fmt(precioVenta)}</div>
+                                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:6}}>≈ US${fmt(precioVenta/tasa,2)}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize:'9.5px',fontWeight:'700',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:8}}>Ganancia por venta</div>
+                                        <div style={{fontSize:'34px',fontWeight:'800',fontFamily:'Fira Code',color:utilidad>=500?'#8FD49A':'#E5B45C',letterSpacing:'-1.5px',lineHeight:1}}>RD${fmt(utilidad)}</div>
+                                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:6}}>{utilidad>=500?'✓ Por encima de RD$500':'⚠ El video recomienda ganar RD$500+'}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize:'9.5px',fontWeight:'700',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:8}}>Precio de comparación</div>
+                                        <div style={{fontSize:'34px',fontWeight:'800',fontFamily:'Fira Code',color:'rgba(255,255,255,0.75)',letterSpacing:'-1.5px',lineHeight:1,textDecoration:'line-through',textDecorationColor:'rgba(229,180,92,0.6)'}}>RD${fmt(precioComp)}</div>
+                                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:6}}>el "tachado" con {n(costeo.pctComparacion)}% off</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12}}>
+                                {[
+                                    {label:'Flete con devoluciones', val:`RD$${fmt(fleteConDev)}`, sub:n(costeo.pctEntregaFlete)>=100?'sin recargo por devolución':`flete ÷ ${n(costeo.pctEntregaFlete)}% de entrega`},
+                                    {label:'CPA costeado real', val:`RD$${fmt(cpaReal)}`, sub:`CPA ÷ ${n(costeo.pctEntregaCpa)}% de entrega`, hot:true},
+                                    {label:'CPA en dólares', val:`US$${fmt(n(costeo.cpaManager)/tasa,2)}`, sub:`real: US$${fmt(cpaReal/tasa,2)}`},
+                                    {label:'Costos totales', val:`RD$${fmt(costosTotales)}`, sub:'todo incluido, por pedido entregado'},
+                                    {label:'Margen sobre precio', val:`${fmt(margen,1)}%`, sub:'utilidad ÷ precio de venta'},
+                                    {label:'Punto de equilibrio', val:`RD$${fmt(costosTotales)}`, sub:'si vendes a esto, no ganas ni pierdes'},
+                                ].map(({label,val,sub,hot})=>(
+                                    <div key={label} className="kpi-card glass glass-mid" style={{padding:'18px 20px'}}>
+                                        <div className="kpi-label">{label}</div>
+                                        <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'21px',color:hot?'var(--orange)':'var(--text)',margin:'8px 0 4px',letterSpacing:'-0.5px'}}>{val}</div>
+                                        <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',lineHeight:1.4}}>{sub}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="card glass" style={{padding:'18px 22px',display:'flex',gap:14,alignItems:'flex-start'}}>
+                                <span style={{fontSize:'18px'}}>💡</span>
+                                <div style={{fontSize:'12px',color:'var(--text-dim)',lineHeight:1.6}}>
+                                    <strong style={{color:'var(--text)'}}>CPA máximo que soporta este producto:</strong> si quieres ganar al menos RD$500 por venta vendiendo a RD${fmt(precioVenta)}, tu CPA real no puede pasar de <strong style={{color:'var(--orange)',fontFamily:'Fira Code'}}>RD${fmt(Math.max(0, precioVenta - 500 - (costosTotales - cpaReal)))}</strong> (US${fmt(Math.max(0, precioVenta - 500 - (costosTotales - cpaReal))/tasa,2)}). Si el Ads Manager te muestra más que RD${fmt(Math.max(0, (precioVenta - 500 - (costosTotales - cpaReal)) * pct(costeo.pctEntregaCpa)))}, estás por encima del límite.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </>;
                 })()}
 
                 {activeTab === 'accesos' && <>
