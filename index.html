@@ -416,6 +416,88 @@ const I = {
     key:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
 };
 
+// ── MOTOR DE DIAGNÓSTICO (rangos saludables RD — del Diccionario COD + FB Ads) ──
+const DX = (tipo, valor) => {
+    const v = parseFloat(valor);
+    if (!isFinite(v) || valor === '' || valor == null) return null;
+    const r = (nivel, label) => ({ nivel, label });
+    switch (tipo) {
+        case 'cpa':         return v<=1 ? r('green','Winner élite') : v<=3 ? r('green','Muy rentable') : v<=5 ? r('gold','Rentable (límite)') : v<=8 ? r('orange','Margen apretado') : r('red','No sostenible');
+        case 'roas':        return v>=4 ? r('green','Escalable fuerte') : v>=3 ? r('green','Winner') : v>=2 ? r('gold','Bueno') : v>=1.5 ? r('orange','Muy justo') : r('red','Pérdida');
+        case 'ctr':         return v>=3 ? r('green','Creativo ganador') : v>=2 ? r('green','Bueno') : v>=1 ? r('gold','Normal') : r('red','Anuncio débil');
+        case 'cpc':         return v<=0.15 ? r('green','Muy bueno') : v<=0.30 ? r('gold','Aceptable') : r('red','Tráfico caro');
+        case 'cpm':         return v<=6 ? r('green','Normal RD') : v<=10 ? r('gold','Competencia media') : r('red','Público saturado');
+        case 'cvr':         return v>=4 ? r('green','Página winner') : v>=2 ? r('green','Buena') : v>=1 ? r('gold','Normal') : r('red','Página débil');
+        case 'frecuencia':  return v<=2 ? r('green','Saludable') : v<=3 ? r('green','Bien') : v<=4 ? r('gold','Cuidado') : r('red','Fatiga publicitaria');
+        case 'confirmacion':return v>=70 ? r('green','Saludable') : v>=50 ? r('gold','Bajo el ideal') : r('red','Crítico');
+        case 'entrega':     return v>=80 ? r('green','Óptimo') : v>=60 ? r('gold','Mejorable') : r('red','Bajo');
+        case 'devoluciones':return v<15 ? r('green','Sano') : v<=25 ? r('gold','Cuidado') : r('red','Alto');
+        default: return null;
+    }
+};
+const DX_COLORS = {
+    green:  { bg:'rgba(74,120,89,0.12)',  bd:'rgba(74,120,89,0.30)', fg:'#3D6646', dot:'#4A7859' },
+    gold:   { bg:'rgba(194,168,120,0.18)', bd:'rgba(194,168,120,0.40)', fg:'#9A7B3E', dot:'#C2A878' },
+    orange: { bg:'rgba(200,92,26,0.12)',  bd:'rgba(200,92,26,0.28)', fg:'#B5531A', dot:'#C85C1A' },
+    red:    { bg:'rgba(160,56,56,0.10)',  bd:'rgba(160,56,56,0.26)', fg:'#A03B3B', dot:'#A03B3B' },
+};
+function DxBadge({ tipo, valor, style }) {
+    const d = DX(tipo, valor);
+    if (!d) return null;
+    const c = DX_COLORS[d.nivel];
+    return <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 9px',borderRadius:99,fontSize:'10px',fontWeight:'700',background:c.bg,border:`1px solid ${c.bd}`,color:c.fg,whiteSpace:'nowrap',...style}}>
+        <span style={{width:5,height:5,borderRadius:'50%',background:c.dot}}/>{d.label}
+    </span>;
+}
+
+// ── DICCIONARIO E-COMMERCE RD (COD + Facebook Ads) ──
+const DICCIONARIO = [
+    { cat:'Fundamentos', icon:'🛒', items:[
+        ['E‑commerce','Venta de productos o servicios a través de internet.'],
+        ['Tienda Online','Sitio web donde se muestran y venden productos.'],
+        ['Landing Page','Página diseñada para vender un solo producto, optimizada para conversiones.'],
+        ['Producto Ganador (Winner)','Producto que genera ventas constantes, buena aceptación y deja margen de ganancia.'],
+        ['Nicho de Mercado','Grupo específico de personas con una necesidad concreta.'],
+        ['Oferta','Combinación de producto, precio, beneficios, bonos y urgencia.'],
+        ['Upsell','Oferta adicional que se muestra después de que el cliente hace un pedido.'],
+        ['Bundle','Paquete de varios productos vendidos juntos a mejor precio.'],
+        ['Ticket Promedio (AOV)','Promedio de dinero que gasta cada cliente por compra.'],
+    ]},
+    { cat:'Logística COD', icon:'🚚', items:[
+        ['Pago Contra Entrega (COD)','El cliente paga al momento de recibir el producto.'],
+        ['Confirmación de Pedido','Validar que el cliente realmente quiere el producto antes de enviarlo.'],
+        ['Tasa de Confirmación','Porcentaje de pedidos que los clientes confirman. Saludable: 70% o más.'],
+        ['Entrega Exitosa','Pedido que fue entregado y cobrado correctamente.'],
+        ['Tasa de Entrega','Pedidos entregados ÷ pedidos enviados. Saludable: 80% o más.'],
+        ['Devolución','Pedido que el cliente rechaza al momento de entrega. Sano: menos de 15%.'],
+        ['Fulfillment','Proceso de preparar, empacar y enviar pedidos.'],
+    ]},
+    { cat:'Facebook Ads', icon:'📣', items:[
+        ['Campaña','Nivel principal donde se define el objetivo publicitario.'],
+        ['Conjunto de Anuncios (Ad Set)','Nivel donde se define el público, presupuesto y ubicaciones.'],
+        ['Anuncio (Ad)','Contenido visual y texto que ve el usuario.'],
+        ['Creativo','Imagen o video del anuncio.'],
+        ['Copy','Texto persuasivo del anuncio.'],
+        ['Ángulo de Venta','Enfoque del mensaje: dolor, beneficio, solución, urgencia o emoción.'],
+        ['Público Frío','Personas que no conocen tu marca.'],
+        ['Público Caliente','Personas que ya interactuaron con tu negocio.'],
+        ['Remarketing','Mostrar anuncios a personas que ya visitaron tu página o interactuaron contigo.'],
+        ['Escalado Vertical','Aumentar presupuesto a anuncios ganadores.'],
+        ['Escalado Horizontal','Probar nuevos públicos, creativos o ángulos de venta.'],
+    ]},
+    { cat:'Métricas', icon:'📊', items:[
+        ['CPA (Costo por Compra)','Cuánto te cuesta conseguir una venta. Si el CPA es menor que tu ganancia por pedido, ganas. RD: ≤$3 rentable, $8+ no sostenible.'],
+        ['ROAS','Cuánto dinero regresa por cada $1 invertido en ads. 3+ = winner, 4+ = escalable.'],
+        ['CTR (Click Through Rate)','Cuántos hacen clic tras ver el anuncio. Mide interés, no ventas. 3%+ = creativo ganador.'],
+        ['CPC (Costo por Clic)','Cuánto pagas por cada clic. RD: $0.05–0.15 muy bueno, $0.30+ caro.'],
+        ['CPM (Costo por Mil)','Lo que cobra Facebook por mostrar el anuncio 1,000 veces. RD: $3–6 normal, $10+ saturado.'],
+        ['CVR (Conversión Web)','Porcentaje de personas que compran al entrar a la página. 4%+ = página winner.'],
+        ['Add To Cart (ATC)','Personas que agregan el producto al carrito. ATC alto sin compras = problema de confianza o precio.'],
+        ['Initiate Checkout (IC)','Personas que empiezan el proceso de compra. Muchos IC sin compras = fricción en el cierre.'],
+        ['Frecuencia','Cuántas veces una persona ve el mismo anuncio. 4+ = fatiga publicitaria, cambiar anuncio.'],
+    ]},
+];
+
 // ── COUNTER ANIMATION ──
 function KpiVal({ value }) {
     const elRef = useRef(null);
@@ -791,6 +873,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     useEffect(() => { try { localStorage.setItem('costeoCalcV2', JSON.stringify(costeo)); } catch {} }, [costeo]);
     const [costeoMoneda, setCosteoMoneda] = useState('DOP');
     const [costeoTab,    setCosteoTab]    = useState('calculadora');
+    const [diccQuery,    setDiccQuery]    = useState('');
+    const [diccCat,      setDiccCat]      = useState('Todas');
     const firstInputRef  = useRef(null);
     const firstGastoRef  = useRef(null);
     const chartRef       = useRef(null);
@@ -840,7 +924,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [savingProd,         setSavingProd]         = useState(false);
     const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Testeando', proveedor:'', imagen:'' });
     const [editSeccion,        setEditSeccion]        = useState(null); // 'facebook'|'testeo'|'inventario'
-    const [fbForm,             setFbForm]             = useState({ gastoAds:'', cpm:'', ctr:'', cpc:'', roas:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
+    const [fbForm,             setFbForm]             = useState({ gastoAds:'', cpa:'', cpm:'', ctr:'', cpc:'', roas:'', cvr:'', frecuencia:'', atc:'', ic:'', aov:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
     const [testeoForm,         setTesteoForm]         = useState({ resultado:'Pendiente', plataformas:'', notas:'', fecha:'' });
     const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', unidadesVendidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
 
@@ -1224,6 +1308,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_link = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
     const I_star = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
     const I_calc = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/><line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="12" y1="15" x2="12" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="8" y1="19" x2="16" y2="19"/></svg>;
+    const I_book = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
 
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
@@ -1235,6 +1320,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ]},
         { label: 'Herramientas', items: [
             { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
+            { key: 'diccionario', label: 'Diccionario', icon: I_book },
             { key: 'accesos', label: 'Accesos Rápidos', icon: I_link },
         ]},
     ];
@@ -1699,19 +1785,25 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     {editSeccion==='facebook' ? (
                                         <div className="card glass" style={{padding:'24px'}}>
                                             <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar métricas de Facebook</div>
-                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
                                                 {[
                                                     {key:'gastoAds',label:'Gasto en Ads (USD)',ph:'0.00'},
-                                                    {key:'roas',label:'ROAS',ph:'Ej. 3.5'},
-                                                    {key:'cpm',label:'CPM',ph:'Costo por mil'},
-                                                    {key:'cpc',label:'CPC',ph:'Costo por clic'},
-                                                    {key:'ctr',label:'CTR (%)',ph:'Ej. 2.4'},
+                                                    {key:'cpa',label:'CPA — Costo por compra (USD)',ph:'Ej. 2.50',dx:'cpa'},
+                                                    {key:'roas',label:'ROAS',ph:'Ej. 3.5',dx:'roas'},
+                                                    {key:'ctr',label:'CTR (%)',ph:'Ej. 2.4',dx:'ctr'},
+                                                    {key:'cpc',label:'CPC (USD)',ph:'Ej. 0.12',dx:'cpc'},
+                                                    {key:'cpm',label:'CPM (USD)',ph:'Ej. 5',dx:'cpm'},
+                                                    {key:'cvr',label:'CVR — Conversión web (%)',ph:'Ej. 3',dx:'cvr'},
+                                                    {key:'frecuencia',label:'Frecuencia',ph:'Ej. 1.8',dx:'frecuencia'},
+                                                    {key:'atc',label:'Add To Cart',ph:'0'},
+                                                    {key:'ic',label:'Initiate Checkout',ph:'0'},
+                                                    {key:'aov',label:'Ticket promedio AOV (RD$)',ph:'0'},
+                                                    {key:'conversiones',label:'Conversiones (compras)',ph:'0'},
                                                     {key:'alcance',label:'Alcance',ph:'0'},
                                                     {key:'impresiones',label:'Impresiones',ph:'0'},
-                                                    {key:'conversiones',label:'Conversiones',ph:'0'},
-                                                ].map(({key,label,ph})=>(
+                                                ].map(({key,label,ph,dx})=>(
                                                     <div key={key} className="form-group" style={{marginBottom:0}}>
-                                                        <label style={{color:'var(--text-dim)'}}>{label}</label>
+                                                        <label style={{color:'var(--text-dim)',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>{label} {dx && <DxBadge tipo={dx} valor={fbForm[key]} />}</label>
                                                         <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                                             type="number" placeholder={ph} value={fbForm[key]||''}
                                                             onChange={e=>setFbForm(f=>({...f,[key]:e.target.value}))} />
@@ -1726,25 +1818,33 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     ) : (
                                         <div className="card glass">
                                             <div style={{padding:'16px 20px',display:'flex',justifyContent:'space-between',borderBottom:'1px solid var(--glass-border)'}}>
-                                                <span style={{fontWeight:'700',fontSize:'13px'}}>Métricas de campaña</span>
-                                                <button className="btn btn-glass btn-sm" onClick={()=>{setFbForm({gastoAds:fb.gastoAds||'',roas:fb.roas||'',cpm:fb.cpm||'',cpc:fb.cpc||'',ctr:fb.ctr||'',alcance:fb.alcance||'',impresiones:fb.impresiones||'',conversiones:fb.conversiones||''});setEditSeccion('facebook');}}>✎ Editar</button>
+                                                <span style={{fontWeight:'700',fontSize:'13px'}}>Métricas de campaña <span style={{fontWeight:'500',color:'var(--text-dimmer)',fontSize:'11px'}}>· diagnóstico automático RD</span></span>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>{setFbForm({gastoAds:fb.gastoAds||'',cpa:fb.cpa||'',roas:fb.roas||'',cpm:fb.cpm||'',cpc:fb.cpc||'',ctr:fb.ctr||'',cvr:fb.cvr||'',frecuencia:fb.frecuencia||'',atc:fb.atc||'',ic:fb.ic||'',aov:fb.aov||'',alcance:fb.alcance||'',impresiones:fb.impresiones||'',conversiones:fb.conversiones||''});setEditSeccion('facebook');}}>✎ Editar</button>
                                             </div>
-                                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:0}}>
+                                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:0}}>
                                                 {[
-                                                    {label:'Gasto Ads', val:fb.gastoAds?`$${fb.gastoAds}`:'—', highlight:false},
-                                                    {label:'ROAS',       val:fb.roas?`${fb.roas}x`:'—', highlight:!!fb.roas},
-                                                    {label:'CPM',        val:fb.cpm?`$${fb.cpm}`:'—', highlight:false},
-                                                    {label:'CPC',        val:fb.cpc?`$${fb.cpc}`:'—', highlight:false},
-                                                    {label:'CTR',        val:fb.ctr?`${fb.ctr}%`:'—', highlight:false},
-                                                    {label:'Alcance',    val:fb.alcance?fmtNum(fb.alcance):'—', highlight:false},
-                                                    {label:'Impresiones',val:fb.impresiones?fmtNum(fb.impresiones):'—', highlight:false},
-                                                    {label:'Conversiones',val:fb.conversiones?fmtNum(fb.conversiones):'—', highlight:false},
-                                                ].map(({label,val,highlight})=>(
-                                                    <div key={label} style={{padding:'18px 20px',borderBottom:'1px solid var(--glass-border)',borderRight:'1px solid var(--glass-border)'}}>
+                                                    {label:'CPA', val:fb.cpa?`$${fb.cpa}`:'—', dx:'cpa', raw:fb.cpa},
+                                                    {label:'ROAS', val:fb.roas?`${fb.roas}x`:'—', dx:'roas', raw:fb.roas},
+                                                    {label:'CTR', val:fb.ctr?`${fb.ctr}%`:'—', dx:'ctr', raw:fb.ctr},
+                                                    {label:'CPC', val:fb.cpc?`$${fb.cpc}`:'—', dx:'cpc', raw:fb.cpc},
+                                                    {label:'CPM', val:fb.cpm?`$${fb.cpm}`:'—', dx:'cpm', raw:fb.cpm},
+                                                    {label:'CVR', val:fb.cvr?`${fb.cvr}%`:'—', dx:'cvr', raw:fb.cvr},
+                                                    {label:'Frecuencia', val:fb.frecuencia||'—', dx:'frecuencia', raw:fb.frecuencia},
+                                                    {label:'Gasto Ads', val:fb.gastoAds?`$${fb.gastoAds}`:'—'},
+                                                    {label:'Add To Cart', val:fb.atc?fmtNum(fb.atc):'—'},
+                                                    {label:'Init. Checkout', val:fb.ic?fmtNum(fb.ic):'—'},
+                                                    {label:'Ticket AOV', val:fb.aov?`RD$${fmtNum(fb.aov)}`:'—'},
+                                                    {label:'Conversiones', val:fb.conversiones?fmtNum(fb.conversiones):'—'},
+                                                ].map(({label,val,dx,raw})=>{
+                                                    const d = dx ? DX(dx, raw) : null;
+                                                    return (
+                                                    <div key={label} style={{padding:'16px 20px',borderBottom:'1px solid var(--glass-border)',borderRight:'1px solid var(--glass-border)'}}>
                                                         <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:6}}>{label}</div>
-                                                        <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'18px',color:highlight?'var(--sand-dark)':'var(--text)'}}>{val}</div>
+                                                        <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'18px',color:d?DX_COLORS[d.nivel].fg:'var(--text)'}}>{val}</div>
+                                                        {d && <div style={{marginTop:6}}><DxBadge tipo={dx} valor={raw} /></div>}
                                                     </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -2024,23 +2124,31 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
 
                             <div className="cst-sec-label">Tasas de conversión</div>
-                            <div style={{marginBottom:16}}>
-                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-                                    <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text-dim)'}}>Confirmación</span>
-                                    <span style={{fontSize:'13px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)'}}>{n(costeo.pctConfirmacion)}%</span>
+                            {(() => {
+                                const dxConf = DX('confirmacion', n(costeo.pctConfirmacion));
+                                const dxEntr = DX('entrega', n(costeo.pctEntrega));
+                                const colConf = dxConf ? DX_COLORS[dxConf.nivel].dot : 'var(--orange)';
+                                const colEntr = dxEntr ? DX_COLORS[dxEntr.nivel].dot : 'var(--orange)';
+                                return <>
+                                <div style={{marginBottom:16}}>
+                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
+                                        <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text-dim)'}}>Confirmación</span>
+                                        <span style={{display:'flex',alignItems:'center',gap:7}}><DxBadge tipo="confirmacion" valor={n(costeo.pctConfirmacion)} /><span style={{fontSize:'13px',fontWeight:'800',fontFamily:'Fira Code',color:colConf}}>{n(costeo.pctConfirmacion)}%</span></span>
+                                    </div>
+                                    <input type="range" min="1" max="100" className="cst-range" value={n(costeo.pctConfirmacion)} onChange={e=>upd('pctConfirmacion',e.target.value)}
+                                        style={{background:`linear-gradient(90deg, ${colConf} ${n(costeo.pctConfirmacion)}%, var(--stone) ${n(costeo.pctConfirmacion)}%)`}} />
                                 </div>
-                                <input type="range" min="1" max="100" className="cst-range" value={n(costeo.pctConfirmacion)} onChange={e=>upd('pctConfirmacion',e.target.value)}
-                                    style={{background:`linear-gradient(90deg, var(--orange) ${n(costeo.pctConfirmacion)}%, var(--stone) ${n(costeo.pctConfirmacion)}%)`}} />
-                            </div>
-                            <div style={{marginBottom:22}}>
-                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-                                    <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text-dim)'}}>Entrega efectiva</span>
-                                    <span style={{fontSize:'13px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)'}}>{n(costeo.pctEntrega)}%</span>
+                                <div style={{marginBottom:22}}>
+                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
+                                        <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text-dim)'}}>Entrega efectiva</span>
+                                        <span style={{display:'flex',alignItems:'center',gap:7}}><DxBadge tipo="entrega" valor={n(costeo.pctEntrega)} /><span style={{fontSize:'13px',fontWeight:'800',fontFamily:'Fira Code',color:colEntr}}>{n(costeo.pctEntrega)}%</span></span>
+                                    </div>
+                                    <input type="range" min="1" max="100" className="cst-range" value={n(costeo.pctEntrega)} onChange={e=>upd('pctEntrega',e.target.value)}
+                                        style={{background:`linear-gradient(90deg, ${colEntr} ${n(costeo.pctEntrega)}%, var(--stone) ${n(costeo.pctEntrega)}%)`}} />
+                                    <div style={{fontSize:'10px',color:'var(--text-dimmer)',marginTop:7,lineHeight:1.5}}>De cada 100 pedidos que genera el anuncio, cuántos terminas entregando. Saludable: Confirmación 70%+, Entrega 80%+.</div>
                                 </div>
-                                <input type="range" min="1" max="100" className="cst-range" value={n(costeo.pctEntrega)} onChange={e=>upd('pctEntrega',e.target.value)}
-                                    style={{background:`linear-gradient(90deg, var(--orange) ${n(costeo.pctEntrega)}%, var(--stone) ${n(costeo.pctEntrega)}%)`}} />
-                                <div style={{fontSize:'10px',color:'var(--text-dimmer)',marginTop:7,lineHeight:1.5}}>De cada 100 pedidos que genera el anuncio, cuántos terminas entregando. Afecta el CPA real y el flete.</div>
-                            </div>
+                                </>;
+                            })()}
 
                             <div className="cst-sec-label" style={{justifyContent:'space-between'}}>
                                 <span>🚚 Logística</span>
@@ -2164,6 +2272,51 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         </div>
                     </div>
+                    )}
+                    </>;
+                })()}
+
+                {activeTab === 'diccionario' && (() => {
+                    const q = diccQuery.trim().toLowerCase();
+                    const cats = ['Todas', ...DICCIONARIO.map(c=>c.cat)];
+                    const filtradas = DICCIONARIO
+                        .filter(c => diccCat==='Todas' || c.cat===diccCat)
+                        .map(c => ({...c, items: c.items.filter(([t,d]) => !q || t.toLowerCase().includes(q) || d.toLowerCase().includes(q))}))
+                        .filter(c => c.items.length>0);
+                    const total = filtradas.reduce((s,c)=>s+c.items.length,0);
+                    return <>
+                    <div className="page-header"><h1>Diccionario E‑commerce RD 📘</h1><p>Términos y métricas del modelo contra entrega + Facebook Ads. Tu referencia y la de tu equipo.</p></div>
+                    <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',marginBottom:20}}>
+                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',maxWidth:340,flex:'1 1 240px'}}
+                            placeholder="🔍 Buscar término o métrica…" value={diccQuery} onChange={e=>setDiccQuery(e.target.value)} />
+                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                            {cats.map(c=>(
+                                <button key={c} className={`btn btn-sm ${diccCat===c?'btn-gold':'btn-glass'}`} onClick={()=>setDiccCat(c)}>{c}</button>
+                            ))}
+                        </div>
+                    </div>
+                    {total===0 ? (
+                        <div className="card glass"><div className="empty"><div className="empty-icon">{I_book}</div><h3>Sin resultados</h3><p>No hay términos que coincidan con "{diccQuery}".</p></div></div>
+                    ) : (
+                        <div style={{display:'flex',flexDirection:'column',gap:20}}>
+                            {filtradas.map(cat=>(
+                                <div key={cat.cat}>
+                                    <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:12}}>
+                                        <span style={{fontSize:'18px'}}>{cat.icon}</span>
+                                        <span style={{fontSize:'12px',fontWeight:'800',color:'var(--text)',textTransform:'uppercase',letterSpacing:'1.5px'}}>{cat.cat}</span>
+                                        <span style={{fontSize:'11px',color:'var(--text-dimmer)',fontFamily:'Fira Code'}}>{cat.items.length}</span>
+                                    </div>
+                                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:12}}>
+                                        {cat.items.map(([term,def])=>(
+                                            <div key={term} className="card glass" style={{padding:'16px 18px'}}>
+                                                <div style={{fontSize:'13.5px',fontWeight:'700',color:'var(--text)',marginBottom:6}}>{term}</div>
+                                                <div style={{fontSize:'12.5px',color:'var(--text-dim)',lineHeight:1.55}}>{def}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
                     </>;
                 })()}
