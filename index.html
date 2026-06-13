@@ -243,6 +243,39 @@
         .cmdk-item .cmdk-kind { margin-left: auto; font-size: 9.5px; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1px; }
         .cmdk-empty { padding: 28px; text-align: center; font-size: 13px; color: var(--text-dim); }
 
+        /* COSTEO CALCULADORA */
+        .cst-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; align-items: start; }
+        @media (max-width: 1100px) { .cst-grid { grid-template-columns: 1fr; } }
+        .cst-panel { padding: 22px; }
+        .cst-sec-label { font-size: 10px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1.5px; display: flex; align-items: center; gap: 7px; margin-bottom: 14px; }
+        .cst-field-label { font-size: 9.5px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px; display: block; }
+        .cst-input { width: 100%; padding: 11px 13px; font-size: 15px; font-weight: 700; font-family: 'Fira Code', monospace; color: var(--text); background: var(--cream-dark); border: 1px solid var(--glass-border); border-radius: 10px; outline: none; transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease; }
+        .cst-input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-dim); background: var(--surface-3); }
+        .cst-input-wrap { position: relative; }
+        .cst-input-wrap .cst-prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 700; color: var(--text-dimmer); font-family: 'Fira Code', monospace; pointer-events: none; }
+        .cst-input.has-prefix { padding-left: 30px; }
+        .cst-range { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 99px; outline: none; cursor: pointer; }
+        .cst-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(200,92,26,0.45); cursor: pointer; transition: transform 120ms ease; }
+        .cst-range::-webkit-slider-thumb:hover { transform: scale(1.18); }
+        .cst-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(200,92,26,0.45); cursor: pointer; }
+        .cst-card { padding: 18px 20px; border-radius: 14px; }
+        .cst-bar-track { height: 9px; border-radius: 99px; background: var(--stone); overflow: hidden; }
+        .cst-bar-fill { height: 100%; border-radius: 99px; transition: width 450ms cubic-bezier(0.22,0.68,0.32,1); }
+        .cst-hero { border-radius: 18px; padding: 30px 32px; background: linear-gradient(125deg, #C85C1A 0%, #A8400E 55%, #7A2E08 100%); position: relative; overflow: hidden; box-shadow: 0 24px 50px -16px rgba(200,92,26,0.45); }
+        .cst-hero::after { content: ''; position: absolute; top: -50%; right: -6%; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 68%); pointer-events: none; }
+        .cst-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 13px; border-radius: 99px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.22); }
+        .cst-pill-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 99px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; background: rgba(255,255,255,0.95); color: var(--orange); border: none; transition: transform 140ms ease, box-shadow 140ms ease; box-shadow: 0 4px 14px rgba(0,0,0,0.14); }
+        .cst-pill-btn:hover { transform: translateY(-1.5px); box-shadow: 0 8px 20px rgba(0,0,0,0.18); }
+        .cst-add-btn { font-size: 11px; font-weight: 700; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--surface-3); color: var(--earth-2); cursor: pointer; transition: all 140ms ease; }
+        .cst-add-btn:hover { background: var(--orange-dim); border-color: var(--orange-border); color: var(--orange); }
+        .cst-tabbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 22px; background: var(--cream-dark); padding: 5px; border-radius: 13px; border: 1px solid var(--glass-border); width: fit-content; }
+        .cst-tab { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: var(--text-dim); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: all 140ms ease; white-space: nowrap; }
+        .cst-tab:hover { color: var(--text); }
+        .cst-tab.active { background: var(--surface-3); color: var(--orange); box-shadow: 0 1px 4px rgba(92,61,30,0.10); }
+        .cst-logi-card { padding: 14px 16px; border-radius: 13px; border: 1.5px solid var(--glass-border); background: var(--surface-3); cursor: pointer; transition: all 150ms ease; position: relative; }
+        .cst-logi-card.sel { border-color: var(--orange-border); background: var(--orange-dim); box-shadow: 0 4px 14px -6px rgba(200,92,26,0.30); }
+        .cst-extra-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 11px; background: var(--surface-3); border: 1px solid var(--glass-border); margin-bottom: 8px; }
+
         /* ========= KPI INTERNALS ========= */
         .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .kpi-label { font-size: 9px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1.5px; }
@@ -739,12 +772,25 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [saving,     setSaving]     = useState(false);
     const [showCmdK,   setShowCmdK]   = useState(false);
     const [cmdQuery,   setCmdQuery]   = useState('');
-    const COSTEO_DEFAULTS = { precioProveedor:'200', fleteBase:'400', fulfillment:'0', admin:'0', pctEntregaFlete:'100', cpaManager:'215', pctEntregaCpa:'80', impuestos:'0', pctUtilidad:'60', pctComparacion:'40', tasaCambio:'61' };
+    const COSTEO_DEFAULTS = {
+        precioVenta: '1500',
+        costoProducto: '400',
+        cpaAds: '300',
+        pctConfirmacion: '80',
+        pctEntrega: '60',
+        margenObjetivo: '30',
+        tasaCambio: '61',
+        logistica: [{ nombre:'Transportadora A', costoEnvio:'180', devolucionActiva:true }],
+        logisticaActiva: 0,
+        costosExtra: [{ nombre:'Empaque / Caja', monto:'50' }, { nombre:'Papelería', monto:'10' }],
+    };
     const [costeo, setCosteo] = useState(() => {
-        try { return { ...COSTEO_DEFAULTS, ...JSON.parse(localStorage.getItem('costeoCalc') || '{}') }; }
+        try { return { ...COSTEO_DEFAULTS, ...JSON.parse(localStorage.getItem('costeoCalcV2') || '{}') }; }
         catch { return COSTEO_DEFAULTS; }
     });
-    useEffect(() => { try { localStorage.setItem('costeoCalc', JSON.stringify(costeo)); } catch {} }, [costeo]);
+    useEffect(() => { try { localStorage.setItem('costeoCalcV2', JSON.stringify(costeo)); } catch {} }, [costeo]);
+    const [costeoMoneda, setCosteoMoneda] = useState('DOP');
+    const [costeoTab,    setCosteoTab]    = useState('calculadora');
     const firstInputRef  = useRef(null);
     const firstGastoRef  = useRef(null);
     const chartRef       = useRef(null);
@@ -1883,93 +1929,242 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                 {activeTab === 'costeo' && (() => {
                     const n = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
-                    const pct = v => Math.min(Math.max(n(v), 1), 100) / 100; // evita división entre 0
-                    const tasa = Math.max(n(costeo.tasaCambio), 1);
-                    const fleteConDev   = n(costeo.fleteBase) / pct(costeo.pctEntregaFlete);
-                    const cpaReal       = n(costeo.cpaManager) / pct(costeo.pctEntregaCpa);
-                    const costosTotales = n(costeo.precioProveedor) + fleteConDev + n(costeo.fulfillment) + n(costeo.admin) + cpaReal + n(costeo.impuestos);
-                    const utilidad      = costosTotales * n(costeo.pctUtilidad) / 100;
-                    const precioVenta   = costosTotales + utilidad;
-                    const precioComp    = n(costeo.pctComparacion) < 100 ? precioVenta / (1 - n(costeo.pctComparacion) / 100) : precioVenta;
-                    const margen        = precioVenta > 0 ? (utilidad / precioVenta) * 100 : 0;
-                    const set = (k) => (e) => setCosteo(c => ({ ...c, [k]: e.target.value }));
-                    const fmt = (v, dec=0) => v.toLocaleString('es-DO', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-                    const campo = (k, label, hint, suffix) => (
-                        <div className="form-group" style={{marginBottom:14}}>
-                            <label style={{color:'var(--text-dim)'}}>{label}{suffix && <span style={{color:'var(--text-dimmer)',fontWeight:'500',textTransform:'none',letterSpacing:0}}> · {suffix}</span>}</label>
-                            <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                value={costeo[k]} onChange={set(k)} />
-                            {hint && <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',marginTop:4,lineHeight:1.5}}>{hint}</div>}
-                        </div>
-                    );
+                    const conf = Math.min(Math.max(n(costeo.pctConfirmacion),1),100)/100;
+                    const entr = Math.min(Math.max(n(costeo.pctEntrega),1),100)/100;
+                    const tasa = Math.max(n(costeo.tasaCambio),1);
+                    const carrier = costeo.logistica[costeo.logisticaActiva] || costeo.logistica[0] || {costoEnvio:'0',devolucionActiva:false};
+                    const fleteAjustado = carrier.devolucionActiva ? n(carrier.costoEnvio)/entr : n(carrier.costoEnvio);
+                    const cpaReal = n(costeo.cpaAds)/(conf*entr);
+                    const extras = (costeo.costosExtra||[]).reduce((s,e)=>s+n(e.monto),0);
+                    const precio = n(costeo.precioVenta);
+                    const costosOp = n(costeo.costoProducto) + fleteAjustado + extras;
+                    const costosTotales = costosOp + cpaReal;
+                    const profit = precio - costosTotales;
+                    const roi = costosTotales>0 ? profit/costosTotales : 0;
+                    const margenActual = precio>0 ? profit/precio*100 : 0;
+                    const cpaBreakeven = precio - costosOp;
+                    const mObj = n(costeo.margenObjetivo)/100;
+                    const precioOptimoRaw = mObj<1 ? costosTotales/(1-mObj) : costosTotales;
+                    const precioOptimo = Math.ceil(precioOptimoRaw/50)*50;
+                    const margenOptimo = precioOptimo>0 ? (precioOptimo-costosTotales)/precioOptimo*100 : 0;
+                    const usd = costeoMoneda==='USD';
+                    const sym = usd ? 'US$' : 'RD$';
+                    const disp = v => usd ? v/tasa : v;
+                    const fmt = (v,dec=0) => disp(v).toLocaleString('es-DO',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+                    const money = (v,dec=0) => `${sym}${fmt(v,dec)}`;
+                    const segs = [
+                        { label:'Producto (Costo)', val:n(costeo.costoProducto), color:'#3B82C4' },
+                        { label:'Publicidad (CPA Real)', val:cpaReal, color:'var(--orange)' },
+                        { label:'Flete '+(carrier.devolucionActiva?'(Ajustado)':'(Base)'), val:fleteAjustado, color:'#7A5230' },
+                        { label:'Extras (Empaque)', val:extras, color:'#C2A878' },
+                    ];
+                    const upd = (k,v) => setCosteo(c=>({...c,[k]:v}));
+                    const updCarrier = (i,k,v) => setCosteo(c=>({...c, logistica:c.logistica.map((l,idx)=>idx===i?{...l,[k]:v}:l)}));
+                    const addCarrier = () => setCosteo(c=>({...c, logistica:[...c.logistica,{nombre:'Transportadora '+String.fromCharCode(65+c.logistica.length),costoEnvio:'150',devolucionActiva:false}], logisticaActiva:c.logistica.length}));
+                    const delCarrier = (i) => setCosteo(c=>{ if(c.logistica.length<=1) return c; const logistica=c.logistica.filter((_,idx)=>idx!==i); return {...c, logistica, logisticaActiva:Math.min(c.logisticaActiva,logistica.length-1)};});
+                    const updExtra = (i,k,v) => setCosteo(c=>({...c, costosExtra:c.costosExtra.map((e,idx)=>idx===i?{...e,[k]:v}:e)}));
+                    const addExtra = () => setCosteo(c=>({...c, costosExtra:[...(c.costosExtra||[]),{nombre:'Nuevo costo',monto:'0'}]}));
+                    const delExtra = (i) => setCosteo(c=>({...c, costosExtra:c.costosExtra.filter((_,idx)=>idx!==i)}));
+                    const tabs = [['calculadora','Calculadora Precio'],['proyeccion','Proyección'],['cierre','Cierre Diario'],['control','Control'],['historial','Historial']];
+
                     return <>
-                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
-                        <div><h1>Calculadora de Costeo 🇩🇴</h1><p>Costea tus productos contra entrega — basada en tu plantilla de República Dominicana</p></div>
-                        <button className="btn btn-glass" onClick={()=>setCosteo({...COSTEO_DEFAULTS})}>Restablecer valores</button>
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'minmax(300px,420px) 1fr',gap:20,alignItems:'start'}}>
-                        <div className="card glass" style={{padding:'24px'}}>
-                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:16}}>Datos del producto</div>
-                            {campo('precioProveedor','Precio proveedor','Lo que te cobra el proveedor por unidad.','RD$')}
-                            {campo('fleteBase','Flete base','Costo de envío por pedido. Si haces fulfillment, súmalo aquí (ej. 350 + 60 = 410).','RD$')}
-                            {campo('pctEntregaFlete','% entrega (flete)','Pon 100 si tu transportadora NO cobra devoluciones. Si te las cobra, pon tu % de entrega real (ej. 70).','%')}
-                            {campo('fulfillment','Fulfillment','Costo por preparar/empacar cada pedido, si no lo sumaste al flete.','RD$')}
-                            {campo('admin','Costos administrativos','Empaque, comisiones, otros costos por pedido.','RD$')}
-                            <div style={{height:1,background:'var(--glass-border)',margin:'18px 0'}}/>
-                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:16}}>Publicidad (CPA)</div>
-                            {campo('cpaManager','CPA del Ads Manager','Lo que Facebook dice que te cuesta cada pedido (costo por compra).','RD$')}
-                            {campo('pctEntregaCpa','% de entrega de pedidos','De cada 10 pedidos, ¿cuántos entregas? 8 de 10 = 80. Facebook cobra por TODOS los pedidos, pero solo cobras los entregados.','%')}
-                            {campo('impuestos','Impuestos','Monto fijo de impuestos por pedido (déjalo en 0 si no aplica).','RD$')}
-                            <div style={{height:1,background:'var(--glass-border)',margin:'18px 0'}}/>
-                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:16}}>Estrategia</div>
-                            {campo('pctUtilidad','% de utilidad deseada','El video recomienda ganar mínimo ~RD$500 por venta. Sube este % hasta lograrlo.','%')}
-                            {campo('pctComparacion','% descuento de comparación','Para el precio "tachado" en tu tienda (40 = el cliente ve 40% de descuento).','%')}
-                            {campo('tasaCambio','Tasa de cambio DOP/USD','Para ver tu CPA en dólares como en el Ads Manager.','RD$/US$')}
-                        </div>
-                        <div style={{display:'flex',flexDirection:'column',gap:16}}>
-                            <div className="card glass" style={{padding:'26px 28px',background:'var(--grad-ink)',border:'none'}}>
-                                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:18}}>
-                                    <div>
-                                        <div style={{fontSize:'9.5px',fontWeight:'700',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:8}}>Precio de venta sugerido</div>
-                                        <div style={{fontSize:'34px',fontWeight:'800',fontFamily:'Fira Code',color:'#FFFFFF',letterSpacing:'-1.5px',lineHeight:1}}>RD${fmt(precioVenta)}</div>
-                                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:6}}>≈ US${fmt(precioVenta/tasa,2)}</div>
-                                    </div>
-                                    <div>
-                                        <div style={{fontSize:'9.5px',fontWeight:'700',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:8}}>Ganancia por venta</div>
-                                        <div style={{fontSize:'34px',fontWeight:'800',fontFamily:'Fira Code',color:utilidad>=500?'#8FD49A':'#E5B45C',letterSpacing:'-1.5px',lineHeight:1}}>RD${fmt(utilidad)}</div>
-                                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:6}}>{utilidad>=500?'✓ Por encima de RD$500':'⚠ El video recomienda ganar RD$500+'}</div>
-                                    </div>
-                                    <div>
-                                        <div style={{fontSize:'9.5px',fontWeight:'700',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:8}}>Precio de comparación</div>
-                                        <div style={{fontSize:'34px',fontWeight:'800',fontFamily:'Fira Code',color:'rgba(255,255,255,0.75)',letterSpacing:'-1.5px',lineHeight:1,textDecoration:'line-through',textDecorationColor:'rgba(229,180,92,0.6)'}}>RD${fmt(precioComp)}</div>
-                                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',marginTop:6}}>el "tachado" con {n(costeo.pctComparacion)}% off</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12}}>
-                                {[
-                                    {label:'Flete con devoluciones', val:`RD$${fmt(fleteConDev)}`, sub:n(costeo.pctEntregaFlete)>=100?'sin recargo por devolución':`flete ÷ ${n(costeo.pctEntregaFlete)}% de entrega`},
-                                    {label:'CPA costeado real', val:`RD$${fmt(cpaReal)}`, sub:`CPA ÷ ${n(costeo.pctEntregaCpa)}% de entrega`, hot:true},
-                                    {label:'CPA en dólares', val:`US$${fmt(n(costeo.cpaManager)/tasa,2)}`, sub:`real: US$${fmt(cpaReal/tasa,2)}`},
-                                    {label:'Costos totales', val:`RD$${fmt(costosTotales)}`, sub:'todo incluido, por pedido entregado'},
-                                    {label:'Margen sobre precio', val:`${fmt(margen,1)}%`, sub:'utilidad ÷ precio de venta'},
-                                    {label:'Punto de equilibrio', val:`RD$${fmt(costosTotales)}`, sub:'si vendes a esto, no ganas ni pierdes'},
-                                ].map(({label,val,sub,hot})=>(
-                                    <div key={label} className="kpi-card glass glass-mid" style={{padding:'18px 20px'}}>
-                                        <div className="kpi-label">{label}</div>
-                                        <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'21px',color:hot?'var(--orange)':'var(--text)',margin:'8px 0 4px',letterSpacing:'-0.5px'}}>{val}</div>
-                                        <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',lineHeight:1.4}}>{sub}</div>
-                                    </div>
+                    <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+                        <div><h1>Calculadora de Costeo 🇩🇴</h1><p>Define tu precio de venta ideal para asegurar un margen saludable por cada unidad vendida.</p></div>
+                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                            <div style={{display:'flex',background:'var(--cream-dark)',borderRadius:10,padding:3,border:'1px solid var(--glass-border)'}}>
+                                {['DOP','USD'].map(m=>(
+                                    <button key={m} onClick={()=>setCosteoMoneda(m)} className="cst-tab" style={{padding:'7px 14px',...(costeoMoneda===m?{background:'var(--surface-3)',color:'var(--orange)',boxShadow:'0 1px 4px rgba(92,61,30,0.10)'}:{})}}>{m}</button>
                                 ))}
                             </div>
-                            <div className="card glass" style={{padding:'18px 22px',display:'flex',gap:14,alignItems:'flex-start'}}>
-                                <span style={{fontSize:'18px'}}>💡</span>
+                        </div>
+                    </div>
+
+                    <div className="cst-tabbar">
+                        {tabs.map(([k,label])=>(
+                            <button key={k} className={`cst-tab ${costeoTab===k?'active':''}`} onClick={()=>setCosteoTab(k)}>
+                                {label}{k!=='calculadora' && <span style={{fontSize:'8.5px',opacity:0.6,marginLeft:2}}>(Free)</span>}
+                            </button>
+                        ))}
+                    </div>
+
+                    {costeoTab!=='calculadora' ? (
+                        <div className="card glass"><div className="empty" style={{padding:'72px 40px'}}>
+                            <div className="empty-icon">{I_calc}</div>
+                            <h3>{tabs.find(t=>t[0]===costeoTab)[1]} — próximamente</h3>
+                            <p>Esta sección se construye en la siguiente fase. La Calculadora de Precio ya está 100% operativa.</p>
+                        </div></div>
+                    ) : (
+                    <div className="cst-grid">
+                        {/* ── PANEL DE PARÁMETROS ── */}
+                        <div className="card glass cst-panel">
+                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+                                <div style={{fontSize:'15px',fontWeight:'800',color:'var(--text)',letterSpacing:'-0.3px'}}>Parámetros</div>
+                                <button className="cst-add-btn" onClick={()=>setCosteo({...COSTEO_DEFAULTS})}>↺ Reset</button>
+                            </div>
+
+                            <div style={{marginBottom:18}}>
+                                <label className="cst-field-label">Precio de Venta (RD$)</label>
+                                <div className="cst-input-wrap">
+                                    <span className="cst-prefix">$</span>
+                                    <input type="number" className="cst-input has-prefix" value={costeo.precioVenta} onChange={e=>upd('precioVenta',e.target.value)} />
+                                </div>
+                            </div>
+
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:22}}>
+                                <div>
+                                    <label className="cst-field-label">Costo Producto</label>
+                                    <div className="cst-input-wrap"><span className="cst-prefix">$</span>
+                                        <input type="number" className="cst-input has-prefix" value={costeo.costoProducto} onChange={e=>upd('costoProducto',e.target.value)} /></div>
+                                </div>
+                                <div>
+                                    <label className="cst-field-label">CPA (Ads)</label>
+                                    <div className="cst-input-wrap"><span className="cst-prefix">$</span>
+                                        <input type="number" className="cst-input has-prefix" value={costeo.cpaAds} onChange={e=>upd('cpaAds',e.target.value)} /></div>
+                                </div>
+                            </div>
+
+                            <div className="cst-sec-label">Tasas de conversión</div>
+                            <div style={{marginBottom:16}}>
+                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                                    <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text-dim)'}}>Confirmación</span>
+                                    <span style={{fontSize:'13px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)'}}>{n(costeo.pctConfirmacion)}%</span>
+                                </div>
+                                <input type="range" min="1" max="100" className="cst-range" value={n(costeo.pctConfirmacion)} onChange={e=>upd('pctConfirmacion',e.target.value)}
+                                    style={{background:`linear-gradient(90deg, var(--orange) ${n(costeo.pctConfirmacion)}%, var(--stone) ${n(costeo.pctConfirmacion)}%)`}} />
+                            </div>
+                            <div style={{marginBottom:22}}>
+                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                                    <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text-dim)'}}>Entrega efectiva</span>
+                                    <span style={{fontSize:'13px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)'}}>{n(costeo.pctEntrega)}%</span>
+                                </div>
+                                <input type="range" min="1" max="100" className="cst-range" value={n(costeo.pctEntrega)} onChange={e=>upd('pctEntrega',e.target.value)}
+                                    style={{background:`linear-gradient(90deg, var(--orange) ${n(costeo.pctEntrega)}%, var(--stone) ${n(costeo.pctEntrega)}%)`}} />
+                                <div style={{fontSize:'10px',color:'var(--text-dimmer)',marginTop:7,lineHeight:1.5}}>De cada 100 pedidos que genera el anuncio, cuántos terminas entregando. Afecta el CPA real y el flete.</div>
+                            </div>
+
+                            <div className="cst-sec-label" style={{justifyContent:'space-between'}}>
+                                <span>🚚 Logística</span>
+                                <button className="cst-add-btn" onClick={addCarrier}>+ Nueva</button>
+                            </div>
+                            <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:22}}>
+                                {costeo.logistica.map((l,i)=>{
+                                    const sel = i===costeo.logisticaActiva;
+                                    return (
+                                    <div key={i} className={`cst-logi-card ${sel?'sel':''}`} onClick={()=>upd('logisticaActiva',i)}>
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                                            <input value={l.nombre} onClick={e=>e.stopPropagation()} onChange={e=>updCarrier(i,'nombre',e.target.value)}
+                                                style={{fontSize:'13px',fontWeight:'700',color:'var(--text)',background:'transparent',border:'none',outline:'none',width:'60%'}} />
+                                            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                                                {sel && <span style={{fontSize:'9px',fontWeight:'700',color:'var(--orange)',textTransform:'uppercase',letterSpacing:'1px'}}>Activa</span>}
+                                                {costeo.logistica.length>1 && <span onClick={e=>{e.stopPropagation();delCarrier(i);}} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'15px',lineHeight:1}}>×</span>}
+                                            </div>
+                                        </div>
+                                        <div style={{display:'flex',gap:10,alignItems:'flex-end'}}>
+                                            <div style={{flex:1}}>
+                                                <label className="cst-field-label" style={{marginBottom:5}}>Costo envío</label>
+                                                <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
+                                                    <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'8px 8px 8px 26px'}} value={l.costoEnvio} onClick={e=>e.stopPropagation()} onChange={e=>updCarrier(i,'costoEnvio',e.target.value)} /></div>
+                                            </div>
+                                            <button onClick={e=>{e.stopPropagation();updCarrier(i,'devolucionActiva',!l.devolucionActiva);}}
+                                                style={{flex:1,padding:'9px 10px',borderRadius:9,border:'1px solid '+(l.devolucionActiva?'var(--orange-border)':'var(--glass-border)'),background:l.devolucionActiva?'var(--orange-dim)':'var(--cream-dark)',color:l.devolucionActiva?'var(--orange)':'var(--text-dim)',fontSize:'10.5px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit',lineHeight:1.3}}>
+                                                Devolución {l.devolucionActiva?'ON · Flete ajustado':'OFF'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="cst-sec-label" style={{justifyContent:'space-between'}}>
+                                <span>📦 Costos extra</span>
+                                <button className="cst-add-btn" onClick={addExtra}>+ Item</button>
+                            </div>
+                            <div>
+                                {(costeo.costosExtra||[]).map((e,i)=>(
+                                    <div key={i} className="cst-extra-row">
+                                        <input value={e.nombre} onChange={ev=>updExtra(i,'nombre',ev.target.value)}
+                                            style={{flex:1,fontSize:'12.5px',fontWeight:'600',color:'var(--text)',background:'transparent',border:'none',outline:'none'}} />
+                                        <div className="cst-input-wrap" style={{width:90}}><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
+                                            <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'8px 8px 8px 24px'}} value={e.monto} onChange={ev=>updExtra(i,'monto',ev.target.value)} /></div>
+                                        <span onClick={()=>delExtra(i)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1,padding:'0 2px'}}>×</span>
+                                    </div>
+                                ))}
+                                {(costeo.costosExtra||[]).length===0 && <div style={{fontSize:'11px',color:'var(--text-dimmer)',padding:'8px 2px'}}>Sin costos extra. Agrega empaque, papelería, etc.</div>}
+                            </div>
+                        </div>
+
+                        {/* ── RESULTADOS ── */}
+                        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                            <div className="cst-hero">
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,flexWrap:'wrap',position:'relative',zIndex:1}}>
+                                    <div>
+                                        <span className="cst-chip">✦ Recomendación</span>
+                                        <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',margin:'18px 0 4px',fontWeight:'600'}}>Precio Óptimo Sugerido</div>
+                                        <div style={{fontSize:'48px',fontWeight:'800',color:'#fff',letterSpacing:'-2px',lineHeight:1,fontFamily:'Fira Code'}}>{money(precioOptimo)}</div>
+                                        <div style={{fontSize:'12px',color:'rgba(255,255,255,0.78)',marginTop:8}}>Margen objetivo: <strong>{n(costeo.margenObjetivo)}%</strong> · Margen estimado: <strong>{margenOptimo.toFixed(1)}%</strong></div>
+                                    </div>
+                                    <div style={{textAlign:'right'}}>
+                                        <div style={{fontSize:'9px',fontWeight:'700',color:'rgba(255,255,255,0.6)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:10}}>Estrategia de precio</div>
+                                        <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end',marginBottom:10}}>
+                                            <button onClick={()=>upd('margenObjetivo',String(Math.max(5,n(costeo.margenObjetivo)-5)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>−</button>
+                                            <span style={{fontSize:'15px',fontWeight:'800',color:'#fff',fontFamily:'Fira Code',minWidth:46,textAlign:'center'}}>{n(costeo.margenObjetivo)}%</span>
+                                            <button onClick={()=>upd('margenObjetivo',String(Math.min(95,n(costeo.margenObjetivo)+5)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>+</button>
+                                        </div>
+                                        <button className="cst-pill-btn" onClick={()=>upd('precioVenta',String(precioOptimo))}>Aplicar {money(precioOptimo)} ✓</button>
+                                        <div style={{fontSize:'10px',color:'rgba(255,255,255,0.6)',marginTop:8,fontStyle:'italic',maxWidth:180}}>Aplica el precio óptimo a tu simulación</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                                <div className="card glass cst-card">
+                                    <div style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>Profit por pedido (1 ud)</div>
+                                    <div style={{fontSize:'30px',fontWeight:'800',fontFamily:'Fira Code',color:profit>=0?'#3D7C47':'#A03B3B',letterSpacing:'-1px',lineHeight:1}}>{money(profit)}</div>
+                                    <div style={{fontSize:'11px',color:'var(--text-dimmer)',marginTop:6}}>ROI real: <strong style={{color:'var(--text-dim)'}}>{roi.toFixed(2)}x</strong> · Margen {margenActual.toFixed(1)}%</div>
+                                </div>
+                                <div className="card glass cst-card">
+                                    <div style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>CPA Breakeven</div>
+                                    <div style={{fontSize:'30px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)',letterSpacing:'-1px',lineHeight:1}}>{money(cpaBreakeven)}</div>
+                                    <div style={{fontSize:'11px',color:'var(--text-dimmer)',marginTop:6}}>Máximo que puedes gastar en ads (real) por venta antes de perder.</div>
+                                </div>
+                            </div>
+
+                            <div className="card glass" style={{padding:'22px 24px'}}>
+                                <div style={{fontSize:'14px',fontWeight:'800',color:'var(--text)',marginBottom:18,display:'flex',alignItems:'center',gap:8}}>📊 Estructura de Costos <span style={{fontSize:'11px',fontWeight:'500',color:'var(--text-dimmer)'}}>· por venta exitosa</span></div>
+                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:7}}>
+                                    <span style={{fontSize:'12px',fontWeight:'700',color:'var(--text)'}}>Precio de Venta</span>
+                                    <span style={{fontSize:'13px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--text)'}}>{money(precio)}</span>
+                                </div>
+                                <div className="cst-bar-track" style={{marginBottom:22}}><div className="cst-bar-fill" style={{width:'100%',background:'var(--grad-ink)'}}/></div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'18px 28px'}}>
+                                    {segs.map((s,i)=>{
+                                        const p = precio>0 ? Math.min(100, s.val/precio*100) : 0;
+                                        return (
+                                        <div key={i}>
+                                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                                                <span style={{fontSize:'11.5px',fontWeight:'600',color:'var(--text-dim)'}}>{s.label}</span>
+                                                <span style={{fontSize:'12px',fontWeight:'700',fontFamily:'Fira Code',color:'var(--text)'}}>{money(s.val)} <span style={{color:'var(--text-dimmer)',fontWeight:'500'}}>({Math.round(p)}%)</span></span>
+                                            </div>
+                                            <div className="cst-bar-track"><div className="cst-bar-fill" style={{width:p+'%',background:s.color}}/></div>
+                                        </div>
+                                        );
+                                    })}
+                                </div>
+                                <div style={{marginTop:20,paddingTop:16,borderTop:'1px solid var(--glass-border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                                    <span style={{fontSize:'12px',fontWeight:'700',color:'var(--text-dim)'}}>Costo total por venta</span>
+                                    <span style={{fontSize:'16px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--text)'}}>{money(costosTotales)}</span>
+                                </div>
+                            </div>
+
+                            <div className="card glass" style={{padding:'16px 20px',display:'flex',gap:13,alignItems:'flex-start'}}>
+                                <span style={{fontSize:'17px'}}>💡</span>
                                 <div style={{fontSize:'12px',color:'var(--text-dim)',lineHeight:1.6}}>
-                                    <strong style={{color:'var(--text)'}}>CPA máximo que soporta este producto:</strong> si quieres ganar al menos RD$500 por venta vendiendo a RD${fmt(precioVenta)}, tu CPA real no puede pasar de <strong style={{color:'var(--orange)',fontFamily:'Fira Code'}}>RD${fmt(Math.max(0, precioVenta - 500 - (costosTotales - cpaReal)))}</strong> (US${fmt(Math.max(0, precioVenta - 500 - (costosTotales - cpaReal))/tasa,2)}). Si el Ads Manager te muestra más que RD${fmt(Math.max(0, (precioVenta - 500 - (costosTotales - cpaReal)) * pct(costeo.pctEntregaCpa)))}, estás por encima del límite.
+                                    Con Confirmación <strong>{n(costeo.pctConfirmacion)}%</strong> y Entrega <strong>{n(costeo.pctEntrega)}%</strong>, tu CPA real es <strong style={{color:'var(--orange)',fontFamily:'Fira Code'}}>{money(cpaReal)}</strong> (lo que Facebook te cobra ÷ {Math.round(conf*entr*100)}% de tasa combinada). Si el Ads Manager te muestra más de <strong style={{color:'var(--orange)',fontFamily:'Fira Code'}}>{money(cpaBreakeven*conf*entr)}</strong> por compra, estás perdiendo dinero en este producto a {money(precio)}.
                                 </div>
                             </div>
                         </div>
                     </div>
+                    )}
                     </>;
                 })()}
 
