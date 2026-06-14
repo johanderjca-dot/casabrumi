@@ -498,6 +498,34 @@ const DICCIONARIO = [
     ]},
 ];
 
+// ── PLATAFORMAS PARA BUSCAR PRODUCTOS GANADORES ──
+const PLATAFORMAS_GANADORES = [
+    { nombre:'Facebook Ad Library', emoji:'📘', url:'https://www.facebook.com/ads/library/', costo:'Gratis', tag:'Espionaje',
+      como:'La herramienta #1. Filtra por país (RD), tipo "Todos los anuncios" y busca por palabra clave o página. Busca anuncios corriendo 7+ días, con muchas versiones activas y alto engagement — eso indica que vende.' },
+    { nombre:'TikTok Creative Center', emoji:'🎵', url:'https://ads.tiktok.com/business/creativecenter/inspiration/topads/pc/en', costo:'Gratis', tag:'Tendencias',
+      como:'Sección "Top Ads": filtra por región e industria, ordena por likes/CTR. Mira "Trending products" y hashtags para detectar lo que está explotando antes que los demás.' },
+    { nombre:'TikTok orgánico', emoji:'📱', url:'https://www.tiktok.com/search?q=tiktokmademebuyit', costo:'Gratis', tag:'Tendencias',
+      como:'Busca los hashtags #tiktokmademebuyit, #amazonfinds, #productosvirales. Si un video tiene millones de vistas y comentarios de "dónde lo compro", es señal de demanda real.' },
+    { nombre:'Minea', emoji:'🔎', url:'https://www.minea.com/', costo:'Pago', tag:'Espionaje',
+      como:'Agrega anuncios de Facebook, TikTok y Pinterest en un solo lugar. Filtra por likes, fecha y país. Su "dropship engine" te dice qué productos están escalando ahora.' },
+    { nombre:'Dropispy', emoji:'🕵️', url:'https://app.dropispy.com/', costo:'Freemium', tag:'Espionaje',
+      como:'Alternativa más barata a Minea. Base de datos enorme de anuncios de Facebook. Ordena por engagement para ver los productos que más se están pautando.' },
+    { nombre:'PiPiAds', emoji:'🎯', url:'https://www.pipiads.com/', costo:'Pago', tag:'Espionaje',
+      como:'El mejor espía específico de TikTok Ads. Filtra por país, días corriendo y conversiones. Ideal si tu tráfico principal va a ser TikTok.' },
+    { nombre:'AliExpress (por órdenes)', emoji:'📦', url:'https://www.aliexpress.com/', costo:'Gratis', tag:'Validación',
+      como:'Busca el producto y ordena por "Número de pedidos". Miles de órdenes = demanda comprobada. También sirve como fuente de proveedor y para ver precio de costo real.' },
+    { nombre:'Amazon Movers & Shakers', emoji:'🛒', url:'https://www.amazon.com/gp/movers-and-shakers', costo:'Gratis', tag:'Validación',
+      como:'Lista de productos que más subieron en ventas en 24h. Ideal para detectar demanda creciente. Cruza lo que veas aquí con anuncios en Ad Library.' },
+    { nombre:'Google Trends', emoji:'📈', url:'https://trends.google.com/trends/', costo:'Gratis', tag:'Validación',
+      como:'Antes de invertir, valida que la demanda sube (no baja). Compara el producto en República Dominicana en los últimos 12 meses. Tendencia plana o subiendo = bien; cayendo = cuidado.' },
+    { nombre:'Sell The Trend', emoji:'🏆', url:'https://www.sellthetrend.com/', costo:'Pago', tag:'Curado',
+      como:'Base de datos curada de productos ganadores con datos de ventas y anuncios. Bueno para inspiración rápida cuando no sabes qué testear.' },
+    { nombre:'Pinterest Trends', emoji:'📌', url:'https://trends.pinterest.com/', costo:'Gratis', tag:'Validación',
+      como:'Muestra qué buscan las personas por temporada. Útil para productos de nicho, hogar, belleza y regalos. Detecta tendencias antes de que saturen Facebook.' },
+    { nombre:'Temu / 1688', emoji:'🏬', url:'https://www.temu.com/', costo:'Gratis', tag:'Sourcing',
+      como:'Para abastecimiento barato. 1688 (en chino, usa traductor) tiene los precios de fábrica más bajos. Compara contra tu precio proveedor en la calculadora de costeo.' },
+];
+
 // ── COUNTER ANIMATION ──
 function KpiVal({ value }) {
     const elRef = useRef(null);
@@ -928,19 +956,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [testeoForm,         setTesteoForm]         = useState({ resultado:'Pendiente', plataformas:'', notas:'', fecha:'' });
     const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', unidadesVendidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
     const ANALISIS_CHECKS = [
-        ['noVenden','¿No lo están vendiendo en mi mercado?'],
-        ['solucionaNicho','¿Soluciona un problema a un nicho?'],
-        ['competirPrecio','¿Puedo competir en precio?'],
-        ['altaPercepcion','¿Alta percepción de valor?'],
-        ['creativoNoUsado','¿Mi creativo no está siendo usado en mi mercado?'],
-        ['efectoWow','¿Efecto WOW?'],
-        ['disponibleMarketplace','¿Disponible en marketplace de tu país?'],
-        ['generaRecompra','¿Genera recompra?'],
-        ['resuelveNecesidad','¿Resuelve necesidad?'],
-        ['ticketBajo','¿Ticket bajo?'],
-        ['anuncioCautivador','¿Anuncio cautivador?'],
-        ['noEsBlack','¿No es black? (producto permitido)'],
-        ['facilImportar','¿Fácil de importar o fabricar?'],
+        ['noVenden','¿No lo están vendiendo en mi mercado?','Poca o ninguna competencia pautándolo activamente en RD. Si nadie más lo vende, tienes ventaja; si muchos lo venden, evalúa si puedes diferenciarte.'],
+        ['solucionaNicho','¿Soluciona un problema a un nicho?','¿El producto resuelve un problema significativo para muchas personas, para un nicho grande?'],
+        ['competirPrecio','¿Puedo competir en precio?','¿Puedes ofrecer un precio competitivo en tu mercado y aún así dejar buen margen de ganancia?'],
+        ['altaPercepcion','¿Alta percepción de valor?','Cuando ves este producto y el problema que resuelve, ¿parece un producto de alta calidad? ¿Crees que puedes venderlo a un precio elevado?'],
+        ['creativoNoUsado','¿Mi creativo no está siendo usado en mi mercado?','El ángulo o creativo que usarás no está saturado/quemado en tu mercado todavía.'],
+        ['efectoWow','¿Efecto WOW?','Factor sorpresa visual + conexión emocional. Las 6 necesidades humanas que motivan la compra: 1) Certeza (evitar dolor, obtener placer), 2) Variedad/novedad, 3) Significado (sentirse único/importante), 4) Conexión/amor, 5) Crecimiento, 6) Contribución.'],
+        ['disponibleMarketplace','¿Disponible en marketplace de tu país?','Valida si el artículo está en Facebook Marketplace del país. Ventaja: puedes comprar al por mayor ya disponible y revender rápido. Desventaja: otros también pueden hacerlo, aumenta la competencia.'],
+        ['generaRecompra','¿Genera recompra?','Producto consumible o de uso que pueda generar recompra del mismo cliente.'],
+        ['resuelveNecesidad','¿Resuelve necesidad?','¿Es una solución que ningún otro producto ofrece de esta manera a ese problema?'],
+        ['ticketBajo','¿Ticket bajo?','Precio de venta accesible para compra impulsiva. RD: inferior a 300 · (COL: <$100.000 · MEX: <$999).'],
+        ['anuncioCautivador','¿Anuncio cautivador?','Tiene buenas vistas, detiene el scroll, factor sorpresa, comentarios, reseñas, compartidos, calidad de diseño, prueba social — O una tienda lo lleva pautando por más de 5 días en otro mercado.'],
+        ['noEsBlack','¿No es black? (producto permitido)','El producto cumple las políticas: NO muestra antes/después, NO es de salud, NO es agresivo al cuerpo humano. Revisa políticas de TikTok y Facebook Ads.'],
+        ['facilImportar','¿Fácil de importar o fabricar?','¿El producto no mide más de 15 cm x 15 cm? Tamaño pequeño = más fácil y barato de importar.'],
     ];
     const ANALISIS_DEFAULT = { precioProveedor:'', precioVenta:'', proveedor:'', linkAnuncio:'', checks:{}, angulo1:'', angulo2:'', angulo3:'', compEnlace1:'', compEnlace2:'', compNotas:'', tecnico:'', notas:'' };
     const [analisisForm, setAnalisisForm] = useState(ANALISIS_DEFAULT);
@@ -965,6 +993,39 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         finally { setSavingCampana(false); }
     };
     const deleteCampana = (id) => { db.collection('campanas').doc(id).delete().catch(console.error); };
+    const [iaCargando, setIaCargando] = useState(false);
+    const [iaError, setIaError] = useState('');
+    const [iaKey, setIaKey] = useState(() => { try { return localStorage.getItem('anthropicKey') || ''; } catch { return ''; } });
+    const guardarIaKey = (v) => { setIaKey(v); try { v ? localStorage.setItem('anthropicKey', v) : localStorage.removeItem('anthropicKey'); } catch {} };
+    const generarAngulosIA = async (prod) => {
+        setIaError(''); setIaCargando(true);
+        const nombre = prod.nombre || '';
+        const desc = prod.descripcion || analisisForm.notas || '';
+        const prompt = `Eres un experto en marketing de e-commerce de pago contra entrega (COD) en República Dominicana. Para el producto "${nombre}"${desc?` — ${desc}`:''}, genera exactamente 3 ángulos de venta potentes para anuncios de Facebook/TikTok: principal, secundario y terciario. Cada ángulo es una frase corta y persuasiva (máximo 12 palabras) enfocada en el dolor, beneficio o emoción del cliente dominicano. Responde SOLO con los 3 ángulos, uno por línea, sin numeración ni texto extra.`;
+        const key = (() => { try { return localStorage.getItem('anthropicKey') || ''; } catch { return ''; } })();
+        try {
+            if (key) {
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'content-type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+                    body: JSON.stringify({ model:'claude-opus-4-8', max_tokens:512, messages:[{ role:'user', content:prompt }] }),
+                });
+                if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || ('Error '+res.status)); }
+                const data = await res.json();
+                const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+                const lineas = text.split('\n').map(l=>l.replace(/^[\d).\-•\s"]+/,'').replace(/"$/,'').trim()).filter(Boolean);
+                if (lineas.length === 0) throw new Error('La IA no devolvió ángulos.');
+                setAnalisisForm(f=>({ ...f, angulo1:lineas[0]||f.angulo1, angulo2:lineas[1]||f.angulo2, angulo3:lineas[2]||f.angulo3 }));
+            } else {
+                await navigator.clipboard.writeText(prompt);
+                setIaError('Sin API key configurada: copié el prompt al portapapeles. Pégalo en claude.ai (gratis) y trae los 3 ángulos, o pega tu API key abajo para generarlos aquí mismo.');
+            }
+        } catch(err) {
+            setIaError('Error de IA: ' + err.message);
+        } finally {
+            setIaCargando(false);
+        }
+    };
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -1764,6 +1825,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const TABS = ['General','Análisis','Facebook','Testeo','Inventario'];
                     const analisis = p.analisis || {};
                     const analisisScore = ANALISIS_CHECKS.filter(([k])=>(analisis.checks||{})[k]==='si').length;
+                    const angulosValidos = !!(analisis.angulo1 && analisis.angulo1.trim());
+                    const posibleGanador = analisisScore >= 6 && angulosValidos;
                     return (
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
@@ -1841,26 +1904,40 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                                         <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'20px 0 12px'}}>Características de un producto ganador</div>
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 16px'}}>
-                                            {ANALISIS_CHECKS.map(([k,label])=>{
+                                            {ANALISIS_CHECKS.map(([k,label,nota])=>{
                                                 const v = (analisisForm.checks||{})[k] || '';
                                                 return (
-                                                <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'8px 12px',borderRadius:10,background:'var(--surface-3)',border:'1px solid var(--glass-border)'}}>
-                                                    <span style={{fontSize:'12px',color:'var(--text-dim)',lineHeight:1.3}}>{label}</span>
-                                                    <div style={{display:'flex',gap:5,flexShrink:0}}>
-                                                        {['si','no'].map(opt=>(
-                                                            <button key={opt} onClick={()=>setAnalisisForm(f=>({...f,checks:{...(f.checks||{}),[k]:opt}}))}
-                                                                style={{padding:'4px 11px',borderRadius:7,fontSize:'10.5px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',
-                                                                    border:'1px solid '+(v===opt?(opt==='si'?'rgba(74,120,89,0.4)':'rgba(160,56,56,0.35)'):'var(--glass-border)'),
-                                                                    background:v===opt?(opt==='si'?'rgba(74,120,89,0.14)':'rgba(160,56,56,0.10)'):'transparent',
-                                                                    color:v===opt?(opt==='si'?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>{opt}</button>
-                                                        ))}
+                                                <div key={k} style={{padding:'10px 12px',borderRadius:10,background:'var(--surface-3)',border:'1px solid var(--glass-border)'}}>
+                                                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:10}}>
+                                                        <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text)',lineHeight:1.3}}>{label}</span>
+                                                        <div style={{display:'flex',gap:5,flexShrink:0}}>
+                                                            {['si','no'].map(opt=>(
+                                                                <button key={opt} onClick={()=>setAnalisisForm(f=>({...f,checks:{...(f.checks||{}),[k]:opt}}))}
+                                                                    style={{padding:'4px 11px',borderRadius:7,fontSize:'10.5px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',
+                                                                        border:'1px solid '+(v===opt?(opt==='si'?'rgba(74,120,89,0.4)':'rgba(160,56,56,0.35)'):'var(--glass-border)'),
+                                                                        background:v===opt?(opt==='si'?'rgba(74,120,89,0.14)':'rgba(160,56,56,0.10)'):'transparent',
+                                                                        color:v===opt?(opt==='si'?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>{opt}</button>
+                                                            ))}
+                                                        </div>
                                                     </div>
+                                                    {nota && <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',lineHeight:1.45,marginTop:6}}>{nota}</div>}
                                                 </div>
                                                 );
                                             })}
                                         </div>
 
-                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Ángulos de venta</div>
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'22px 0 12px',flexWrap:'wrap',gap:8}}>
+                                            <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px'}}>Ángulos de venta</span>
+                                            <button className="btn btn-gold btn-sm" disabled={iaCargando} onClick={()=>generarAngulosIA(p)} style={{background:'linear-gradient(135deg,#8B5CF6,#6D28D9)',border:'none'}}>
+                                                {iaCargando ? '✦ Generando…' : '✦ Generar con IA'}
+                                            </button>
+                                        </div>
+                                        {iaError && <div style={{fontSize:'11.5px',color:'var(--earth-2)',background:'var(--cream-dark)',border:'1px solid var(--glass-border)',borderRadius:8,padding:'10px 12px',marginBottom:12,lineHeight:1.5}}>{iaError}</div>}
+                                        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:14}}>
+                                            <input type="password" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',fontSize:'12px',flex:1}}
+                                                placeholder="🔑 Pega tu API key de Claude (sk-ant-…) — se guarda solo en tu navegador" value={iaKey} onChange={e=>guardarIaKey(e.target.value)} />
+                                            {iaKey && <span style={{fontSize:'10.5px',color:'#3D6646',fontWeight:'700',whiteSpace:'nowrap'}}>✓ Conectada</span>}
+                                        </div>
                                         <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #1 — Principal</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo1} onChange={e=>setAnalisisForm(f=>({...f,angulo1:e.target.value}))} /></div>
                                         <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #2 — Secundario</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo2} onChange={e=>setAnalisisForm(f=>({...f,angulo2:e.target.value}))} /></div>
                                         <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #3 — Terciario</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo3} onChange={e=>setAnalisisForm(f=>({...f,angulo3:e.target.value}))} /></div>
@@ -1887,8 +1964,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <div style={{padding:'18px 22px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid var(--glass-border)',flexWrap:'wrap',gap:10}}>
                                                 <div style={{display:'flex',alignItems:'center',gap:14}}>
                                                     <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px'}}>Validación ganador</div>
-                                                    <span style={{fontFamily:'Fira Code',fontWeight:'800',fontSize:'20px',color:analisisScore>=11?'#3D6646':analisisScore>=8?'#9A7B3E':'#A03B3B'}}>{analisisScore}/{ANALISIS_CHECKS.length}</span>
-                                                    {(() => { const lvl = analisisScore>=11?'green':analisisScore>=8?'gold':'red'; const c=DX_COLORS[lvl]; const lab=analisisScore>=11?'Producto ganador':analisisScore>=8?'Prometedor':'Riesgoso'; return <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 11px',borderRadius:99,fontSize:'11px',fontWeight:'700',background:c.bg,border:`1px solid ${c.bd}`,color:c.fg}}><span style={{width:5,height:5,borderRadius:'50%',background:c.dot}}/>{lab}</span>; })()}
+                                                    <span style={{fontFamily:'Fira Code',fontWeight:'800',fontSize:'20px',color:posibleGanador?'#3D6646':analisisScore>=6?'#9A7B3E':'#A03B3B'}}>{analisisScore}/{ANALISIS_CHECKS.length}</span>
+                                                    {(() => {
+                                                        const lvl = posibleGanador?'green':(analisisScore>=6?'gold':(analisisScore>0?'orange':'red'));
+                                                        const c=DX_COLORS[lvl];
+                                                        const lab = posibleGanador?'✓ Posible producto ganador':(analisisScore>=6?'Faltan ángulos de venta':(analisisScore>0?'En análisis':'Sin evaluar'));
+                                                        return <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 11px',borderRadius:99,fontSize:'11px',fontWeight:'700',background:c.bg,border:`1px solid ${c.bd}`,color:c.fg}}><span style={{width:5,height:5,borderRadius:'50%',background:c.dot}}/>{lab}</span>;
+                                                    })()}
                                                 </div>
                                                 <button className="btn btn-glass btn-sm" onClick={()=>{setAnalisisForm({...ANALISIS_DEFAULT, ...analisis, checks:{...(analisis.checks||{})}}); setEditSeccion('analisis');}}>✎ Editar análisis</button>
                                             </div>
@@ -2626,6 +2708,35 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             ))}
                         </div>
                     )}
+
+                    {/* ── Guía: dónde buscar productos ganadores ── */}
+                    <div style={{marginTop:36}}>
+                        <div className="page-header" style={{marginBottom:8}}><h1 style={{fontSize:'20px'}}>🏆 Dónde buscar productos ganadores</h1><p>Las mejores herramientas para encontrar productos que vendan — y cómo buscarlos en cada una.</p></div>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(290px,1fr))',gap:14}}>
+                            {PLATAFORMAS_GANADORES.map(pf=>{
+                                const tagColor = pf.tag==='Espionaje'?DX_COLORS.orange:pf.tag==='Validación'?DX_COLORS.green:pf.tag==='Tendencias'?DX_COLORS.gold:{bg:'var(--cream-dark)',bd:'var(--glass-border)',fg:'var(--text-dim)'};
+                                return (
+                                <a key={pf.nombre} href={pf.url} target="_blank" rel="noopener noreferrer" className="card glass" style={{padding:'18px 20px',textDecoration:'none',display:'flex',flexDirection:'column',gap:8,transition:'transform var(--t-fast),box-shadow var(--t-fast)'}}
+                                    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';}} onMouseLeave={e=>{e.currentTarget.style.transform='';}}>
+                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                                        <span style={{display:'flex',alignItems:'center',gap:9}}><span style={{fontSize:'22px'}}>{pf.emoji}</span><span style={{fontSize:'14px',fontWeight:'700',color:'var(--text)'}}>{pf.nombre}</span></span>
+                                        <span style={{fontSize:'9px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'0.5px',whiteSpace:'nowrap'}}>{pf.costo}</span>
+                                    </div>
+                                    <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 9px',borderRadius:99,fontSize:'10px',fontWeight:'700',background:tagColor.bg,border:`1px solid ${tagColor.bd}`,color:tagColor.fg,alignSelf:'flex-start'}}><span style={{width:5,height:5,borderRadius:'50%',background:tagColor.fg}}/>{pf.tag}</span>
+                                    <span style={{fontSize:'12px',color:'var(--text-dim)',lineHeight:1.55}}>{pf.como}</span>
+                                    <span style={{fontSize:'11px',color:'var(--orange)',fontWeight:'700',marginTop:2}}>Abrir ↗</span>
+                                </a>
+                                );
+                            })}
+                        </div>
+                        <div className="card glass" style={{padding:'16px 20px',marginTop:14,display:'flex',gap:13,alignItems:'flex-start'}}>
+                            <span style={{fontSize:'17px'}}>🧭</span>
+                            <div style={{fontSize:'12px',color:'var(--text-dim)',lineHeight:1.6}}>
+                                <strong style={{color:'var(--text)'}}>Flujo recomendado:</strong> 1) Detecta en <strong>Ad Library / TikTok Creative Center</strong> productos pautándose 5+ días. 2) Valida demanda en <strong>AliExpress (órdenes)</strong> y <strong>Google Trends</strong>. 3) Confirma que cumple tu checklist en <strong>Análisis de Producto</strong>. 4) Cuéstalo en la <strong>Calculadora de Costeo</strong>. 5) Si pasa, va a <strong>Planeación de Campañas</strong>.
+                            </div>
+                        </div>
+                    </div>
+
                     {showLinkModal && (
                         <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowLinkModal(false);setEditingLink(null);}}}>
                             <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:460}}>
