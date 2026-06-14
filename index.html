@@ -927,6 +927,44 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [fbForm,             setFbForm]             = useState({ gastoAds:'', cpa:'', cpm:'', ctr:'', cpc:'', roas:'', cvr:'', frecuencia:'', atc:'', ic:'', aov:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
     const [testeoForm,         setTesteoForm]         = useState({ resultado:'Pendiente', plataformas:'', notas:'', fecha:'' });
     const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', unidadesVendidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
+    const ANALISIS_CHECKS = [
+        ['noVenden','¿No lo están vendiendo en mi mercado?'],
+        ['solucionaNicho','¿Soluciona un problema a un nicho?'],
+        ['competirPrecio','¿Puedo competir en precio?'],
+        ['altaPercepcion','¿Alta percepción de valor?'],
+        ['creativoNoUsado','¿Mi creativo no está siendo usado en mi mercado?'],
+        ['efectoWow','¿Efecto WOW?'],
+        ['disponibleMarketplace','¿Disponible en marketplace de tu país?'],
+        ['generaRecompra','¿Genera recompra?'],
+        ['resuelveNecesidad','¿Resuelve necesidad?'],
+        ['ticketBajo','¿Ticket bajo?'],
+        ['anuncioCautivador','¿Anuncio cautivador?'],
+        ['noEsBlack','¿No es black? (producto permitido)'],
+        ['facilImportar','¿Fácil de importar o fabricar?'],
+    ];
+    const ANALISIS_DEFAULT = { precioProveedor:'', precioVenta:'', proveedor:'', linkAnuncio:'', checks:{}, angulo1:'', angulo2:'', angulo3:'', compEnlace1:'', compEnlace2:'', compNotas:'', tecnico:'', notas:'' };
+    const [analisisForm, setAnalisisForm] = useState(ANALISIS_DEFAULT);
+    const [campanas, setCampanas] = useState([]);
+    const CAMPANA_DEFAULT = { fecha:'', tienda:'', desarrollador:'', producto:'', proceso:'Producto nuevo', categoria:'', variaciones:'', proveedor:'', codigoPlataforma:'', costoProveedor:'', precioVenta:'', cpaBreakeven:'', linkDrive:'', linkLanding:'', reviso:'', cuentaPubli:'', fanpage:'', obsLanding:'', obsCreativo:'' };
+    const [campanaForm, setCampanaForm] = useState(CAMPANA_DEFAULT);
+    const [showCampanaModal, setShowCampanaModal] = useState(false);
+    const [editingCampana, setEditingCampana] = useState(null);
+    const [savingCampana, setSavingCampana] = useState(false);
+    const CAMPANA_PROCESOS = ['Producto nuevo','Migración','Relanzamiento','Pausado'];
+    const saveCampana = async () => {
+        if (!campanaForm.producto || savingCampana) return;
+        setSavingCampana(true);
+        try {
+            if (editingCampana) {
+                await db.collection('campanas').doc(editingCampana.id).update({...campanaForm});
+            } else {
+                await db.collection('campanas').add({...campanaForm, creadoEn: firebase.firestore.FieldValue.serverTimestamp()});
+            }
+            setShowCampanaModal(false); setEditingCampana(null); setCampanaForm(CAMPANA_DEFAULT);
+        } catch(err){ console.error('Error guardando campaña:', err); }
+        finally { setSavingCampana(false); }
+    };
+    const deleteCampana = (id) => { db.collection('campanas').doc(id).delete().catch(console.error); };
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -993,6 +1031,18 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const unsub = db.collection('productos').orderBy('creadoEn','desc').onSnapshot(
             snap => setProductos(snap.docs.map(d=>({id:d.id,...d.data()}))),
             err => console.error('Productos:', err)
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('campanas').onSnapshot(
+            snap => {
+                const docs = snap.docs.map(d=>({id:d.id,...d.data()}));
+                docs.sort((a,b)=>(b.creadoEn?.toDate?.()?.getTime()||0)-(a.creadoEn?.toDate?.()?.getTime()||0));
+                setCampanas(docs);
+            },
+            err => console.error('Campañas:', err)
         );
         return unsub;
     }, []);
@@ -1309,6 +1359,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_star = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
     const I_calc = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/><line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="12" y1="15" x2="12" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="8" y1="19" x2="16" y2="19"/></svg>;
     const I_book = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
+    const I_target = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
 
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
@@ -1317,6 +1368,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'gastos',      label: 'Gastos',      icon: I.dollar },
             { key: 'ganadores',   label: 'Prod. Ganadores', icon: I_star },
+            { key: 'campanas',    label: 'Planeación Campañas', icon: I_target },
         ]},
         { label: 'Herramientas', items: [
             { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
@@ -1709,7 +1761,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const fb = p.facebook||{}; const testeo = p.testeo||{}; const inv = p.inventario||{};
                     const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
                     const gananciaTotal = gananciaUnit * parseFloat(inv.unidadesVendidas||0);
-                    const TABS = ['General','Facebook','Testeo','Inventario'];
+                    const TABS = ['General','Análisis','Facebook','Testeo','Inventario'];
+                    const analisis = p.analisis || {};
+                    const analisisScore = ANALISIS_CHECKS.filter(([k])=>(analisis.checks||{})[k]==='si').length;
                     return (
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
@@ -1771,6 +1825,113 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* ── Tab Análisis ── */}
+                            {productoTab==='análisis' && (
+                                editSeccion==='analisis' ? (
+                                    <div className="card glass" style={{padding:'24px'}}>
+                                        <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Análisis de producto ganador</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:20}}>
+                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Precio proveedor (RD$)</label><input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.precioProveedor} onChange={e=>setAnalisisForm(f=>({...f,precioProveedor:e.target.value}))} /></div>
+                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Precio venta (RD$)</label><input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.precioVenta} onChange={e=>setAnalisisForm(f=>({...f,precioVenta:e.target.value}))} /></div>
+                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Nombre del proveedor</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.proveedor} onChange={e=>setAnalisisForm(f=>({...f,proveedor:e.target.value}))} /></div>
+                                        </div>
+                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Link del anuncio</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="https://..." value={analisisForm.linkAnuncio} onChange={e=>setAnalisisForm(f=>({...f,linkAnuncio:e.target.value}))} /></div>
+
+                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'20px 0 12px'}}>Características de un producto ganador</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 16px'}}>
+                                            {ANALISIS_CHECKS.map(([k,label])=>{
+                                                const v = (analisisForm.checks||{})[k] || '';
+                                                return (
+                                                <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'8px 12px',borderRadius:10,background:'var(--surface-3)',border:'1px solid var(--glass-border)'}}>
+                                                    <span style={{fontSize:'12px',color:'var(--text-dim)',lineHeight:1.3}}>{label}</span>
+                                                    <div style={{display:'flex',gap:5,flexShrink:0}}>
+                                                        {['si','no'].map(opt=>(
+                                                            <button key={opt} onClick={()=>setAnalisisForm(f=>({...f,checks:{...(f.checks||{}),[k]:opt}}))}
+                                                                style={{padding:'4px 11px',borderRadius:7,fontSize:'10.5px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',
+                                                                    border:'1px solid '+(v===opt?(opt==='si'?'rgba(74,120,89,0.4)':'rgba(160,56,56,0.35)'):'var(--glass-border)'),
+                                                                    background:v===opt?(opt==='si'?'rgba(74,120,89,0.14)':'rgba(160,56,56,0.10)'):'transparent',
+                                                                    color:v===opt?(opt==='si'?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>{opt}</button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Ángulos de venta</div>
+                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #1 — Principal</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo1} onChange={e=>setAnalisisForm(f=>({...f,angulo1:e.target.value}))} /></div>
+                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #2 — Secundario</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo2} onChange={e=>setAnalisisForm(f=>({...f,angulo2:e.target.value}))} /></div>
+                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #3 — Terciario</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo3} onChange={e=>setAnalisisForm(f=>({...f,angulo3:e.target.value}))} /></div>
+
+                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Análisis de competencia</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Enlace competencia 1</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.compEnlace1} onChange={e=>setAnalisisForm(f=>({...f,compEnlace1:e.target.value}))} /></div>
+                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Enlace competencia 2</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.compEnlace2} onChange={e=>setAnalisisForm(f=>({...f,compEnlace2:e.target.value}))} /></div>
+                                        </div>
+                                        <div className="form-group" style={{marginTop:12}}><label style={{color:'var(--text-dim)'}}>Notas sobre competencia</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}} value={analisisForm.compNotas} onChange={e=>setAnalisisForm(f=>({...f,compNotas:e.target.value}))} /></div>
+
+                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Análisis técnico</div>
+                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>¿Por qué tu creativo está validado en otro mercado?</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}} placeholder="Ej: En Alemania lleva 5 días activo, alcanzó 1.000 likes…" value={analisisForm.tecnico} onChange={e=>setAnalisisForm(f=>({...f,tecnico:e.target.value}))} /></div>
+                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Notas adicionales</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'60px',resize:'vertical'}} value={analisisForm.notas} onChange={e=>setAnalisisForm(f=>({...f,notas:e.target.value}))} /></div>
+
+                                        <div style={{display:'flex',gap:10,marginTop:8}}>
+                                            <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
+                                            <button className="btn btn-gold" onClick={()=>saveSeccion(p.id,'analisis',analisisForm)}>Guardar Análisis</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="card glass" style={{marginBottom:16}}>
+                                            <div style={{padding:'18px 22px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid var(--glass-border)',flexWrap:'wrap',gap:10}}>
+                                                <div style={{display:'flex',alignItems:'center',gap:14}}>
+                                                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px'}}>Validación ganador</div>
+                                                    <span style={{fontFamily:'Fira Code',fontWeight:'800',fontSize:'20px',color:analisisScore>=11?'#3D6646':analisisScore>=8?'#9A7B3E':'#A03B3B'}}>{analisisScore}/{ANALISIS_CHECKS.length}</span>
+                                                    {(() => { const lvl = analisisScore>=11?'green':analisisScore>=8?'gold':'red'; const c=DX_COLORS[lvl]; const lab=analisisScore>=11?'Producto ganador':analisisScore>=8?'Prometedor':'Riesgoso'; return <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 11px',borderRadius:99,fontSize:'11px',fontWeight:'700',background:c.bg,border:`1px solid ${c.bd}`,color:c.fg}}><span style={{width:5,height:5,borderRadius:'50%',background:c.dot}}/>{lab}</span>; })()}
+                                                </div>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>{setAnalisisForm({...ANALISIS_DEFAULT, ...analisis, checks:{...(analisis.checks||{})}}); setEditSeccion('analisis');}}>✎ Editar análisis</button>
+                                            </div>
+                                            <div style={{padding:'10px 22px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:0}}>
+                                                {ANALISIS_CHECKS.map(([k,label])=>{
+                                                    const v=(analisis.checks||{})[k];
+                                                    return (
+                                                    <div key={k} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 0',fontSize:'12px',color:'var(--text-dim)'}}>
+                                                        <span style={{width:18,height:18,borderRadius:5,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'800',
+                                                            background:v==='si'?'rgba(74,120,89,0.14)':v==='no'?'rgba(160,56,56,0.10)':'var(--cream-dark)',
+                                                            color:v==='si'?'#3D6646':v==='no'?'#A03B3B':'var(--text-dimmer)'}}>{v==='si'?'✓':v==='no'?'✕':'·'}</span>
+                                                        {label}
+                                                    </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+                                            <div className="card glass" style={{padding:'20px'}}>
+                                                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:14}}>Ángulos de venta</div>
+                                                {[['#1 Principal',analisis.angulo1],['#2 Secundario',analisis.angulo2],['#3 Terciario',analisis.angulo3]].map(([t,val])=>(
+                                                    <div key={t} style={{marginBottom:12}}>
+                                                        <div style={{fontSize:'10px',fontWeight:'700',color:'var(--orange)',marginBottom:3}}>{t}</div>
+                                                        <div style={{fontSize:'13px',color:val?'var(--text)':'var(--text-dimmer)'}}>{val||'—'}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                                                <div className="card glass" style={{padding:'20px'}}>
+                                                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:12}}>Competencia</div>
+                                                    {analisis.compEnlace1 && <div style={{fontSize:'12px',marginBottom:6}}><a href={analisis.compEnlace1} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Enlace 1 ↗</a></div>}
+                                                    {analisis.compEnlace2 && <div style={{fontSize:'12px',marginBottom:6}}><a href={analisis.compEnlace2} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Enlace 2 ↗</a></div>}
+                                                    <div style={{fontSize:'12.5px',color:analisis.compNotas?'var(--text-dim)':'var(--text-dimmer)',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{analisis.compNotas||'Sin notas de competencia.'}</div>
+                                                </div>
+                                                <div className="card glass" style={{padding:'20px'}}>
+                                                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:12}}>Análisis técnico</div>
+                                                    <div style={{fontSize:'12.5px',color:analisis.tecnico?'var(--text-dim)':'var(--text-dimmer)',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{analisis.tecnico||'Sin análisis técnico.'}</div>
+                                                    {analisis.linkAnuncio && <div style={{marginTop:10,fontSize:'12px'}}><a href={analisis.linkAnuncio} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Ver anuncio ↗</a></div>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )
                             )}
 
                             {/* ── Tab Facebook ── */}
@@ -2097,10 +2258,28 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     <div className="cst-grid">
                         {/* ── PANEL DE PARÁMETROS ── */}
                         <div className="card glass cst-panel">
-                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
                                 <div style={{fontSize:'15px',fontWeight:'800',color:'var(--text)',letterSpacing:'-0.3px'}}>Parámetros</div>
                                 <button className="cst-add-btn" onClick={()=>setCosteo({...COSTEO_DEFAULTS})}>↺ Reset</button>
                             </div>
+
+                            {productos.length>0 && (
+                                <div style={{marginBottom:18,padding:'12px 14px',borderRadius:12,background:'var(--orange-dim)',border:'1px solid var(--orange-border)'}}>
+                                    <label className="cst-field-label" style={{color:'var(--orange)'}}>⭐ Cargar producto guardado</label>
+                                    <select className="cst-input" style={{fontFamily:'inherit',fontWeight:'600',fontSize:'13px'}} value=""
+                                        onChange={e=>{
+                                            const prod = productos.find(x=>x.id===e.target.value); if(!prod) return;
+                                            const a = prod.analisis||{}; const inv = prod.inventario||{};
+                                            const pv = a.precioVenta || inv.precioVenta || '';
+                                            const pp = a.precioProveedor || inv.precioCompra || '';
+                                            setCosteo(c=>({...c, precioVenta:String(pv||c.precioVenta), costoProducto:String(pp||c.costoProducto), productoCargado:prod.nombre}));
+                                        }}>
+                                        <option value="">Selecciona un producto…</option>
+                                        {productos.map(prod=>(<option key={prod.id} value={prod.id}>{prod.nombre}</option>))}
+                                    </select>
+                                    {costeo.productoCargado && <div style={{fontSize:'10.5px',color:'var(--text-dim)',marginTop:7}}>Cargado: <strong style={{color:'var(--orange)'}}>{costeo.productoCargado}</strong> — precio y costo actualizados.</div>}
+                                </div>
+                            )}
 
                             <div style={{marginBottom:18}}>
                                 <label className="cst-field-label">Precio de Venta (RD$)</label>
@@ -2272,6 +2451,98 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         </div>
                     </div>
+                    )}
+                    </>;
+                })()}
+
+                {activeTab === 'campanas' && (() => {
+                    const fmtMoney = v => { const x=parseFloat(v); return isFinite(x)? 'RD$'+x.toLocaleString('es-DO') : '—'; };
+                    const procColor = p => p==='Producto nuevo'?'badge-green':p==='Relanzamiento'?'badge-gold':p==='Migración'?'badge-gold':'badge-gray';
+                    return <>
+                    <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+                        <div><h1>Planeación de Campañas 🎯</h1><p>Control de productos en proceso: proveedor, costos, links y observaciones.</p></div>
+                        <button className="btn btn-gold" onClick={()=>{setEditingCampana(null);setCampanaForm(CAMPANA_DEFAULT);setShowCampanaModal(true);}}>{I.plus} Nueva campaña</button>
+                    </div>
+                    {campanas.length===0 ? (
+                        <div className="card glass"><div className="empty"><div className="empty-icon">{I_target}</div><h3>Sin campañas aún</h3><p>Registra tu primer producto en planeación.</p></div></div>
+                    ) : (
+                        <div className="card glass" style={{overflowX:'auto'}}>
+                            <table style={{minWidth:980}}>
+                                <thead><tr>
+                                    <th>Producto</th><th>Tienda</th><th>Proceso</th><th>Categoría</th><th>Proveedor</th><th>Costo</th><th>Precio</th><th>CPA B.E.</th><th>Links</th><th></th>
+                                </tr></thead>
+                                <tbody>
+                                    {campanas.map(c=>(
+                                        <tr key={c.id}>
+                                            <td><strong>{c.producto||'—'}</strong>{c.desarrollador && <div style={{fontSize:'11px',color:'var(--text-dimmer)'}}>{c.desarrollador}</div>}</td>
+                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{c.tienda||'—'}</td>
+                                            <td>{c.proceso ? <span className={`badge ${procColor(c.proceso)}`}><span className="badge-dot"/>{c.proceso}</span> : '—'}</td>
+                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{c.categoria||'—'}</td>
+                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{c.proveedor||'—'}</td>
+                                            <td className="td-num" style={{fontSize:'12px'}}>{fmtMoney(c.costoProveedor)}</td>
+                                            <td className="td-num" style={{fontSize:'12px'}}>{fmtMoney(c.precioVenta)}</td>
+                                            <td className="td-num" style={{fontSize:'12px',color:'var(--orange)'}}>{fmtMoney(c.cpaBreakeven)}</td>
+                                            <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>
+                                                {c.linkDrive && <a href={c.linkDrive} target="_blank" rel="noopener" style={{color:'var(--orange)',marginRight:8}}>Drive</a>}
+                                                {c.linkLanding && <a href={c.linkLanding} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Landing</a>}
+                                                {!c.linkDrive && !c.linkLanding && '—'}
+                                            </td>
+                                            <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>{setEditingCampana(c);setCampanaForm({...CAMPANA_DEFAULT,...c});setShowCampanaModal(true);}}>✎</button>
+                                                <button className="btn btn-glass btn-sm" style={{marginLeft:6,color:'#A03B3B'}} onClick={()=>{if(confirm('¿Eliminar esta campaña?'))deleteCampana(c.id);}}>×</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {showCampanaModal && (
+                        <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowCampanaModal(false);setEditingCampana(null);}}}>
+                            <div className="modal glass glass-high" style={{maxWidth:680}}>
+                                <div className="modal-hd">
+                                    <h2>{editingCampana?'Editar campaña':'Nueva campaña'}</h2>
+                                    <button className="modal-close" onClick={()=>{setShowCampanaModal(false);setEditingCampana(null);}}>×</button>
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                                    {[
+                                        {k:'producto',l:'Producto *',ph:'Nombre del producto'},
+                                        {k:'tienda',l:'Tienda',ph:'Ej. CHOOP COL'},
+                                        {k:'desarrollador',l:'Desarrollador',ph:'Quién lo trabaja'},
+                                        {k:'categoria',l:'Categoría',ph:'Ej. Mascotas'},
+                                        {k:'proveedor',l:'Proveedor',ph:'Ej. Dropi'},
+                                        {k:'codigoPlataforma',l:'Código plataforma',ph:''},
+                                        {k:'variaciones',l:'Variaciones',ph:'Ej. No tiene'},
+                                        {k:'fecha',l:'Fecha',ph:'',type:'date'},
+                                        {k:'costoProveedor',l:'Costo proveedor (RD$)',ph:'0',type:'number'},
+                                        {k:'precioVenta',l:'Precio de venta (RD$)',ph:'0',type:'number'},
+                                        {k:'cpaBreakeven',l:'CPA Break Even (RD$)',ph:'0',type:'number'},
+                                        {k:'reviso',l:'Revisó',ph:''},
+                                        {k:'cuentaPubli',l:'Cuenta publicitaria',ph:''},
+                                        {k:'fanpage',l:'FanPage',ph:''},
+                                        {k:'linkDrive',l:'Link carpeta Drive',ph:'https://...'},
+                                        {k:'linkLanding',l:'Link landing',ph:'https://...'},
+                                    ].map(({k,l,ph,type})=>(
+                                        <div key={k} className="form-group" style={{marginBottom:0}}>
+                                            <label style={{color:'var(--text-dim)'}}>{l}</label>
+                                            <input type={type||'text'} className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder={ph} value={campanaForm[k]||''} onChange={e=>setCampanaForm(f=>({...f,[k]:e.target.value}))} />
+                                        </div>
+                                    ))}
+                                    <div className="form-group" style={{marginBottom:0}}>
+                                        <label style={{color:'var(--text-dim)'}}>Proceso</label>
+                                        <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={campanaForm.proceso} onChange={e=>setCampanaForm(f=>({...f,proceso:e.target.value}))}>
+                                            {CAMPANA_PROCESOS.map(p=><option key={p} value={p}>{p}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="form-group" style={{marginTop:12}}><label style={{color:'var(--text-dim)'}}>Observación de landing</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'56px',resize:'vertical'}} value={campanaForm.obsLanding} onChange={e=>setCampanaForm(f=>({...f,obsLanding:e.target.value}))} /></div>
+                                <div className="form-group"><label style={{color:'var(--text-dim)'}}>Observación de creativo</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'56px',resize:'vertical'}} value={campanaForm.obsCreativo} onChange={e=>setCampanaForm(f=>({...f,obsCreativo:e.target.value}))} /></div>
+                                <div className="modal-actions">
+                                    <button className="btn btn-glass" onClick={()=>{setShowCampanaModal(false);setEditingCampana(null);}}>Cancelar</button>
+                                    <button className="btn btn-gold" onClick={saveCampana} disabled={!campanaForm.producto||savingCampana} style={{flex:1,justifyContent:'center'}}>{editingCampana?'Guardar cambios':'Crear campaña'}</button>
+                                </div>
+                            </div>
+                        </div>
                     )}
                     </>;
                 })()}
