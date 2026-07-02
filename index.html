@@ -576,42 +576,51 @@ function RevealTable({ children, className, style }) {
 
 // ── CIERRE DIARIO ──
 function CierreDiario({ productos, user }) {
-    const FILA_VACIA = { nombre: '', cantidad: '', monto: '', _otro: false };
+    const FILA_VACIA = { nombre: '', cantidad: '', monto: '' };
     const [filas,     setFilas]     = useState([{ ...FILA_VACIA }]);
     const [saving,    setSaving]    = useState(false);
     const [guardado,  setGuardado]  = useState(false);
-    const [cierreHoy, setCierreHoy] = useState(null);
     const [historial, setHistorial] = useState([]);
+    const [navOffset, setNavOffset] = useState(0); // 0=hoy, -1=ayer, etc.
+    const skipFillRef      = useRef(false);
+    const prevOffsetRef    = useRef(0);
 
-    const hoy      = new Date();
-    const fechaStr = hoy.toISOString().slice(0, 10);
-    const todayStr = hoy.toLocaleDateString('es-DO', { weekday:'long', day:'numeric', month:'long' });
+    const getTodayStr = () => new Date().toISOString().slice(0, 10);
+    const getDateStr  = off => { const d = new Date(); d.setDate(d.getDate() + off); return d.toISOString().slice(0,10); };
+    const selectedFechaStr = getDateStr(navOffset);
+    const selectedDate     = new Date(selectedFechaStr + 'T12:00:00');
+    const labelFecha       = selectedDate.toLocaleDateString('es-DO', { weekday:'long', day:'numeric', month:'long' });
+    const isToday          = navOffset === 0;
+
+    const cierreSeleccionado = historial.find(c => c.fechaStr === selectedFechaStr) || null;
+    const prodActivos        = productos.filter(p => p.estado === 'Activo').map(p => p.nombre).filter(Boolean);
 
     useEffect(() => {
-        const unsub = db.collection('cierres').orderBy('registradoEn', 'desc').limit(60).onSnapshot(
-            snap => {
-                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                const hoyDoc = docs.find(c => c.fechaStr === fechaStr);
-                setCierreHoy(hoyDoc || null);
-                if (hoyDoc && hoyDoc.productos?.length) {
-                    setFilas(hoyDoc.productos.map(p => {
-                        const enLista = prodNombres.includes(p.nombre||'');
-                        return { nombre: p.nombre||'', cantidad: String(p.cantidad||''), monto: String(p.monto||''), _otro: !enLista };
-                    }));
-                }
-                setHistorial(docs);
-            },
-            err => console.error('Cierres:', err)
+        const unsub = db.collection('cierres').orderBy('registradoEn', 'desc').limit(90).onSnapshot(
+            snap => setHistorial(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            err  => console.error('Cierres:', err)
         );
         return () => unsub();
-    }, [fechaStr]);
+    }, []);
+
+    useEffect(() => {
+        const offsetChanged = prevOffsetRef.current !== navOffset;
+        prevOffsetRef.current = navOffset;
+        if (!offsetChanged && skipFillRef.current) { skipFillRef.current = false; return; }
+        const cierre = historial.find(c => c.fechaStr === selectedFechaStr);
+        if (cierre && cierre.productos?.length) {
+            setFilas(cierre.productos.map(p => ({ nombre: p.nombre||'', cantidad: String(p.cantidad||''), monto: String(p.monto||'') })));
+        } else {
+            setFilas([{ ...FILA_VACIA }]);
+        }
+    }, [navOffset, historial]);
 
     const addFila    = () => setFilas(f => [...f, { ...FILA_VACIA }]);
     const removeFila = i  => setFilas(f => f.length > 1 ? f.filter((_, idx) => idx !== i) : f);
     const upd        = (i, field, val) => setFilas(f => f.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
 
-    const totalMonto    = filas.reduce((s, f) => s + (parseFloat(f.monto)    || 0), 0);
-    const totalCantidad = filas.reduce((s, f) => s + (parseInt(f.cantidad)   || 0), 0);
+    const totalMonto    = filas.reduce((s, f) => s + (parseFloat(f.monto)  || 0), 0);
+    const totalCantidad = filas.reduce((s, f) => s + (parseInt(f.cantidad) || 0), 0);
 
     const registrarCierre = async () => {
         const validas = filas.filter(f => f.nombre.trim());
@@ -620,57 +629,63 @@ function CierreDiario({ productos, user }) {
         try {
             const prodData = validas.map(f => ({
                 nombre:   f.nombre.trim(),
-                cantidad: parseInt(f.cantidad)   || 0,
-                monto:    parseFloat(f.monto)    || 0,
+                cantidad: parseInt(f.cantidad)  || 0,
+                monto:    parseFloat(f.monto)   || 0,
             }));
             const payload = {
-                fechaStr,
-                productos:      prodData,
-                totalMonto:     prodData.reduce((s, p) => s + p.monto, 0),
-                totalCantidad:  prodData.reduce((s, p) => s + p.cantidad, 0),
-                registradoPor:  user.email,
+                fechaStr:      selectedFechaStr,
+                productos:     prodData,
+                totalMonto:    prodData.reduce((s, p) => s + p.monto,    0),
+                totalCantidad: prodData.reduce((s, p) => s + p.cantidad, 0),
+                registradoPor: user.email,
             };
-            if (cierreHoy) {
-                await db.collection('cierres').doc(cierreHoy.id).update({ ...payload, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp() });
+            if (cierreSeleccionado) {
+                await db.collection('cierres').doc(cierreSeleccionado.id).update({ ...payload, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp() });
             } else {
                 await db.collection('cierres').add({ ...payload, fecha: firebase.firestore.FieldValue.serverTimestamp(), registradoEn: firebase.firestore.FieldValue.serverTimestamp() });
             }
+            skipFillRef.current = true;
+            setFilas([{ ...FILA_VACIA }]);
             setGuardado(true);
             setTimeout(() => setGuardado(false), 3000);
         } catch(e) { console.error('Error cierre:', e); }
         setSaving(false);
     };
 
-    const prodNombres = productos.filter(p => ['Activo','Ganador','Testeando'].includes(p.estado)).map(p => p.nombre).filter(Boolean);
-    const OTRO = '__otro__';
-
     return (<>
         <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
             <div>
                 <h1>Cierre Diario</h1>
-                <p>Resumen del {todayStr}</p>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
+                    <button className="btn btn-glass btn-sm" onClick={()=>setNavOffset(n=>n-1)}
+                        style={{padding:'4px 10px',fontSize:16,lineHeight:1}}>‹</button>
+                    <span style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{labelFecha}</span>
+                    {isToday
+                        ? <span style={{fontSize:9,fontWeight:800,background:'var(--orange)',color:'#fff',borderRadius:4,padding:'2px 7px',textTransform:'uppercase',letterSpacing:'1px'}}>Hoy</span>
+                        : <button className="btn btn-glass btn-sm" onClick={()=>setNavOffset(n=>Math.min(0,n+1))}
+                            style={{padding:'4px 10px',fontSize:16,lineHeight:1}}>›</button>
+                    }
+                </div>
             </div>
             <button className="btn btn-gold" onClick={registrarCierre}
                 disabled={saving || filas.every(f => !f.nombre.trim())} style={{flexShrink:0}}>
-                {saving ? 'Guardando...' : guardado ? '✓ Guardado' : cierreHoy ? 'Actualizar Cierre' : 'Registrar Cierre'}
+                {saving ? 'Guardando...' : guardado ? '✓ Guardado' : cierreSeleccionado ? 'Actualizar Cierre' : 'Registrar Cierre'}
             </button>
         </div>
 
-        {/* KPIs resumen */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:24}}>
             <div className="kpi-card" style={{background:'var(--earth)',border:'none',borderRadius:'var(--r)',padding:'22px 24px'}}>
-                <div style={{fontSize:'9px',fontWeight:800,color:'rgba(247,242,234,0.5)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:8}}>Total del día</div>
+                <div style={{fontSize:'9px',fontWeight:800,color:'rgba(247,242,234,0.5)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:8}}>{isToday ? 'Total del día' : 'Total del cierre'}</div>
                 <div style={{fontSize:'32px',fontWeight:800,letterSpacing:'-1.5px',fontFamily:"'Fira Code',monospace",lineHeight:1,marginBottom:6,color:'#fff'}}>RD${totalMonto.toLocaleString()}</div>
                 <div style={{fontSize:'11px',color:'rgba(247,242,234,0.45)'}}>{totalCantidad} unidad{totalCantidad!==1?'es':''} vendida{totalCantidad!==1?'s':''}</div>
             </div>
             <div className="kpi-card glass">
-                <div className="kpi-label">Productos registrados</div>
+                <div className="kpi-label">Productos</div>
                 <div className="kpi-val">{filas.filter(f=>f.nombre.trim()).length}</div>
                 <div className="kpi-sub">en este cierre</div>
             </div>
         </div>
 
-        {/* Formulario */}
         <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden',marginBottom:24}}>
             <div className="sec-header" style={{padding:'16px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
                 <h2>Ventas del día por producto</h2>
@@ -678,43 +693,28 @@ function CierreDiario({ productos, user }) {
             </div>
             <div style={{padding:'20px 24px'}}>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 110px 150px 32px',gap:10,marginBottom:8,padding:'0 2px'}}>
-                    {['Producto','Cantidad','Monto (RD$)',''].map((h,i) => (
-                        <div key={i} style={{fontSize:'9px',fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.5px'}}>{h}</div>
+                    {['Producto','Cantidad','Monto (RD$)',''].map((h,idx)=>(
+                        <div key={idx} style={{fontSize:'9px',fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.5px'}}>{h}</div>
                     ))}
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                     {filas.map((fila, i) => (
-                        <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 110px 150px 32px',gap:10,alignItems:'start'}}>
-                            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                                <select className="form-input no-icon"
-                                    value={fila._otro ? OTRO : (fila.nombre || '')}
-                                    onChange={e => {
-                                        if (e.target.value === OTRO) {
-                                            setFilas(f => f.map((r,idx) => idx===i ? {...r, _otro:true, nombre:''} : r));
-                                        } else {
-                                            setFilas(f => f.map((r,idx) => idx===i ? {...r, _otro:false, nombre:e.target.value} : r));
-                                        }
-                                    }}>
-                                    <option value="">— Seleccionar producto —</option>
-                                    {prodNombres.map(n => <option key={n} value={n}>{n}</option>)}
-                                    <option value={OTRO}>Otro (escribir)</option>
-                                </select>
-                                {fila._otro && (
-                                    <input className="form-input no-icon" placeholder="Escribe el nombre"
-                                        value={fila.nombre} onChange={e=>upd(i,'nombre',e.target.value)} />
-                                )}
-                            </div>
+                        <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 110px 150px 32px',gap:10,alignItems:'center'}}>
+                            <select className="form-input no-icon" value={fila.nombre}
+                                onChange={e => upd(i, 'nombre', e.target.value)}>
+                                <option value="">— Seleccionar —</option>
+                                {prodActivos.map(n => <option key={n} value={n}>{n}</option>)}
+                            </select>
                             <input className="form-input no-icon" type="number" min="0"
                                 value={fila.cantidad} onChange={e=>upd(i,'cantidad',e.target.value)} placeholder="0" />
                             <input className="form-input no-icon" type="number" min="0" step="0.01"
                                 value={fila.monto} onChange={e=>upd(i,'monto',e.target.value)} placeholder="0.00" />
                             <button onClick={()=>removeFila(i)}
-                                style={{background:'none',border:'none',color:'var(--text-dimmer)',cursor:'pointer',fontSize:20,lineHeight:1,padding:0,marginTop:14,opacity:filas.length===1?.3:1}}
+                                style={{background:'none',border:'none',color:'var(--text-dimmer)',cursor:'pointer',fontSize:20,lineHeight:1,padding:0,opacity:filas.length===1?.3:1}}
                                 disabled={filas.length===1}>×</button>
                         </div>
                     ))}
                 </div>
-                {/* Totales */}
                 <div style={{borderTop:'1px solid var(--glass-border)',marginTop:14,paddingTop:12,display:'grid',gridTemplateColumns:'1fr 110px 150px 32px',gap:10}}>
                     <div style={{fontSize:12,fontWeight:700,color:'var(--text)',textAlign:'right',paddingRight:4}}>Total</div>
                     <div style={{fontFamily:"'Fira Code',monospace",fontWeight:700,fontSize:13}}>{totalCantidad}</div>
@@ -724,7 +724,6 @@ function CierreDiario({ productos, user }) {
             </div>
         </div>
 
-        {/* Historial */}
         {historial.length > 0 && (
             <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}>
                 <div className="sec-header" style={{padding:'16px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
@@ -738,14 +737,19 @@ function CierreDiario({ productos, user }) {
                         <th style={{textAlign:'right'}}>Total</th>
                     </tr></thead>
                     <tbody>
-                        {historial.map(c => (
-                            <tr key={c.id}>
-                                <td style={{fontFamily:"'Fira Code',monospace",fontSize:12,whiteSpace:'nowrap'}}>{c.fechaStr}</td>
-                                <td style={{fontSize:12,color:'var(--text-dim)'}}>{(c.productos||[]).map(p=>p.nombre).join(', ') || '—'}</td>
-                                <td style={{textAlign:'center',fontFamily:"'Fira Code',monospace",fontSize:12}}>{c.totalCantidad||0}</td>
-                                <td style={{textAlign:'right',fontWeight:700,fontFamily:"'Fira Code',monospace",color:'var(--orange)'}}>RD${(c.totalMonto||0).toLocaleString()}</td>
-                            </tr>
-                        ))}
+                        {historial.map(c => {
+                            const diff = Math.round((new Date(c.fechaStr+'T12:00:00') - new Date(getTodayStr()+'T12:00:00')) / 86400000);
+                            const isSelected = c.fechaStr === selectedFechaStr;
+                            return (
+                                <tr key={c.id} onClick={()=>setNavOffset(diff)}
+                                    style={{cursor:'pointer',background:isSelected?'var(--orange-dim)':undefined}}>
+                                    <td style={{fontFamily:"'Fira Code',monospace",fontSize:12,whiteSpace:'nowrap',fontWeight:isSelected?700:400}}>{c.fechaStr}</td>
+                                    <td style={{fontSize:12,color:'var(--text-dim)'}}>{(c.productos||[]).map(p=>p.nombre).join(', ')||'—'}</td>
+                                    <td style={{textAlign:'center',fontFamily:"'Fira Code',monospace",fontSize:12}}>{c.totalCantidad||0}</td>
+                                    <td style={{textAlign:'right',fontWeight:700,fontFamily:"'Fira Code',monospace",color:'var(--orange)'}}>RD${(c.totalMonto||0).toLocaleString()}</td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -1056,6 +1060,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [activeTab,  setActiveTab]  = useState('dashboard');
     const [vendedores, setVendedores] = useState([]);
     const [ventas,     setVentas]     = useState([]);
+    const [cierres,    setCierres]    = useState([]);
     const [showModal,  setShowModal]  = useState(false);
     const [form,       setForm]       = useState({ nombre: '', email: '' });
     const [saving,     setSaving]     = useState(false);
@@ -1291,6 +1296,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const unsub = db.collection('links').onSnapshot(
             snap => setLinks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             err => console.error('Links error:', err)
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('cierres').orderBy('registradoEn', 'desc').limit(90).onSnapshot(
+            snap => setCierres(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            err => console.error('Cierres:', err)
         );
         return unsub;
     }, []);
@@ -1594,6 +1607,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     };
 
     const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
+    const _mesStr        = new Date().toISOString().slice(0, 7);
+    const _cierresMes    = cierres.filter(c => c.fechaStr?.startsWith(_mesStr));
+    const totalVentasMes = _cierresMes.reduce((s, c) => s + (c.totalMonto    || 0), 0);
+    const totalUndsMes   = _cierresMes.reduce((s, c) => s + (c.totalCantidad || 0), 0);
+    const _hoyStr        = new Date().toISOString().slice(0, 10);
+    const cierreHoyDash  = cierres.find(c => c.fechaStr === _hoyStr);
 
     const I_link = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
     const I_star = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
@@ -1608,7 +1627,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'vendedores',  label: 'Vendedores',  icon: I.users  },
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'gastos',      label: 'Gastos',      icon: I.dollar },
-            { key: 'ganadores',   label: 'Prod. Ganadores', icon: I_star },
+            { key: 'ganadores',   label: 'Productos', icon: I_star },
             { key: 'campanas',    label: 'Planeación Campañas', icon: I_target },
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
         ]},
@@ -1690,16 +1709,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <div style={{position:'absolute',top:'-40px',left:'-40px',width:'180px',height:'180px',borderRadius:'50%',background:'rgba(255,255,255,0.08)',pointerEvents:'none'}} />
                                 <div style={{position:'absolute',bottom:'-30px',right:'-30px',width:'140px',height:'140px',borderRadius:'50%',background:'rgba(0,0,0,0.10)',pointerEvents:'none'}} />
                                 <div style={{position:'relative',zIndex:1}}>
-                                    <p style={{fontSize:'9px',fontWeight:'800',color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'2.5px',marginBottom:'16px'}}>Monto total ventas</p>
-                                    <div style={{fontSize:'44px',fontWeight:'800',fontFamily:"'Fira Code',monospace",letterSpacing:'-2px',color:'#FFFFFF',lineHeight:1,marginBottom:'6px'}}>
-                                        <KpiVal value={`$${totalVentas.toFixed(0)}`} />
+                                    <p style={{fontSize:'9px',fontWeight:'800',color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'2.5px',marginBottom:'16px'}}>Ventas del mes</p>
+                                    <div style={{fontSize:'40px',fontWeight:'800',fontFamily:"'Fira Code',monospace",letterSpacing:'-2px',color:'#FFFFFF',lineHeight:1,marginBottom:'6px'}}>
+                                        <KpiVal value={`RD$${totalVentasMes.toLocaleString()}`} />
                                     </div>
-                                    <p style={{fontSize:'11px',color:'rgba(255,255,255,0.55)'}}>acumulado histórico</p>
+                                    <p style={{fontSize:'11px',color:'rgba(255,255,255,0.55)'}}>{new Date().toLocaleDateString('es-DO',{month:'long',year:'numeric'})}</p>
                                 </div>
                                 <div style={{position:'relative',zIndex:1,display:'flex',flexDirection:'column',gap:'8px'}}>
                                     {[
-                                        {l:'Registros',v:ventas.length},
-                                        {l:'Hoy',v:ventas.filter(v=>{const d=v.fecha?.toDate?.();return d&&d.toDateString()===new Date().toDateString();}).length},
+                                        {l:'Días cerrados',v:_cierresMes.length},
+                                        {l:'Unidades',v:totalUndsMes},
                                     ].map((r,i)=>(
                                         <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'rgba(255,255,255,0.13)',borderRadius:'8px'}}>
                                             <span style={{fontSize:'11px',color:'rgba(255,255,255,0.70)',fontWeight:'600'}}>{r.l}</span>
@@ -1738,11 +1757,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{nGanadores} ganadores</p>
                             </div>
                             <div style={{gridColumn:'3',borderRadius:'14px',padding:'18px 20px',background:'var(--orange-dim)',border:'1px solid var(--orange-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px'}}>
-                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--orange)',textTransform:'uppercase',letterSpacing:'2px'}}>Ventas hoy</p>
-                                <div style={{fontSize:'24px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--orange)',lineHeight:1}}>
-                                    <KpiVal value={ventas.filter(v=>{const d=v.fecha?.toDate?.();return d&&d.toDateString()===new Date().toDateString();}).length}/>
+                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--orange)',textTransform:'uppercase',letterSpacing:'2px'}}>Cierre hoy</p>
+                                <div style={{fontSize:'20px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--orange)',lineHeight:1}}>
+                                    <KpiVal value={cierreHoyDash ? `RD$${(cierreHoyDash.totalMonto||0).toLocaleString()}` : '—'}/>
                                 </div>
-                                <p style={{fontSize:'10px',color:'var(--orange)',opacity:0.7}}>registradas hoy</p>
+                                <p style={{fontSize:'10px',color:'var(--orange)',opacity:0.7}}>{cierreHoyDash ? `${cierreHoyDash.totalCantidad||0} unidades` : 'sin cierre aún'}</p>
                             </div>
 
                             {/* ── ROW 3 — Chart spans cols 1-3 ── */}
@@ -2005,7 +2024,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const gananciaTotal = gananciaUnit * parseFloat(inv.unidadesVendidas||0);
                     const TABS = ['General','Análisis','Facebook','Testeo','Inventario','Contenido'];
                     const CONTENT_ITEMS = [
-                        { key: 'plataforma',       label: 'Plataforma',                desc: 'Configurado en Shopify' },
                         { key: 'imagenProducto',   label: 'Imagen Producto',           desc: 'Cantidad mínima: 4 imágenes' },
                         { key: 'resenas',          label: 'Reseñas',                   desc: 'Fotos de personas (buscar en internet)' },
                         { key: 'clientesProbaron', label: 'Clientes que Probaron',     desc: 'Busca o genera mínimo 4' },
@@ -3834,46 +3852,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
 // ── VENDEDOR PANEL ──
 function VendedorPanel({ user, onLogout, onPhotoChange }) {
-    const [activeTab, setActiveTab] = useState('ventas');
-    const [ventas,    setVentas]    = useState([]);
-    const [form,      setForm]      = useState({ cliente: '', producto: '', monto: '' });
-    const [saving,    setSaving]    = useState(false);
+    const [activeTab, setActiveTab] = useState('cierre');
+    const [productos, setProductos] = useState([]);
 
     useEffect(() => {
-        const unsub = db.collection('ventas').onSnapshot(snap => {
-            const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setVentas(all.filter(v => v.vendedorId === user.uid));
-        });
+        const unsub = db.collection('productos').onSnapshot(
+            snap => setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            err  => console.error('Productos vendedor:', err)
+        );
         return unsub;
-    }, [user.uid]);
+    }, []);
 
-    const addVenta = async () => {
-        if (!form.monto || saving) return;
-        setSaving(true);
-        try {
-            await db.collection('ventas').add({
-                cliente:       form.cliente,
-                producto:      form.producto,
-                monto:         parseFloat(form.monto),
-                vendedorId:    user.uid,
-                vendedorEmail: user.email,
-                fecha:         firebase.firestore.FieldValue.serverTimestamp(),
-                estado:        'Pendiente',
-            });
-            setForm({ cliente: '', producto: '', monto: '' });
-            setActiveTab('ventas');
-        } catch(e) {
-            console.error('Error al registrar venta:', e);
-        }
-        setSaving(false);
-    };
-
-    const total = ventas.reduce((s, v) => s + (v.monto || 0), 0);
+    const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
 
     const navSections = [
         { label: 'Mi Trabajo', items: [
-            { key: 'ventas',   label: 'Mis Ventas',  icon: I.chart },
-            { key: 'registro', label: 'Nueva Venta', icon: I.plus  },
+            { key: 'cierre', label: 'Cierre Diario', icon: I_cierre },
         ]},
     ];
 
@@ -3883,78 +3877,7 @@ function VendedorPanel({ user, onLogout, onPhotoChange }) {
             <Header user={user} onLogout={onLogout} activeTab={activeTab} navSections={navSections} onPhotoChange={onPhotoChange} />
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
             <main className="main">
-                {activeTab === 'ventas' && <>
-                    <div className="kpi-grid" style={{gridTemplateColumns:'repeat(2,1fr)', maxWidth:460, marginBottom:20}}>
-                        <div className="kpi-card glass glass-mid">
-                            <div className="kpi-top"><div className="kpi-label">Registradas</div><div className="kpi-icon gold">{I.invoice}</div></div>
-                            <div className="kpi-val">{ventas.length}</div>
-                            <div className="kpi-sub">ventas en total</div>
-                        </div>
-                        <div className="kpi-card glass glass-mid">
-                            <div className="kpi-top"><div className="kpi-label">Monto total</div><div className="kpi-icon gold">{I.dollar}</div></div>
-                            <div className="kpi-val">${total.toFixed(0)}</div>
-                            <div className="kpi-sub">pendiente aprobacion</div>
-                        </div>
-                    </div>
-                    <div className="sec-header">
-                        <h2>Historial</h2>
-                        <button className="btn btn-gold" onClick={() => setActiveTab('registro')}>{I.plus} Nueva venta</button>
-                    </div>
-                    <div className="card glass">
-                        {ventas.length > 0 ? (
-                            <table>
-                                <thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Monto</th><th>Estado</th></tr></thead>
-                                <tbody>
-                                    {ventas.map((v, i) => (
-                                        <tr key={i}>
-                                            <td className="td-num" style={{color:'var(--text-dimmer)', fontSize:'12px'}}>
-                                                {v.fecha?.toDate?.().toLocaleDateString('es') || '—'}
-                                            </td>
-                                            <td><strong>{v.cliente || '—'}</strong></td>
-                                            <td style={{color:'var(--text-dim)'}}>{v.producto || '—'}</td>
-                                            <td className="td-num"><strong>${(v.monto||0).toFixed(2)}</strong></td>
-                                            <td><span className="badge badge-gray"><span className="badge-dot"/>{v.estado}</span></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        ) : (
-                            <div className="empty">
-                                <div className="empty-icon">{I.inbox}</div>
-                                <h3>Sin ventas aun</h3>
-                                <p>Registra tu primera venta y aparecera aqui.</p>
-                            </div>
-                        )}
-                    </div>
-                </>}
-
-                {activeTab === 'registro' && <>
-                    <div className="page-header"><h1>Nueva Venta</h1><p>Completa los datos de la venta</p></div>
-                    <div className="card glass card-body" style={{maxWidth:500, borderRadius:'var(--r)'}}>
-                        <div className="form-group">
-                            <label style={{color:'var(--text-dim)'}}>Cliente</label>
-                            <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
-                                value={form.cliente} onChange={e => setForm({...form, cliente: e.target.value})} placeholder="Nombre del cliente" />
-                        </div>
-                        <div className="form-group">
-                            <label style={{color:'var(--text-dim)'}}>Producto</label>
-                            <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
-                                value={form.producto} onChange={e => setForm({...form, producto: e.target.value})} placeholder="Descripcion del producto" />
-                        </div>
-                        <div className="form-group" style={{marginBottom:22}}>
-                            <label style={{color:'var(--text-dim)'}}>Monto (USD)</label>
-                            <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
-                                type="number" min="0" step="0.01" inputMode="decimal"
-                                value={form.monto} onChange={e => setForm({...form, monto: e.target.value})} placeholder="0.00" />
-                        </div>
-                        <div style={{display:'flex', gap:10}}>
-                            <button className="btn btn-glass" onClick={() => setActiveTab('ventas')}>Cancelar</button>
-                            <button className="btn btn-gold" onClick={addVenta} disabled={saving} style={{flex:1, justifyContent:'center'}}>
-                                {saving ? 'Guardando...' : <>{I.plus} Registrar Venta</>}
-                            </button>
-                        </div>
-                    </div>
-                </>}
+                {activeTab === 'cierre' && <CierreDiario productos={productos} user={user} />}
             </main>
         </div>
     );
