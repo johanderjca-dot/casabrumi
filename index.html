@@ -1158,11 +1158,18 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ['generaRecompra','¿Genera recompra?','Producto consumible o de uso que pueda generar recompra del mismo cliente.'],
         ['resuelveNecesidad','¿Resuelve necesidad?','¿Es una solución que ningún otro producto ofrece de esta manera a ese problema?'],
         ['ticketBajo','¿Ticket bajo?','Precio de venta accesible para compra impulsiva. RD: inferior a 300 · (COL: <$100.000 · MEX: <$999).'],
-        ['anuncioCautivador','¿Anuncio cautivador?','Tiene buenas vistas, detiene el scroll, factor sorpresa, comentarios, reseñas, compartidos, calidad de diseño, prueba social — O una tienda lo lleva pautando por más de 5 días en otro mercado.'],
         ['noEsBlack','¿No es black? (producto permitido)','El producto cumple las políticas: NO muestra antes/después, NO es de salud, NO es agresivo al cuerpo humano. Revisa políticas de TikTok y Facebook Ads.'],
         ['facilImportar','¿Fácil de importar o fabricar?','¿El producto no mide más de 15 cm x 15 cm? Tamaño pequeño = más fácil y barato de importar.'],
     ];
-    const ANALISIS_DEFAULT = { precioProveedor:'', precioVenta:'', proveedor:'', linkAnuncio:'', checks:{}, angulo1:'', angulo2:'', angulo3:'', compEnlace1:'', compEnlace2:'', compNotas:'', tecnico:'', notas:'' };
+    const CREATIVO_CHECKS = [
+        ['c5dias',      '¿Lleva +5 días activo en otro mercado?'],
+        ['cVistas',     '¿Tiene buenas vistas o reacciones (+1K)?'],
+        ['cComentarios','¿Tiene comentarios positivos?'],
+        ['cNoQuemado',  '¿El ángulo no está quemado en RD?'],
+        ['cIdioma',     '¿Tiene subtítulos o texto adaptado al cliente?'],
+        ['cHispano',    '¿Funciona en mercado hispano similar?'],
+    ];
+    const ANALISIS_DEFAULT = { precioProveedor:'', proveedor:'', linkAnuncio:'', checks:{}, angulo1Titulo:'', angulo1Desc:'', angulo2Titulo:'', angulo2Desc:'', angulo3Titulo:'', angulo3Desc:'', comp1Nombre:'', comp1Precio:'', comp2Nombre:'', comp2Precio:'', creativoChecks:{}, notas:'' };
     const [analisisForm, setAnalisisForm] = useState(ANALISIS_DEFAULT);
     const [campanas, setCampanas] = useState([]);
     const CAMPANA_DEFAULT = { fecha:'', tienda:'', desarrollador:'', producto:'', proceso:'Producto nuevo', categoria:'', variaciones:'', proveedor:'', codigoPlataforma:'', costoProveedor:'', precioVenta:'', cpaBreakeven:'', linkDrive:'', linkLanding:'', reviso:'', cuentaPubli:'', fanpage:'', obsLanding:'', obsCreativo:'' };
@@ -2011,7 +2018,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     ];
                     const analisis = p.analisis || {};
                     const analisisScore = ANALISIS_CHECKS.filter(([k])=>(analisis.checks||{})[k]==='si').length;
-                    const angulosValidos = !!(analisis.angulo1 && analisis.angulo1.trim());
+                    const angulosValidos = !!(analisis.angulo1Titulo && analisis.angulo1Titulo.trim());
                     const posibleGanador = analisisScore >= 6 && angulosValidos;
                     return (
                         <>
@@ -2114,20 +2121,46 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{margin:'22px 0 12px'}}>
                                             <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px'}}>Ángulos de venta</span>
                                         </div>
-                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #1 — Principal</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo1} onChange={e=>setAnalisisForm(f=>({...f,angulo1:e.target.value}))} /></div>
-                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #2 — Secundario</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo2} onChange={e=>setAnalisisForm(f=>({...f,angulo2:e.target.value}))} /></div>
-                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #3 — Terciario</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo3} onChange={e=>setAnalisisForm(f=>({...f,angulo3:e.target.value}))} /></div>
+                                        {[['1','Principal'],['2','Secundario'],['3','Terciario']].map(([n,lbl])=>(
+                                            <div key={n} style={{marginBottom:16,padding:'14px 16px',borderRadius:'var(--r-sm)',border:'1px solid var(--glass-border)',background:'var(--surface-2)'}}>
+                                                <div style={{fontSize:'10px',fontWeight:'800',color:'var(--orange)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:10}}>Ángulo #{n} — {lbl}</div>
+                                                <div className="form-group" style={{marginBottom:8}}><label style={{color:'var(--text-dim)'}}>Título</label><input className="form-input no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm[`angulo${n}Titulo`]} onChange={e=>setAnalisisForm(f=>({...f,[`angulo${n}Titulo`]:e.target.value}))} placeholder="Ej: Dolor de rodilla sin cirugía" /></div>
+                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Descripción</label><input className="form-input no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm[`angulo${n}Desc`]} onChange={e=>setAnalisisForm(f=>({...f,[`angulo${n}Desc`]:e.target.value}))} placeholder="Ej: Emocional / aspiracional — vida activa recuperada" /></div>
+                                            </div>
+                                        ))}
 
                                         <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Análisis de competencia</div>
-                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Enlace competencia 1</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.compEnlace1} onChange={e=>setAnalisisForm(f=>({...f,compEnlace1:e.target.value}))} /></div>
-                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Enlace competencia 2</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.compEnlace2} onChange={e=>setAnalisisForm(f=>({...f,compEnlace2:e.target.value}))} /></div>
-                                        </div>
-                                        <div className="form-group" style={{marginTop:12}}><label style={{color:'var(--text-dim)'}}>Notas sobre competencia</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}} value={analisisForm.compNotas} onChange={e=>setAnalisisForm(f=>({...f,compNotas:e.target.value}))} /></div>
+                                        {[['1'],['2']].map(([n])=>(
+                                            <div key={n} style={{display:'grid',gridTemplateColumns:'1fr 140px',gap:10,marginBottom:10}}>
+                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Nombre tienda #{n}</label><input className="form-input no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm[`comp${n}Nombre`]} onChange={e=>setAnalisisForm(f=>({...f,[`comp${n}Nombre`]:e.target.value}))} placeholder="Ej: TiendaXY.com" /></div>
+                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Precio</label><input className="form-input no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm[`comp${n}Precio`]} onChange={e=>setAnalisisForm(f=>({...f,[`comp${n}Precio`]:e.target.value}))} placeholder="RD$1,500" /></div>
+                                            </div>
+                                        ))}
 
-                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Análisis técnico</div>
-                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>¿Por qué tu creativo está validado en otro mercado?</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}} placeholder="Ej: En Alemania lleva 5 días activo, alcanzó 1.000 likes…" value={analisisForm.tecnico} onChange={e=>setAnalisisForm(f=>({...f,tecnico:e.target.value}))} /></div>
-                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Notas adicionales</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'60px',resize:'vertical'}} value={analisisForm.notas} onChange={e=>setAnalisisForm(f=>({...f,notas:e.target.value}))} /></div>
+                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Creativo validado</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
+                                            {CREATIVO_CHECKS.map(([k,label])=>{
+                                                const v = (analisisForm.creativoChecks||{})[k];
+                                                const setV = val => setAnalisisForm(f=>({...f, creativoChecks:{...(f.creativoChecks||{}),[k]:val}}));
+                                                return (
+                                                    <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderRadius:'var(--r-sm)',border:'1px solid var(--glass-border)',background:'var(--surface-2)',gap:8}}>
+                                                        <span style={{fontSize:'12px',color:'var(--text)',flex:1}}>{label}</span>
+                                                        <div style={{display:'flex',gap:4,flexShrink:0}}>
+                                                            {['si','no'].map(opt=>(
+                                                                <button key={opt} onClick={()=>setV(v===opt?'':opt)}
+                                                                    style={{padding:'3px 10px',borderRadius:6,border:'1.5px solid',fontSize:'11px',fontWeight:'700',cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.5px',
+                                                                        borderColor: v===opt?(opt==='si'?'#4A9050':'#A03B3B'):'var(--glass-border)',
+                                                                        background:  v===opt?(opt==='si'?'rgba(74,144,80,0.12)':'rgba(160,56,56,0.10)'):'transparent',
+                                                                        color:       v===opt?(opt==='si'?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>
+                                                                    {opt}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="form-group"><label style={{color:'var(--text-dim)'}}>Notas adicionales</label><textarea className="form-input no-icon" style={{border:'1px solid var(--glass-border)',height:'60px',resize:'vertical'}} value={analisisForm.notas} onChange={e=>setAnalisisForm(f=>({...f,notas:e.target.value}))} /></div>
 
                                         <div style={{display:'flex',gap:10,marginTop:8}}>
                                             <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
@@ -2148,7 +2181,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         return <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 11px',borderRadius:99,fontSize:'11px',fontWeight:'700',background:c.bg,border:`1px solid ${c.bd}`,color:c.fg}}><span style={{width:5,height:5,borderRadius:'50%',background:c.dot}}/>{lab}</span>;
                                                     })()}
                                                 </div>
-                                                <button className="btn btn-glass btn-sm" onClick={()=>{setAnalisisForm({...ANALISIS_DEFAULT, ...analisis, checks:{...(analisis.checks||{})}}); setEditSeccion('analisis');}}>✎ Editar análisis</button>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>{setAnalisisForm({...ANALISIS_DEFAULT, ...analisis, checks:{...(analisis.checks||{})}, creativoChecks:{...(analisis.creativoChecks||{})}}); setEditSeccion('analisis');}}>✎ Editar análisis</button>
                                             </div>
                                             <div style={{padding:'10px 22px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:0}}>
                                                 {ANALISIS_CHECKS.map(([k,label])=>{
@@ -2167,23 +2200,43 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
                                             <div className="card glass" style={{padding:'20px'}}>
                                                 <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:14}}>Ángulos de venta</div>
-                                                {[['#1 Principal',analisis.angulo1],['#2 Secundario',analisis.angulo2],['#3 Terciario',analisis.angulo3]].map(([t,val])=>(
-                                                    <div key={t} style={{marginBottom:12}}>
-                                                        <div style={{fontSize:'10px',fontWeight:'700',color:'var(--orange)',marginBottom:3}}>{t}</div>
-                                                        <div style={{fontSize:'13px',color:val?'var(--text)':'var(--text-dimmer)'}}>{val||'—'}</div>
+                                                {[['1','Principal'],['2','Secundario'],['3','Terciario']].map(([n,lbl])=>(
+                                                    <div key={n} style={{marginBottom:14,paddingBottom:14,borderBottom:n!=='3'?'1px solid var(--glass-border)':undefined}}>
+                                                        <div style={{fontSize:'10px',fontWeight:'700',color:'var(--orange)',marginBottom:4}}>#{n} {lbl}</div>
+                                                        <div style={{fontSize:'13px',fontWeight:600,color:'var(--text)',marginBottom:2}}>{analisis[`angulo${n}Titulo`]||'—'}</div>
+                                                        {analisis[`angulo${n}Desc`] && <div style={{fontSize:'11.5px',color:'var(--text-dim)'}}>{analisis[`angulo${n}Desc`]}</div>}
                                                     </div>
                                                 ))}
                                             </div>
                                             <div style={{display:'flex',flexDirection:'column',gap:16}}>
                                                 <div className="card glass" style={{padding:'20px'}}>
                                                     <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:12}}>Competencia</div>
-                                                    {analisis.compEnlace1 && <div style={{fontSize:'12px',marginBottom:6}}><a href={analisis.compEnlace1} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Enlace 1 ↗</a></div>}
-                                                    {analisis.compEnlace2 && <div style={{fontSize:'12px',marginBottom:6}}><a href={analisis.compEnlace2} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Enlace 2 ↗</a></div>}
-                                                    <div style={{fontSize:'12.5px',color:analisis.compNotas?'var(--text-dim)':'var(--text-dimmer)',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{analisis.compNotas||'Sin notas de competencia.'}</div>
+                                                    {[['1'],['2']].map(([n])=>{
+                                                        const nombre = analisis[`comp${n}Nombre`];
+                                                        const precio = analisis[`comp${n}Precio`];
+                                                        if (!nombre && !precio) return null;
+                                                        return (
+                                                            <div key={n} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,padding:'8px 10px',borderRadius:6,background:'var(--surface-1)'}}>
+                                                                <span style={{fontSize:'12.5px',fontWeight:600,color:'var(--text)'}}>{nombre||'—'}</span>
+                                                                <span style={{fontSize:'12px',fontFamily:"'Fira Code',monospace",color:'var(--orange)',fontWeight:700}}>{precio||'—'}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {!analisis.comp1Nombre && !analisis.comp2Nombre && <div style={{fontSize:'12px',color:'var(--text-dimmer)'}}>Sin competencia registrada.</div>}
                                                 </div>
                                                 <div className="card glass" style={{padding:'20px'}}>
-                                                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:12}}>Análisis técnico</div>
-                                                    <div style={{fontSize:'12.5px',color:analisis.tecnico?'var(--text-dim)':'var(--text-dimmer)',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{analisis.tecnico||'Sin análisis técnico.'}</div>
+                                                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:12}}>Creativo validado</div>
+                                                    {CREATIVO_CHECKS.map(([k,label])=>{
+                                                        const v=(analisis.creativoChecks||{})[k];
+                                                        return (
+                                                            <div key={k} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,fontSize:'12px'}}>
+                                                                <span style={{width:16,height:16,borderRadius:4,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:'800',
+                                                                    background:v==='si'?'rgba(74,144,80,0.14)':v==='no'?'rgba(160,56,56,0.10)':'var(--cream-dark)',
+                                                                    color:v==='si'?'#3D6646':v==='no'?'#A03B3B':'var(--text-dimmer)'}}>{v==='si'?'✓':v==='no'?'✕':'·'}</span>
+                                                                <span style={{color:'var(--text-dim)'}}>{label}</span>
+                                                            </div>
+                                                        );
+                                                    })}
                                                     {analisis.linkAnuncio && <div style={{marginTop:10,fontSize:'12px'}}><a href={analisis.linkAnuncio} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Ver anuncio ↗</a></div>}
                                                 </div>
                                             </div>
