@@ -1421,6 +1421,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_calc = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/><line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="12" y1="15" x2="12" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="8" y1="19" x2="16" y2="19"/></svg>;
     const I_book = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
     const I_target = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
+    const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
 
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
@@ -1430,6 +1431,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'gastos',      label: 'Gastos',      icon: I.dollar },
             { key: 'ganadores',   label: 'Prod. Ganadores', icon: I_star },
             { key: 'campanas',    label: 'Planeación Campañas', icon: I_target },
+            { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
         ]},
         { label: 'Herramientas', items: [
             { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
@@ -3291,6 +3293,108 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         </>
                     );
+                })()}
+
+                {activeTab === 'cierre' && (() => {
+                    const hoy = new Date();
+                    const esHoy = f => { const d = f?.toDate?.(); return d && d.toDateString() === hoy.toDateString(); };
+                    const ventasHoy = ventas.filter(v => esHoy(v.fecha));
+                    const gastosHoy = gastos.filter(g => esHoy(g.fecha));
+                    const totalVentas = ventasHoy.reduce((s, v) => s + (v.monto || 0), 0);
+                    const gastosDOP   = gastosHoy.filter(g => g.moneda === 'DOP').reduce((s, g) => s + (g.monto || 0), 0);
+                    const gastosUSD   = gastosHoy.filter(g => g.moneda !== 'DOP').reduce((s, g) => s + (g.monto || 0), 0);
+
+                    const agrupado = {};
+                    ventasHoy.forEach(v => {
+                        const key = (v.producto || 'Sin especificar').trim();
+                        if (!agrupado[key]) agrupado[key] = { monto: 0, count: 0 };
+                        agrupado[key].monto += (v.monto || 0);
+                        agrupado[key].count++;
+                    });
+                    const prodEntries = Object.entries(agrupado).sort((a, b) => b[1].monto - a[1].monto);
+
+                    const prodActivos = productos.filter(p => ['Activo', 'Ganador'].includes(p.estado));
+                    const sinVentas   = prodActivos.filter(p => !prodEntries.some(([n]) => n.toLowerCase() === (p.nombre||'').toLowerCase()));
+
+                    const todayStr = hoy.toLocaleDateString('es-DO', { weekday:'long', day:'numeric', month:'long' });
+                    return (<>
+                        <div className="page-header">
+                            <h1>Cierre Diario</h1>
+                            <p>Resumen del {todayStr}</p>
+                        </div>
+
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:24}}>
+                            <div className="kpi-card" style={{background:'var(--earth)',border:'none',borderRadius:'var(--r)',padding:'22px 24px'}}>
+                                <div style={{fontSize:'9px',fontWeight:800,color:'rgba(247,242,234,0.5)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:8}}>Ventas del día</div>
+                                <div style={{fontSize:'30px',fontWeight:800,letterSpacing:'-1.5px',fontFamily:"'Fira Code',monospace",lineHeight:1,marginBottom:6,color:'#fff'}}>RD${totalVentas.toLocaleString()}</div>
+                                <div style={{fontSize:'11px',color:'rgba(247,242,234,0.45)'}}>{ventasHoy.length} venta{ventasHoy.length!==1?'s':''} registrada{ventasHoy.length!==1?'s':''}</div>
+                            </div>
+                            <div className="kpi-card glass">
+                                <div className="kpi-label">Gastos del día <span style={{opacity:.6}}>(DOP)</span></div>
+                                <div className="kpi-val">RD${gastosDOP.toLocaleString()}</div>
+                                <div className="kpi-sub">{gastosHoy.filter(g=>g.moneda==='DOP').length} gasto{gastosHoy.filter(g=>g.moneda==='DOP').length!==1?'s':''}</div>
+                            </div>
+                            <div className="kpi-card glass">
+                                <div className="kpi-label">Gastos del día <span style={{opacity:.6}}>(USD)</span></div>
+                                <div className="kpi-val">${gastosUSD.toLocaleString()}</div>
+                                <div className="kpi-sub">{gastosHoy.filter(g=>g.moneda!=='DOP').length} gasto{gastosHoy.filter(g=>g.moneda!=='DOP').length!==1?'s':''}</div>
+                            </div>
+                        </div>
+
+                        <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden',marginBottom:16}}>
+                            <div className="sec-header" style={{padding:'16px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
+                                <h2>Ventas por Producto</h2>
+                                <span style={{fontSize:'11px',color:'var(--text-dim)'}}>{ventasHoy.length} venta{ventasHoy.length!==1?'s':''} hoy</span>
+                            </div>
+                            {prodEntries.length === 0 ? (
+                                <div className="empty" style={{padding:'40px 24px'}}>
+                                    <div className="empty-icon" style={{fontSize:'24px',background:'none',border:'none'}}>📦</div>
+                                    <h3>Sin ventas registradas hoy</h3>
+                                    <p>Las ventas del día aparecerán aquí agrupadas por producto.</p>
+                                </div>
+                            ) : (
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Estado</th>
+                                            <th style={{textAlign:'center'}}># Ventas</th>
+                                            <th style={{textAlign:'right'}}>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {prodEntries.map(([nombre, data]) => {
+                                            const prod = productos.find(p => (p.nombre||'').toLowerCase() === nombre.toLowerCase());
+                                            const estadoColor = prod ? (prod.estado==='Ganador'?'badge-green':(prod.estado==='Activo'?'badge-gold':'badge-gray')) : 'badge-gray';
+                                            return (
+                                                <tr key={nombre}>
+                                                    <td style={{fontWeight:600}}>{nombre}</td>
+                                                    <td><span className={`badge ${estadoColor}`}><span className="badge-dot"/>{prod ? prod.estado : 'Sin registrar'}</span></td>
+                                                    <td style={{textAlign:'center',fontFamily:"'Fira Code',monospace"}}>{data.count}</td>
+                                                    <td style={{textAlign:'right',fontWeight:700,fontFamily:"'Fira Code',monospace",color:'var(--orange)'}}>RD${data.monto.toLocaleString()}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
+                        {sinVentas.length > 0 && (
+                            <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}>
+                                <div className="sec-header" style={{padding:'14px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
+                                    <h2>Productos Activos sin Ventas Hoy</h2>
+                                </div>
+                                <div style={{padding:'16px 24px',display:'flex',flexWrap:'wrap',gap:8}}>
+                                    {sinVentas.map(p => (
+                                        <span key={p.id} className={`badge ${p.estado==='Ganador'?'badge-green':'badge-gold'}`}>
+                                            <span className="badge-dot"/>{p.nombre}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>);
                 })()}
 
                 {showModal && (
