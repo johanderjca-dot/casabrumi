@@ -2114,9 +2114,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 editSeccion==='analisis' ? (
                                     <div className="card glass" style={{padding:'24px'}}>
                                         <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Análisis de producto ganador</div>
-                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:20}}>
+                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
                                             <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Precio proveedor (RD$)</label><input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.precioProveedor} onChange={e=>setAnalisisForm(f=>({...f,precioProveedor:e.target.value}))} /></div>
-                                            <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Precio venta (RD$)</label><input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.precioVenta} onChange={e=>setAnalisisForm(f=>({...f,precioVenta:e.target.value}))} /></div>
                                             <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Nombre del proveedor</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.proveedor} onChange={e=>setAnalisisForm(f=>({...f,proveedor:e.target.value}))} /></div>
                                         </div>
                                         <div className="form-group"><label style={{color:'var(--text-dim)'}}>Link del anuncio</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="https://..." value={analisisForm.linkAnuncio} onChange={e=>setAnalisisForm(f=>({...f,linkAnuncio:e.target.value}))} /></div>
