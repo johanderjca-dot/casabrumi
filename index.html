@@ -574,6 +574,195 @@ function RevealTable({ children, className, style }) {
     return <div ref={ref} className={className} style={style}>{children}</div>;
 }
 
+// ── CIERRE DIARIO ──
+function CierreDiario({ ventas, gastos, productos, user }) {
+    const [saving,   setSaving]   = useState(false);
+    const [cierreHoy, setCierreHoy] = useState(null);
+    const [historial, setHistorial] = useState([]);
+    const [guardado,  setGuardado]  = useState(false);
+
+    const hoy      = new Date();
+    const fechaStr = hoy.toISOString().slice(0, 10);
+    const esHoy    = f => { const d = f?.toDate?.(); return d && d.toDateString() === hoy.toDateString(); };
+
+    const ventasHoy   = ventas.filter(v => esHoy(v.fecha));
+    const gastosHoy   = gastos.filter(g => esHoy(g.fecha));
+    const totalVentas = ventasHoy.reduce((s, v) => s + (v.monto || 0), 0);
+    const gastosDOP   = gastosHoy.filter(g => g.moneda === 'DOP').reduce((s, g) => s + (g.monto || 0), 0);
+    const gastosUSD   = gastosHoy.filter(g => g.moneda !== 'DOP').reduce((s, g) => s + (g.monto || 0), 0);
+
+    const agrupado = {};
+    ventasHoy.forEach(v => {
+        const key = (v.producto || 'Sin especificar').trim();
+        if (!agrupado[key]) agrupado[key] = { monto: 0, count: 0 };
+        agrupado[key].monto += (v.monto || 0);
+        agrupado[key].count++;
+    });
+    const prodEntries = Object.entries(agrupado).sort((a, b) => b[1].monto - a[1].monto);
+    const prodActivos = productos.filter(p => ['Activo', 'Ganador'].includes(p.estado));
+    const sinVentas   = prodActivos.filter(p => !prodEntries.some(([n]) => n.toLowerCase() === (p.nombre||'').toLowerCase()));
+
+    useEffect(() => {
+        const unsub = db.collection('cierres').orderBy('registradoEn', 'desc').limit(30).onSnapshot(
+            snap => {
+                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setCierreHoy(docs.find(c => c.fechaStr === fechaStr) || null);
+                setHistorial(docs);
+            },
+            err => console.error('Cierres:', err)
+        );
+        return () => unsub();
+    }, [fechaStr]);
+
+    const registrarCierre = async () => {
+        if (saving) return;
+        setSaving(true);
+        try {
+            const ventasPorProducto = prodEntries.map(([nombre, data]) => {
+                const prod = productos.find(p => (p.nombre||'').toLowerCase() === nombre.toLowerCase());
+                return { nombre, monto: data.monto, count: data.count, estado: prod?.estado || 'Sin registrar' };
+            });
+            const payload = {
+                fechaStr, totalVentas, gastosDOP, gastosUSD, ventasPorProducto,
+                registradoPor: user.email,
+            };
+            if (cierreHoy) {
+                await db.collection('cierres').doc(cierreHoy.id).update({
+                    ...payload, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+            } else {
+                await db.collection('cierres').add({
+                    ...payload,
+                    fecha: firebase.firestore.FieldValue.serverTimestamp(),
+                    registradoEn: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+            }
+            setGuardado(true);
+            setTimeout(() => setGuardado(false), 3000);
+        } catch(e) { console.error('Error cierre:', e); }
+        setSaving(false);
+    };
+
+    const todayStr = hoy.toLocaleDateString('es-DO', { weekday:'long', day:'numeric', month:'long' });
+
+    return (<>
+        <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+            <div>
+                <h1>Cierre Diario</h1>
+                <p>Resumen del {todayStr}</p>
+            </div>
+            <button className="btn btn-gold" onClick={registrarCierre} disabled={saving} style={{flexShrink:0}}>
+                {saving ? 'Guardando...' : guardado ? '✓ Guardado' : cierreHoy ? 'Actualizar Cierre' : 'Registrar Cierre'}
+            </button>
+        </div>
+
+        {cierreHoy && (
+            <div style={{marginBottom:16,padding:'10px 16px',borderRadius:'var(--r-sm)',background:'rgba(60,130,80,0.08)',border:'1px solid rgba(60,130,80,0.22)',fontSize:'12px',color:'#3C7840',display:'flex',alignItems:'center',gap:8}}>
+                <span style={{width:6,height:6,borderRadius:'50%',background:'#4A9050',flexShrink:0,display:'inline-block'}}/>
+                Cierre del día ya registrado en Firebase — puedes actualizarlo si hubo más ventas.
+            </div>
+        )}
+
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:24}}>
+            <div className="kpi-card" style={{background:'var(--earth)',border:'none',borderRadius:'var(--r)',padding:'22px 24px'}}>
+                <div style={{fontSize:'9px',fontWeight:800,color:'rgba(247,242,234,0.5)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:8}}>Ventas del día</div>
+                <div style={{fontSize:'30px',fontWeight:800,letterSpacing:'-1.5px',fontFamily:"'Fira Code',monospace",lineHeight:1,marginBottom:6,color:'#fff'}}>RD${totalVentas.toLocaleString()}</div>
+                <div style={{fontSize:'11px',color:'rgba(247,242,234,0.45)'}}>{ventasHoy.length} venta{ventasHoy.length!==1?'s':''} registrada{ventasHoy.length!==1?'s':''}</div>
+            </div>
+            <div className="kpi-card glass">
+                <div className="kpi-label">Gastos del día <span style={{opacity:.6}}>(DOP)</span></div>
+                <div className="kpi-val">RD${gastosDOP.toLocaleString()}</div>
+                <div className="kpi-sub">{gastosHoy.filter(g=>g.moneda==='DOP').length} gasto{gastosHoy.filter(g=>g.moneda==='DOP').length!==1?'s':''}</div>
+            </div>
+            <div className="kpi-card glass">
+                <div className="kpi-label">Gastos del día <span style={{opacity:.6}}>(USD)</span></div>
+                <div className="kpi-val">${gastosUSD.toLocaleString()}</div>
+                <div className="kpi-sub">{gastosHoy.filter(g=>g.moneda!=='DOP').length} gasto{gastosHoy.filter(g=>g.moneda!=='DOP').length!==1?'s':''}</div>
+            </div>
+        </div>
+
+        <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden',marginBottom:16}}>
+            <div className="sec-header" style={{padding:'16px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
+                <h2>Ventas por Producto</h2>
+                <span style={{fontSize:'11px',color:'var(--text-dim)'}}>{ventasHoy.length} venta{ventasHoy.length!==1?'s':''} hoy</span>
+            </div>
+            {prodEntries.length === 0 ? (
+                <div className="empty" style={{padding:'40px 24px'}}>
+                    <div className="empty-icon" style={{fontSize:'24px',background:'none',border:'none'}}>📦</div>
+                    <h3>Sin ventas registradas hoy</h3>
+                    <p>Las ventas del día aparecerán aquí agrupadas por producto.</p>
+                </div>
+            ) : (
+                <table>
+                    <thead><tr>
+                        <th>Producto</th>
+                        <th>Estado</th>
+                        <th style={{textAlign:'center'}}># Ventas</th>
+                        <th style={{textAlign:'right'}}>Total</th>
+                    </tr></thead>
+                    <tbody>
+                        {prodEntries.map(([nombre, data]) => {
+                            const prod = productos.find(p => (p.nombre||'').toLowerCase() === nombre.toLowerCase());
+                            const estadoColor = prod ? (prod.estado==='Ganador'?'badge-green':(prod.estado==='Activo'?'badge-gold':'badge-gray')) : 'badge-gray';
+                            return (
+                                <tr key={nombre}>
+                                    <td style={{fontWeight:600}}>{nombre}</td>
+                                    <td><span className={`badge ${estadoColor}`}><span className="badge-dot"/>{prod ? prod.estado : 'Sin registrar'}</span></td>
+                                    <td style={{textAlign:'center',fontFamily:"'Fira Code',monospace"}}>{data.count}</td>
+                                    <td style={{textAlign:'right',fontWeight:700,fontFamily:"'Fira Code',monospace",color:'var(--orange)'}}>RD${data.monto.toLocaleString()}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            )}
+        </div>
+
+        {sinVentas.length > 0 && (
+            <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden',marginBottom:16}}>
+                <div className="sec-header" style={{padding:'14px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
+                    <h2>Productos Activos sin Ventas Hoy</h2>
+                </div>
+                <div style={{padding:'16px 24px',display:'flex',flexWrap:'wrap',gap:8}}>
+                    {sinVentas.map(p => (
+                        <span key={p.id} className={`badge ${p.estado==='Ganador'?'badge-green':'badge-gold'}`}>
+                            <span className="badge-dot"/>{p.nombre}
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {historial.length > 0 && (
+            <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}>
+                <div className="sec-header" style={{padding:'16px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
+                    <h2>Historial de Cierres</h2>
+                </div>
+                <table>
+                    <thead><tr>
+                        <th>Fecha</th>
+                        <th>Productos</th>
+                        <th style={{textAlign:'right'}}>Total Ventas</th>
+                        <th style={{textAlign:'right'}}>Gastos DOP</th>
+                        <th style={{textAlign:'right'}}>Gastos USD</th>
+                    </tr></thead>
+                    <tbody>
+                        {historial.map(c => (
+                            <tr key={c.id}>
+                                <td style={{fontFamily:"'Fira Code',monospace",fontSize:12}}>{c.fechaStr}</td>
+                                <td style={{fontSize:12,color:'var(--text-dim)'}}>{(c.ventasPorProducto||[]).map(p=>p.nombre).join(', ') || '—'}</td>
+                                <td style={{textAlign:'right',fontWeight:700,fontFamily:"'Fira Code',monospace",color:'var(--orange)'}}>RD${(c.totalVentas||0).toLocaleString()}</td>
+                                <td style={{textAlign:'right',fontFamily:"'Fira Code',monospace",fontSize:12}}>RD${(c.gastosDOP||0).toLocaleString()}</td>
+                                <td style={{textAlign:'right',fontFamily:"'Fira Code',monospace",fontSize:12}}>${(c.gastosUSD||0).toLocaleString()}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+    </>);
+}
+
 // ── APP ──
 function App() {
     const [user,       setUser]       = useState(null);
@@ -3295,107 +3484,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     );
                 })()}
 
-                {activeTab === 'cierre' && (() => {
-                    const hoy = new Date();
-                    const esHoy = f => { const d = f?.toDate?.(); return d && d.toDateString() === hoy.toDateString(); };
-                    const ventasHoy = ventas.filter(v => esHoy(v.fecha));
-                    const gastosHoy = gastos.filter(g => esHoy(g.fecha));
-                    const totalVentas = ventasHoy.reduce((s, v) => s + (v.monto || 0), 0);
-                    const gastosDOP   = gastosHoy.filter(g => g.moneda === 'DOP').reduce((s, g) => s + (g.monto || 0), 0);
-                    const gastosUSD   = gastosHoy.filter(g => g.moneda !== 'DOP').reduce((s, g) => s + (g.monto || 0), 0);
-
-                    const agrupado = {};
-                    ventasHoy.forEach(v => {
-                        const key = (v.producto || 'Sin especificar').trim();
-                        if (!agrupado[key]) agrupado[key] = { monto: 0, count: 0 };
-                        agrupado[key].monto += (v.monto || 0);
-                        agrupado[key].count++;
-                    });
-                    const prodEntries = Object.entries(agrupado).sort((a, b) => b[1].monto - a[1].monto);
-
-                    const prodActivos = productos.filter(p => ['Activo', 'Ganador'].includes(p.estado));
-                    const sinVentas   = prodActivos.filter(p => !prodEntries.some(([n]) => n.toLowerCase() === (p.nombre||'').toLowerCase()));
-
-                    const todayStr = hoy.toLocaleDateString('es-DO', { weekday:'long', day:'numeric', month:'long' });
-                    return (<>
-                        <div className="page-header">
-                            <h1>Cierre Diario</h1>
-                            <p>Resumen del {todayStr}</p>
-                        </div>
-
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:24}}>
-                            <div className="kpi-card" style={{background:'var(--earth)',border:'none',borderRadius:'var(--r)',padding:'22px 24px'}}>
-                                <div style={{fontSize:'9px',fontWeight:800,color:'rgba(247,242,234,0.5)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:8}}>Ventas del día</div>
-                                <div style={{fontSize:'30px',fontWeight:800,letterSpacing:'-1.5px',fontFamily:"'Fira Code',monospace",lineHeight:1,marginBottom:6,color:'#fff'}}>RD${totalVentas.toLocaleString()}</div>
-                                <div style={{fontSize:'11px',color:'rgba(247,242,234,0.45)'}}>{ventasHoy.length} venta{ventasHoy.length!==1?'s':''} registrada{ventasHoy.length!==1?'s':''}</div>
-                            </div>
-                            <div className="kpi-card glass">
-                                <div className="kpi-label">Gastos del día <span style={{opacity:.6}}>(DOP)</span></div>
-                                <div className="kpi-val">RD${gastosDOP.toLocaleString()}</div>
-                                <div className="kpi-sub">{gastosHoy.filter(g=>g.moneda==='DOP').length} gasto{gastosHoy.filter(g=>g.moneda==='DOP').length!==1?'s':''}</div>
-                            </div>
-                            <div className="kpi-card glass">
-                                <div className="kpi-label">Gastos del día <span style={{opacity:.6}}>(USD)</span></div>
-                                <div className="kpi-val">${gastosUSD.toLocaleString()}</div>
-                                <div className="kpi-sub">{gastosHoy.filter(g=>g.moneda!=='DOP').length} gasto{gastosHoy.filter(g=>g.moneda!=='DOP').length!==1?'s':''}</div>
-                            </div>
-                        </div>
-
-                        <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden',marginBottom:16}}>
-                            <div className="sec-header" style={{padding:'16px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
-                                <h2>Ventas por Producto</h2>
-                                <span style={{fontSize:'11px',color:'var(--text-dim)'}}>{ventasHoy.length} venta{ventasHoy.length!==1?'s':''} hoy</span>
-                            </div>
-                            {prodEntries.length === 0 ? (
-                                <div className="empty" style={{padding:'40px 24px'}}>
-                                    <div className="empty-icon" style={{fontSize:'24px',background:'none',border:'none'}}>📦</div>
-                                    <h3>Sin ventas registradas hoy</h3>
-                                    <p>Las ventas del día aparecerán aquí agrupadas por producto.</p>
-                                </div>
-                            ) : (
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Producto</th>
-                                            <th>Estado</th>
-                                            <th style={{textAlign:'center'}}># Ventas</th>
-                                            <th style={{textAlign:'right'}}>Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {prodEntries.map(([nombre, data]) => {
-                                            const prod = productos.find(p => (p.nombre||'').toLowerCase() === nombre.toLowerCase());
-                                            const estadoColor = prod ? (prod.estado==='Ganador'?'badge-green':(prod.estado==='Activo'?'badge-gold':'badge-gray')) : 'badge-gray';
-                                            return (
-                                                <tr key={nombre}>
-                                                    <td style={{fontWeight:600}}>{nombre}</td>
-                                                    <td><span className={`badge ${estadoColor}`}><span className="badge-dot"/>{prod ? prod.estado : 'Sin registrar'}</span></td>
-                                                    <td style={{textAlign:'center',fontFamily:"'Fira Code',monospace"}}>{data.count}</td>
-                                                    <td style={{textAlign:'right',fontWeight:700,fontFamily:"'Fira Code',monospace",color:'var(--orange)'}}>RD${data.monto.toLocaleString()}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-
-                        {sinVentas.length > 0 && (
-                            <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}>
-                                <div className="sec-header" style={{padding:'14px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
-                                    <h2>Productos Activos sin Ventas Hoy</h2>
-                                </div>
-                                <div style={{padding:'16px 24px',display:'flex',flexWrap:'wrap',gap:8}}>
-                                    {sinVentas.map(p => (
-                                        <span key={p.id} className={`badge ${p.estado==='Ganador'?'badge-green':'badge-gold'}`}>
-                                            <span className="badge-dot"/>{p.nombre}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </>);
-                })()}
+                {activeTab === 'cierre' && <CierreDiario ventas={ventas} gastos={gastos} productos={productos} user={user} />}
 
                 {showModal && (
                     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}>
