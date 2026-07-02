@@ -70,9 +70,9 @@
             --glass-shadow:  0 1px 0 rgba(255,255,255,0.7) inset, 0 2px 12px rgba(92,61,30,0.07);
             --glass-shadow-lg: 0 1px 0 rgba(255,255,255,0.8) inset, 0 16px 48px rgba(92,61,30,0.14);
 
-            --text:        #2C1F0E;
-            --text-dim:    rgba(92,61,30,0.55);
-            --text-dimmer: rgba(92,61,30,0.30);
+            --text:        #1A1008;
+            --text-dim:    rgba(26,16,8,0.72);
+            --text-dimmer: rgba(26,16,8,0.48);
 
             --header-h:  56px;
             --sidebar-w: 220px;
@@ -656,7 +656,7 @@ function CierreDiario({ productos, user }) {
         <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
             <div>
                 <h1>Cierre Diario</h1>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6,flexWrap:'wrap'}}>
                     <button className="btn btn-glass btn-sm" onClick={()=>setNavOffset(n=>n-1)}
                         style={{padding:'4px 10px',fontSize:16,lineHeight:1}}>‹</button>
                     <span style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{labelFecha}</span>
@@ -665,6 +665,13 @@ function CierreDiario({ productos, user }) {
                         : <button className="btn btn-glass btn-sm" onClick={()=>setNavOffset(n=>Math.min(0,n+1))}
                             style={{padding:'4px 10px',fontSize:16,lineHeight:1}}>›</button>
                     }
+                    <input type="date" max={getTodayStr()} value={selectedFechaStr}
+                        onChange={e=>{
+                            if(!e.target.value) return;
+                            const diff = Math.round((new Date(e.target.value+'T12:00:00') - new Date(getTodayStr()+'T12:00:00')) / 86400000);
+                            setNavOffset(Math.min(0,diff));
+                        }}
+                        style={{fontSize:12,padding:'4px 8px',borderRadius:'var(--r-sm)',border:'1.5px solid var(--glass-border)',background:'var(--parchment)',color:'var(--text)',fontFamily:'inherit',cursor:'pointer'}} />
                 </div>
             </div>
             <button className="btn btn-gold" onClick={registrarCierre}
@@ -1131,6 +1138,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [productos,          setProductos]          = useState([]);
     const [activeProducto,     setActiveProducto]     = useState(null);
     const [productoTab,        setProductoTab]        = useState('general');
+    const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
     const [showProdModal,      setShowProdModal]      = useState(false);
     const [editingProducto,    setEditingProducto]    = useState(null);
     const [savingProd,         setSavingProd]         = useState(false);
@@ -2024,13 +2032,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
                     const gananciaTotal = gananciaUnit * parseFloat(inv.unidadesVendidas||0);
                     const TABS = ['General','Análisis','Facebook','Testeo','Inventario','Contenido'];
-                    const CONTENT_ITEMS = [
-                        { key: 'imagenProducto',   label: 'Imagen Producto',           desc: 'Cantidad mínima: 4 imágenes' },
-                        { key: 'resenas',          label: 'Reseñas',                   desc: 'Fotos de personas (buscar en internet)' },
-                        { key: 'clientesProbaron', label: 'Clientes que Probaron',     desc: 'Busca o genera mínimo 4' },
-                        { key: 'videoProducto',    label: 'Video Producto (Clientes)', desc: 'GIF o VIDEO para landing (2) + FB ADS' },
-                        { key: 'beneficios',       label: 'Beneficios',                desc: 'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
-                        { key: 'usos',             label: 'Usos',                      desc: 'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
+                    const CONTENT_GROUPS = [
+                        { key: 'shopify', label: 'SHOPIFY', items: [
+                            { key: 'imagenProducto',   label: 'Imagen Producto',           desc: 'Cantidad mínima: 4 imágenes' },
+                            { key: 'resenas',          label: 'Reseñas',                   desc: 'Fotos de personas (buscar en internet)' },
+                            { key: 'clientesProbaron', label: 'Clientes que Probaron',     desc: 'Busca o genera mínimo 4' },
+                            { key: 'videoProducto',    label: 'Video Producto (Clientes)', desc: 'GIF o VIDEO para landing (2) + FB ADS' },
+                            { key: 'beneficios',       label: 'Beneficios',                desc: 'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
+                            { key: 'usos',             label: 'Usos',                      desc: 'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
+                        ]},
                     ];
                     const analisis = p.analisis || {};
                     const analisisScore = ANALISIS_CHECKS.filter(([k])=>(analisis.checks||{})[k]==='si').length;
@@ -2427,35 +2437,62 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             {/* ── Tab Contenido ── */}
                             {productoTab==='contenido' && (() => {
                                 const contenido = p.contenido || {};
-                                const completados = CONTENT_ITEMS.filter(i => contenido[i.key]).length;
-                                const toggleItem = (key, val) => {
-                                    db.collection('productos').doc(p.id).update({ [`contenido.${key}`]: val })
-                                      .catch(console.error);
-                                };
+                                const totalItems   = CONTENT_GROUPS.reduce((s,g)=>s+g.items.length,0);
+                                const completados  = CONTENT_GROUPS.reduce((s,g)=>s+g.items.filter(i=>contenido[i.key]).length,0);
+                                const toggleItem   = (key, val) => db.collection('productos').doc(p.id).update({ [`contenido.${key}`]: val }).catch(console.error);
+                                const toggleGroup  = key => setCGroupsOpen(o=>({...o,[key]:!o[key]}));
                                 return (
                                     <div>
-                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                                            <div style={{fontSize:13,color:'var(--text-dim)'}}>Checklist de contenido del producto</div>
-                                            <span className={`badge ${completados===CONTENT_ITEMS.length?'badge-green':'badge-gold'}`}>
-                                                <span className="badge-dot"/>{completados}/{CONTENT_ITEMS.length} completados
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                                            <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>Checklist de contenido</div>
+                                            <span className={`badge ${completados===totalItems?'badge-green':'badge-gold'}`}>
+                                                <span className="badge-dot"/>{completados}/{totalItems} completados
                                             </span>
                                         </div>
-                                        <div style={{height:4,borderRadius:99,background:'var(--stone)',marginBottom:24,overflow:'hidden'}}>
-                                            <div style={{height:'100%',borderRadius:99,background:'var(--orange)',width:`${(completados/CONTENT_ITEMS.length)*100}%`,transition:'width 0.3s ease'}}/>
+                                        <div style={{height:4,borderRadius:99,background:'var(--stone)',marginBottom:20,overflow:'hidden'}}>
+                                            <div style={{height:'100%',borderRadius:99,background:'var(--orange)',width:`${totalItems?((completados/totalItems)*100):0}%`,transition:'width 0.3s ease'}}/>
                                         </div>
-                                        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                                            {CONTENT_ITEMS.map(item => {
-                                                const done = !!contenido[item.key];
+                                        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                                            {CONTENT_GROUPS.map(group => {
+                                                const open     = !!cGroupsOpen[group.key];
+                                                const gTotal   = group.items.length;
+                                                const gDone    = group.items.filter(i=>contenido[i.key]).length;
+                                                const allDone  = gDone === gTotal;
                                                 return (
-                                                    <div key={item.key} onClick={() => toggleItem(item.key, !done)}
-                                                        style={{display:'flex',alignItems:'center',gap:14,padding:'14px 18px',borderRadius:'var(--r-sm)',border:'1.5px solid',borderColor:done?'rgba(60,130,80,0.25)':'var(--glass-border)',background:done?'rgba(60,130,80,0.06)':'var(--surface-2)',cursor:'pointer',transition:'all 150ms ease',userSelect:'none'}}>
-                                                        <div style={{width:22,height:22,borderRadius:6,border:'2px solid',borderColor:done?'#4A9050':'var(--stone-mid)',background:done?'#4A9050':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 150ms ease'}}>
-                                                            {done && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                                    <div key={group.key} className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}>
+                                                        {/* Group header */}
+                                                        <div onClick={()=>toggleGroup(group.key)}
+                                                            style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',cursor:'pointer',userSelect:'none',borderBottom: open ? '1px solid var(--glass-border)' : 'none'}}>
+                                                            <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                                                <span style={{fontSize:'11px',fontWeight:800,letterSpacing:'2px',color:'var(--text)'}}>
+                                                                    {group.label}
+                                                                </span>
+                                                                <span className={`badge ${allDone?'badge-green':'badge-gold'}`} style={{fontSize:10}}>
+                                                                    <span className="badge-dot"/>{gDone}/{gTotal}
+                                                                </span>
+                                                            </div>
+                                                            <span style={{fontSize:18,color:'var(--text-dim)',lineHeight:1,transition:'transform 200ms ease',display:'inline-block',transform:open?'rotate(180deg)':'rotate(0deg)'}}>⌄</span>
                                                         </div>
-                                                        <div style={{flex:1}}>
-                                                            <div style={{fontSize:13,fontWeight:done?700:500,color:done?'var(--text)':'var(--text-dim)'}}>{item.label}</div>
-                                                            <div style={{fontSize:11,color:'var(--text-dimmer)',marginTop:2}}>{item.desc}</div>
-                                                        </div>
+                                                        {/* Items */}
+                                                        {open && (
+                                                            <div style={{display:'flex',flexDirection:'column',gap:0}}>
+                                                                {group.items.map((item,idx) => {
+                                                                    const done = !!contenido[item.key];
+                                                                    return (
+                                                                        <div key={item.key} onClick={()=>toggleItem(item.key,!done)}
+                                                                            style={{display:'flex',alignItems:'center',gap:14,padding:'13px 18px',cursor:'pointer',transition:'background 120ms ease',userSelect:'none',borderTop:idx>0?'1px solid var(--glass-border)':undefined,background:done?'rgba(60,130,80,0.06)':'transparent'}}>
+                                                                            <div style={{width:22,height:22,borderRadius:6,border:'2px solid',borderColor:done?'#4A9050':'var(--stone-mid)',background:done?'#4A9050':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all 150ms ease'}}>
+                                                                                {done && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                                                            </div>
+                                                                            <div style={{flex:1}}>
+                                                                                <div style={{fontSize:13,fontWeight:done?700:500,color:'var(--text)'}}>{item.label}</div>
+                                                                                <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>{item.desc}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
