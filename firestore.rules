@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMaster() {
+      return isSignedIn() && (
+        request.auth.token.email == 'johanderjca@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'master')
+      );
+    }
+
+    // ── users ── perfil de cada cuenta (uid, email, role, photoURL)
+    match /users/{uid} {
+      allow read:   if isMaster() || (isSignedIn() && request.auth.uid == uid);
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      // el propio usuario puede actualizar su perfil (ej. foto) pero NO su rol;
+      // solo el master puede cambiar el campo role (ver cambiarRol en el panel)
+      allow update: if isMaster() ||
+        (isSignedIn() && request.auth.uid == uid &&
+         request.resource.data.role == resource.data.role);
+      allow delete: if isMaster();
+    }
+
+    // ── vendedores ── ficha de cada vendedor (puede o no tener cuenta en /users)
+    // lectura abierta a cualquier logueado: el login de cada vendedor hace un
+    // get() sin filtro sobre toda la coleccion para vincular su cuenta (uid/email),
+    // y Firestore no puede permitir eso con una regla restringida por campo
+    match /vendedores/{id} {
+      allow read:   if isSignedIn();
+      // el master crea vendedores desde el panel; el auto-registro crea su propia ficha
+      allow create: if isMaster() || (isSignedIn() && request.resource.data.email == request.auth.token.email);
+      // el propio vendedor puede vincular su uid/normalizar su email en su ficha (login);
+      // el master puede editar cualquier ficha
+      allow update: if isMaster() ||
+        (isSignedIn() && (resource.data.email == request.auth.token.email || resource.data.uid == request.auth.uid));
+      allow delete: if isMaster();
+    }
+
+    // ── gastos ── solo el master los ve y gestiona
+    match /gastos/{id} {
+      allow read, write: if isMaster();
+    }
+
+    // ── ventas ── cada vendedor solo ve/crea las suyas; el master ve/gestiona todas
+    match /ventas/{id} {
+      allow read:   if isMaster() || (isSignedIn() && resource.data.vendedorId == request.auth.uid);
+      allow create: if isMaster() || (isSignedIn() && request.resource.data.vendedorId == request.auth.uid);
+      allow update, delete: if isMaster();
+    }
+
+    // ── tiendas ── cualquier usuario logueado puede leer los nombres;
+    // solo el master crea/edita/borra tiendas
+    match /tiendas/{id} {
+      allow read:  if isSignedIn();
+      allow write: if isMaster();
+    }
+
+    // ── otras colecciones que ya existen en esta base (cierres, links, productos)
+    // y que no pertenecen a este panel: mantengo el comportamiento actual
+    // (cualquier usuario logueado puede leer/escribir) para no romper la otra app
+    // que las usa. Avisame si querés que las restrinja tambien.
+    match /cierres/{id}    { allow read, write: if isSignedIn(); }
+    match /links/{id}      { allow read, write: if isSignedIn(); }
+    match /productos/{id}  { allow read, write: if isSignedIn(); }
+
+    // ── campanas ── Planeacion de Campanas, solo master
+    match /campanas/{id}   { allow read, write: if isMaster(); }
+
+    // cualquier otra coleccion no listada: denegada por defecto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
