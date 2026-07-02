@@ -2005,7 +2005,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const fb = p.facebook||{}; const testeo = p.testeo||{}; const inv = p.inventario||{};
                     const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
                     const gananciaTotal = gananciaUnit * parseFloat(inv.unidadesVendidas||0);
-                    const TABS = ['General','Análisis','Facebook','Testeo','Inventario','Contenido'];
+                    const TABS = ['General','Análisis','Contenido','Facebook','Testeo','Inventario'];
                     const CONTENT_GROUPS = [
                         { key: 'shopify', label: 'SHOPIFY', items: [
                             { key: 'imagenProducto',   label: 'Imagen Producto',           desc: 'Cantidad mínima: 4 imágenes' },
