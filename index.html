@@ -1185,39 +1185,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         finally { setSavingCampana(false); }
     };
     const deleteCampana = (id) => { db.collection('campanas').doc(id).delete().catch(console.error); };
-    const [iaCargando, setIaCargando] = useState(false);
-    const [iaError, setIaError] = useState('');
-    const [iaKey, setIaKey] = useState(() => { try { return localStorage.getItem('anthropicKey') || ''; } catch { return ''; } });
-    const guardarIaKey = (v) => { setIaKey(v); try { v ? localStorage.setItem('anthropicKey', v) : localStorage.removeItem('anthropicKey'); } catch {} };
-    const generarAngulosIA = async (prod) => {
-        setIaError(''); setIaCargando(true);
-        const nombre = prod.nombre || '';
-        const desc = prod.descripcion || analisisForm.notas || '';
-        const prompt = `Eres un experto en marketing de e-commerce de pago contra entrega (COD) en República Dominicana. Para el producto "${nombre}"${desc?` — ${desc}`:''}, genera exactamente 3 ángulos de venta potentes para anuncios de Facebook/TikTok: principal, secundario y terciario. Cada ángulo es una frase corta y persuasiva (máximo 12 palabras) enfocada en el dolor, beneficio o emoción del cliente dominicano. Responde SOLO con los 3 ángulos, uno por línea, sin numeración ni texto extra.`;
-        const key = (() => { try { return localStorage.getItem('anthropicKey') || ''; } catch { return ''; } })();
-        try {
-            if (key) {
-                const res = await fetch('https://api.anthropic.com/v1/messages', {
-                    method: 'POST',
-                    headers: { 'content-type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-                    body: JSON.stringify({ model:'claude-opus-4-8', max_tokens:512, messages:[{ role:'user', content:prompt }] }),
-                });
-                if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || ('Error '+res.status)); }
-                const data = await res.json();
-                const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
-                const lineas = text.split('\n').map(l=>l.replace(/^[\d).\-•\s"]+/,'').replace(/"$/,'').trim()).filter(Boolean);
-                if (lineas.length === 0) throw new Error('La IA no devolvió ángulos.');
-                setAnalisisForm(f=>({ ...f, angulo1:lineas[0]||f.angulo1, angulo2:lineas[1]||f.angulo2, angulo3:lineas[2]||f.angulo3 }));
-            } else {
-                await navigator.clipboard.writeText(prompt);
-                setIaError('Sin API key configurada: copié el prompt al portapapeles. Pégalo en claude.ai (gratis) y trae los 3 ángulos, o pega tu API key abajo para generarlos aquí mismo.');
-            }
-        } catch(err) {
-            setIaError('Error de IA: ' + err.message);
-        } finally {
-            setIaCargando(false);
-        }
-    };
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -2144,17 +2111,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             })}
                                         </div>
 
-                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'22px 0 12px',flexWrap:'wrap',gap:8}}>
+                                        <div style={{margin:'22px 0 12px'}}>
                                             <span style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px'}}>Ángulos de venta</span>
-                                            <button className="btn btn-gold btn-sm" disabled={iaCargando} onClick={()=>generarAngulosIA(p)} style={{background:'linear-gradient(135deg,#8B5CF6,#6D28D9)',border:'none'}}>
-                                                {iaCargando ? '✦ Generando…' : '✦ Generar con IA'}
-                                            </button>
-                                        </div>
-                                        {iaError && <div style={{fontSize:'11.5px',color:'var(--earth-2)',background:'var(--cream-dark)',border:'1px solid var(--glass-border)',borderRadius:8,padding:'10px 12px',marginBottom:12,lineHeight:1.5}}>{iaError}</div>}
-                                        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:14}}>
-                                            <input type="password" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',fontSize:'12px',flex:1}}
-                                                placeholder="🔑 Pega tu API key de Claude (sk-ant-…) — se guarda solo en tu navegador" value={iaKey} onChange={e=>guardarIaKey(e.target.value)} />
-                                            {iaKey && <span style={{fontSize:'10.5px',color:'#3D6646',fontWeight:'700',whiteSpace:'nowrap'}}>✓ Conectada</span>}
                                         </div>
                                         <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #1 — Principal</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo1} onChange={e=>setAnalisisForm(f=>({...f,angulo1:e.target.value}))} /></div>
                                         <div className="form-group"><label style={{color:'var(--text-dim)'}}>Ángulo #2 — Secundario</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={analisisForm.angulo2} onChange={e=>setAnalisisForm(f=>({...f,angulo2:e.target.value}))} /></div>
