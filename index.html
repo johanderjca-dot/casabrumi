@@ -1357,7 +1357,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         } catch(err) { console.error('Error guardando asiento:', err); }
         finally { setSavingAsiento(false); }
     };
-    const deleteAsiento = id => { if (confirm('¿Eliminar este asiento? Esta acción no se puede deshacer.')) db.collection('asientos_contables').doc(id).delete().catch(console.error); };
+    const deleteAsiento = a => {
+        if (a.auto) { alert('Este asiento se generó automáticamente desde Gastos o Cierre Diario y no se puede borrar aquí — corrige o elimina el registro original.'); return; }
+        if (confirm('¿Eliminar este asiento? Esta acción no se puede deshacer.')) db.collection('asientos_contables').doc(a.id).delete().catch(console.error);
+    };
 
     // Suma débitos/créditos de un conjunto de asientos por cuenta y calcula el saldo según naturaleza de cada cuenta.
     const sumarSaldosCtb = (cuentasScope, asientosScope) => {
@@ -1377,6 +1380,109 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const cuentasCtbScope   = contabScope==='todas' ? cuentas  : cuentas.filter(c=>c.tiendaId===activeTiendaId);
     const asientosCtbScope  = contabScope==='todas' ? asientos : asientos.filter(a=>a.tiendaId===activeTiendaId);
     const hoyISO = new Date().toISOString().slice(0,10);
+
+    // ── Sincronización automática: Gastos y Cierre Diario → Libro Diario ──
+    // Ledger de solo-agregar: nunca borra ni reescribe asientos ya posteados; una edición
+    // posterior a un gasto/cierre ya sincronizado genera un asiento de AJUSTE por la diferencia,
+    // no una corrección silenciosa del historial (así se audita como en contabilidad real).
+    const CUENTA_MEDIO_PAGO = { Efectivo:'Caja Efectivo', Tarjeta:'Banco/Tarjeta', Transferencia:'Transferencias' };
+    const CTB_CODIGO_BASE = { Activo:1000, Pasivo:2000, Patrimonio:3000, Ingreso:4000, Gasto:5000 };
+    const ctbSyncingRef = useRef(new Set());
+
+    const ensureCuentaCtb = async (nombre, tipo, moneda) => {
+        const existente = cuentas.find(c => c.tiendaId===activeTiendaId && c.nombre===nombre && c.moneda===moneda);
+        if (existente) return { id: existente.id, nombre, codigo: existente.codigo };
+        const snap = await db.collection('cuentas_contables')
+            .where('tiendaId','==',activeTiendaId).where('nombre','==',nombre).where('moneda','==',moneda).limit(1).get();
+        if (!snap.empty) return { id: snap.docs[0].id, nombre, codigo: snap.docs[0].data().codigo };
+        const codigo = String(CTB_CODIGO_BASE[tipo] + cuentas.filter(c=>c.tiendaId===activeTiendaId && c.tipo===tipo).length + 1);
+        const ref = await db.collection('cuentas_contables').add({ codigo, nombre, tipo, moneda, tiendaId: activeTiendaId, activa: true, auto: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        return { id: ref.id, nombre, codigo };
+    };
+
+    const postAsientoAuto = async (fecha, descripcion, lineas, origen) => {
+        const totalDebe  = lineas.reduce((s,l)=>s+(l.debe ||0),0);
+        const totalHaber = lineas.reduce((s,l)=>s+(l.haber||0),0);
+        const ref = await db.collection('asientos_contables').add({
+            fecha, descripcion, tiendaId: activeTiendaId, lineas, totalDebe, totalHaber, moneda: lineas[0]?.moneda||'USD',
+            origen, auto: true, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        return ref.id;
+    };
+
+    const sincronizarGasto = async (g) => {
+        if (ctbSyncingRef.current.has('gasto_'+g.id)) return;
+        const moneda = g.moneda || 'USD';
+        const fecha = g.fecha?.toDate ? g.fecha.toDate().toISOString().slice(0,10) : hoyISO;
+        const abonado = g.esCredito ? (g.montoAbonado||0) : 0;
+        const yaAbonoSync = g.ctbAbonoSincronizado || 0;
+        const necesitaInicial = !g.ctbAsientoInicialId;
+        const deltaAbono = g.esCredito ? (abonado - yaAbonoSync) : 0;
+        if (!necesitaInicial && Math.abs(deltaAbono) < 0.005) return;
+        ctbSyncingRef.current.add('gasto_'+g.id);
+        try {
+            const cGasto = await ensureCuentaCtb(`Gasto: ${g.categoria||'Operacional'}`, 'Gasto', moneda);
+            const nombreMedio = (g.medioPago==='Tarjeta' && g.terminal) ? `Banco/Tarjeta — ${g.terminal}` : (CUENTA_MEDIO_PAGO[g.medioPago]||'Caja Efectivo');
+            const cMedio = await ensureCuentaCtb(nombreMedio, 'Activo', moneda);
+            const updates = {};
+            if (necesitaInicial) {
+                const lineas = [{ cuentaId:cGasto.id, cuentaNombre:cGasto.nombre, cuentaCodigo:cGasto.codigo, moneda, debe:g.monto||0, haber:0 }];
+                if (g.esCredito) {
+                    const cPP = await ensureCuentaCtb('Cuentas por Pagar', 'Pasivo', moneda);
+                    lineas.push({ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:g.monto||0 });
+                } else {
+                    lineas.push({ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:g.monto||0 });
+                }
+                updates.ctbAsientoInicialId = await postAsientoAuto(fecha, `Gasto: ${g.descripcion||g.categoria||''}`, lineas, { tipo:'gasto', id:g.id, parte:'inicial' });
+                updates.ctbAbonoSincronizado = 0;
+            }
+            if (g.esCredito && Math.abs(deltaAbono) >= 0.005) {
+                const cPP = await ensureCuentaCtb('Cuentas por Pagar', 'Pasivo', moneda);
+                const lineas = deltaAbono > 0
+                    ? [{ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:deltaAbono, haber:0 },
+                       { cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:deltaAbono }]
+                    : [{ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:-deltaAbono, haber:0 },
+                       { cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:-deltaAbono }];
+                await postAsientoAuto(fecha, `Abono: ${g.descripcion||g.categoria||''}`, lineas, { tipo:'gasto-abono', id:g.id });
+                updates.ctbAbonoSincronizado = abonado;
+            }
+            if (Object.keys(updates).length) await db.collection('gastos').doc(g.id).update(updates);
+        } catch(err) { console.error('Sync contable (gasto):', g.id, err); }
+        finally { ctbSyncingRef.current.delete('gasto_'+g.id); }
+    };
+
+    const sincronizarCierre = async (c) => {
+        if (ctbSyncingRef.current.has('cierre_'+c.id)) return;
+        const moneda = 'DOP'; // Cierre Diario no distingue moneda; ventas contra entrega en RD
+        const yaSync = c.ctbMontoSincronizado || 0;
+        const delta = (c.totalMonto||0) - yaSync;
+        if (Math.abs(delta) < 0.5) return; // umbral mayor: montos en DOP, evita ruido de redondeo
+        ctbSyncingRef.current.add('cierre_'+c.id);
+        try {
+            const cVentas = await ensureCuentaCtb('Ventas', 'Ingreso', moneda);
+            const cCaja   = await ensureCuentaCtb('Caja Efectivo', 'Activo', moneda);
+            const lineas = delta > 0
+                ? [{ cuentaId:cCaja.id, cuentaNombre:cCaja.nombre, cuentaCodigo:cCaja.codigo, moneda, debe:delta, haber:0 },
+                   { cuentaId:cVentas.id, cuentaNombre:cVentas.nombre, cuentaCodigo:cVentas.codigo, moneda, debe:0, haber:delta }]
+                : [{ cuentaId:cVentas.id, cuentaNombre:cVentas.nombre, cuentaCodigo:cVentas.codigo, moneda, debe:-delta, haber:0 },
+                   { cuentaId:cCaja.id, cuentaNombre:cCaja.nombre, cuentaCodigo:cCaja.codigo, moneda, debe:0, haber:-delta }];
+            await postAsientoAuto(c.fechaStr, `Ventas del ${c.fechaStr}`, lineas, { tipo:'cierre', id:c.id });
+            await db.collection('cierres').doc(c.id).update({ ctbMontoSincronizado: c.totalMonto||0 });
+        } catch(err) { console.error('Sync contable (cierre):', c.id, err); }
+        finally { ctbSyncingRef.current.delete('cierre_'+c.id); }
+    };
+
+    // Se ejecuta solo mientras el master tiene abierta la pestaña Contabilidad (evita que
+    // vendedores, que no tienen permiso de escritura sobre estas colecciones, la disparen).
+    useEffect(() => {
+        if (activeTab !== 'contabilidad') return;
+        gastos.filter(perteneceATienda).forEach(sincronizarGasto);
+        // Trae el historial completo de cierres (el listener de arriba solo guarda los últimos 90)
+        // para poder sincronizar también los antiguos; incluye docs sin tiendaId (pre-multitienda).
+        db.collection('cierres').get()
+            .then(snap => snap.docs.map(d=>({id:d.id,...d.data()})).filter(perteneceATienda).forEach(sincronizarCierre))
+            .catch(err => console.error('Sync contable (carga cierres):', err));
+    }, [activeTab, activeTiendaId, gastos, cuentas]);
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -3724,12 +3830,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <React.Fragment key={a.id}>
                                                 <tr style={{cursor:'pointer'}} onClick={()=>setAsientoAbierto(x=>x===a.id?null:a.id)}>
                                                     <td style={{fontFamily:'Fira Code',fontSize:'12px'}}>{a.fecha}</td>
-                                                    <td>{a.descripcion||'—'}</td>
+                                                    <td>{a.descripcion||'—'}{a.auto && <span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>Auto</span>}</td>
                                                     <td>{a.moneda}</td>
                                                     <td className="td-num">{fmtCtb(a.totalDebe,a.moneda)}</td>
                                                     <td className="td-num">{fmtCtb(a.totalHaber,a.moneda)}</td>
                                                     <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
-                                                        <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={e=>{e.stopPropagation();deleteAsiento(a.id);}}>×</button>
+                                                        <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={e=>{e.stopPropagation();deleteAsiento(a);}}>×</button>
                                                     </td>
                                                 </tr>
                                                 {asientoAbierto===a.id && (
@@ -3935,9 +4041,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                             <div className="form-group">
                                 <label style={{color:'var(--text-dim)'}}>Nombre de la cuenta</label>
-                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                <input className="form-input glass no-icon" list="cuenta-nombres-sugeridos" style={{border:'1px solid var(--glass-border)'}}
                                     value={cuentaForm.nombre} onChange={e=>setCuentaForm(f=>({...f,nombre:e.target.value}))}
                                     placeholder="Ej. Caja, Banco Popular USD, Ventas..." onKeyDown={e=>e.key==='Enter'&&saveCuenta()} />
+                                <datalist id="cuenta-nombres-sugeridos">
+                                    {[...new Set(gastos.filter(g=>g.medioPago==='Tarjeta' && g.terminal).map(g=>`Banco/Tarjeta — ${g.terminal}`))].map(n=>(
+                                        <option key={n} value={n} />
+                                    ))}
+                                </datalist>
+                                <p style={{fontSize:'10.5px',color:'var(--text-dimmer)',marginTop:4}}>Sugerencias tomadas de los terminales de tarjeta que ya usas en Gastos — puedes elegir uno o escribir un nombre nuevo.</p>
                             </div>
                             <div className="form-group">
                                 <label style={{color:'var(--text-dim)'}}>Tipo</label>
