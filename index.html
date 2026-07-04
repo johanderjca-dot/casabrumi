@@ -1142,8 +1142,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [linkForm,            setLinkForm]            = useState({ nombre:'', url:'', icono:'🔗' });
     const [editingLink,         setEditingLink]         = useState(null);
     const LINK_ICONOS = ['🔗','🛒','🏪','📦','🚚','💼','💰','📊','🌐','📱','💻','🎯','📋','📌','🏬','🛍️','🌍','📣','🔍','📸','🎨','📝','📞','📧','💬','🤝','🏆','⚡','🔔','📅','🗂️','📂','🖥️','🛠️','⚙️','🔐','👥','🏷️','💳','🏦','📈','📉','🎪','🧾','🔖'];
-    const PROD_ESTADOS = ['Testeando','Ganador','Activo','Pausado','Descartado'];
-    const PROD_ESTADO_COLOR = { Ganador:'badge-green', Testeando:'badge-gold', Activo:'badge-gold', Pausado:'badge-gray', Descartado:'badge-gray' };
+    const PROD_ESTADOS = ['Ganador','Activo','Pausado','Descartado'];
+    const PROD_ESTADO_COLOR = { Ganador:'badge-green', Activo:'badge-gold', Pausado:'badge-gray', Descartado:'badge-gray' };
     const [productos,          setProductos]          = useState([]);
     const [activeProducto,     setActiveProducto]     = useState(null);
     const [productoTab,        setProductoTab]        = useState('general');
@@ -1151,10 +1151,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showProdModal,      setShowProdModal]      = useState(false);
     const [editingProducto,    setEditingProducto]    = useState(null);
     const [savingProd,         setSavingProd]         = useState(false);
-    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Testeando', proveedor:'', imagen:'' });
-    const [editSeccion,        setEditSeccion]        = useState(null); // 'facebook'|'testeo'|'inventario'
+    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'' });
+    const [editSeccion,        setEditSeccion]        = useState(null); // 'facebook'|'inventario'
     const [fbForm,             setFbForm]             = useState({ gastoAds:'', cpa:'', cpm:'', ctr:'', cpc:'', roas:'', cvr:'', frecuencia:'', atc:'', ic:'', aov:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
-    const [testeoForm,         setTesteoForm]         = useState({ resultado:'Pendiente', plataformas:'', notas:'', fecha:'' });
     const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', unidadesVendidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
     const ANALISIS_CHECKS = [
         ['noVenden','¿No lo están vendiendo en mi mercado?','Poca o ninguna competencia pautándolo activamente en RD. Si nadie más lo vende, tienes ventaja; si muchos lo venden, evalúa si puedes diferenciarte.'],
@@ -1180,27 +1179,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     ];
     const ANALISIS_DEFAULT = { precioProveedor:'', proveedor:'', linkAnuncio:'', checks:{}, angulo1Titulo:'', angulo1Desc:'', angulo2Titulo:'', angulo2Desc:'', angulo3Titulo:'', angulo3Desc:'', comp1Nombre:'', comp1Precio:'', comp2Nombre:'', comp2Precio:'', creativoChecks:{}, notas:'' };
     const [analisisForm, setAnalisisForm] = useState(ANALISIS_DEFAULT);
-    const [campanas, setCampanas] = useState([]);
-    const CAMPANA_DEFAULT = { fecha:'', tienda:'', desarrollador:'', producto:'', proceso:'Producto nuevo', categoria:'', variaciones:'', proveedor:'', codigoPlataforma:'', costoProveedor:'', precioVenta:'', cpaBreakeven:'', linkDrive:'', linkLanding:'', reviso:'', cuentaPubli:'', fanpage:'', obsLanding:'', obsCreativo:'' };
-    const [campanaForm, setCampanaForm] = useState(CAMPANA_DEFAULT);
-    const [showCampanaModal, setShowCampanaModal] = useState(false);
-    const [editingCampana, setEditingCampana] = useState(null);
-    const [savingCampana, setSavingCampana] = useState(false);
-    const CAMPANA_PROCESOS = ['Producto nuevo','Migración','Relanzamiento','Pausado'];
-    const saveCampana = async () => {
-        if (!campanaForm.producto || savingCampana) return;
-        setSavingCampana(true);
-        try {
-            if (editingCampana) {
-                await db.collection('campanas').doc(editingCampana.id).update({...campanaForm});
-            } else {
-                await db.collection('campanas').add({...campanaForm, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp()});
-            }
-            setShowCampanaModal(false); setEditingCampana(null); setCampanaForm(CAMPANA_DEFAULT);
-        } catch(err){ console.error('Error guardando campaña:', err); }
-        finally { setSavingCampana(false); }
-    };
-    const deleteCampana = (id) => { db.collection('campanas').doc(id).delete().catch(console.error); };
 
     // ── Tiendas (multi-negocio) ──
     const [tiendas,         setTiendas]         = useState([]);
@@ -1208,6 +1186,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showTiendaModal, setShowTiendaModal] = useState(false);
     const [tiendaForm,      setTiendaForm]      = useState({ nombre: '' });
     const [savingTienda,    setSavingTienda]    = useState(false);
+    const [editingTienda,   setEditingTienda]   = useState(null);
     const firstTiendaRef = useRef(null);
 
     useEffect(() => { try { localStorage.setItem('brumi_active_tienda', activeTiendaId); } catch {} }, [activeTiendaId]);
@@ -1240,14 +1219,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (!tiendaForm.nombre || savingTienda) return;
         setSavingTienda(true);
         try {
-            const ref = db.collection('tiendas').doc();
-            await ref.set({
-                nombre: tiendaForm.nombre.trim(),
-                activa: true,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-            setActiveTiendaId(ref.id);
+            if (editingTienda) {
+                await db.collection('tiendas').doc(editingTienda.id).update({ nombre: tiendaForm.nombre.trim() });
+            } else {
+                const ref = db.collection('tiendas').doc();
+                await ref.set({
+                    nombre: tiendaForm.nombre.trim(),
+                    activa: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+                setActiveTiendaId(ref.id);
+            }
             setTiendaForm({ nombre: '' });
+            setEditingTienda(null);
             setShowTiendaModal(false);
         } catch(err) {
             console.error('Error guardando tienda:', err);
@@ -1255,8 +1239,144 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             setSavingTienda(false);
         }
     };
+    const openEditTienda = t => { setEditingTienda(t); setTiendaForm({ nombre: t.nombre }); setShowTiendaModal(true); };
 
     useEffect(() => { if (showTiendaModal && firstTiendaRef.current) firstTiendaRef.current.focus(); }, [showTiendaModal]);
+
+    // ── Botón "Atrás" del navegador: retrocede dentro del panel en vez de salir ──
+    // Niveles: 0 = dashboard sin nada abierto · 1 = una pestaña del sidebar · 2 = un detalle (producto/tarjeta/categoría) abierto
+    const navDepth = (activeProducto || activePago || activeCat) ? 2 : (activeTab !== 'dashboard' ? 1 : 0);
+    const navDepthRef      = useRef(navDepth);
+    const suppressSyncRef  = useRef(false); // el cambio de estado ya vino de un popstate real: no volver a tocar el history
+    const suppressPopRef   = useRef(false); // el próximo popstate lo disparamos nosotros (history.go): ignorarlo
+
+    useEffect(() => {
+        const onPopState = () => {
+            if (suppressPopRef.current) { suppressPopRef.current = false; return; }
+            suppressSyncRef.current = true;
+            if (activeProducto) return setActiveProducto(null);
+            if (activePago)     return setActivePago(null);
+            if (activeCat)      return setActiveCat(null);
+            if (activeTab !== 'dashboard') return setActiveTab('dashboard');
+        };
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, [activeProducto, activePago, activeCat, activeTab]);
+
+    useEffect(() => {
+        if (suppressSyncRef.current) { suppressSyncRef.current = false; navDepthRef.current = navDepth; return; }
+        const diff = navDepth - navDepthRef.current;
+        if (diff > 0) { for (let i = 0; i < diff; i++) history.pushState({ brumiNav: true }, ''); }
+        else if (diff < 0) { suppressPopRef.current = true; history.go(diff); }
+        navDepthRef.current = navDepth;
+    }, [navDepth]);
+
+    // ── Contabilidad (partida doble, manual, por tienda) ──
+    const CUENTA_TIPOS = ['Activo','Pasivo','Patrimonio','Ingreso','Gasto'];
+    const CUENTA_NATURALEZA = { Activo:'deudora', Gasto:'deudora', Pasivo:'acreedora', Patrimonio:'acreedora', Ingreso:'acreedora' };
+    const CUENTA_TIPO_COLOR = { Activo:'badge-green', Gasto:'badge-gray', Pasivo:'badge-gold', Patrimonio:'badge-gold', Ingreso:'badge-green' };
+    const MONEDAS_CTB = ['USD','DOP'];
+    const [cuentas,          setCuentas]          = useState([]);
+    const [asientos,         setAsientos]         = useState([]);
+    const [contabTab,        setContabTab]        = useState('plan'); // 'plan'|'diario'|'balance'|'resultados'
+    const [contabScope,      setContabScope]      = useState('activa'); // 'activa'|'todas' — solo afecta los reportes
+    const [contabMoneda,     setContabMoneda]     = useState('USD');
+    const [showCuentaModal,  setShowCuentaModal]  = useState(false);
+    const [editingCuenta,    setEditingCuenta]    = useState(null);
+    const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD' });
+    const [savingCuenta,     setSavingCuenta]     = useState(false);
+    const ASIENTO_LINEA_VACIA = { cuentaId:'', debe:'', haber:'' };
+    const [showAsientoModal, setShowAsientoModal] = useState(false);
+    const [asientoForm,      setAsientoForm]      = useState({ fecha:'', descripcion:'', lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}] });
+    const [savingAsiento,    setSavingAsiento]    = useState(false);
+    const [asientoAbierto,   setAsientoAbierto]   = useState(null); // id del asiento expandido en Libro Diario
+    const [balanceFecha,     setBalanceFecha]     = useState('');
+    const [resultDesde,      setResultDesde]      = useState('');
+    const [resultHasta,      setResultHasta]      = useState('');
+
+    useEffect(() => {
+        const unsub = db.collection('cuentas_contables').orderBy('codigo','asc').onSnapshot(
+            snap => setCuentas(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Cuentas contables:', err)
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('asientos_contables').orderBy('fecha','desc').onSnapshot(
+            snap => setAsientos(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Asientos contables:', err)
+        );
+        return unsub;
+    }, []);
+
+    const saveCuenta = async () => {
+        if (!cuentaForm.nombre.trim() || !cuentaForm.codigo.trim() || savingCuenta) return;
+        setSavingCuenta(true);
+        try {
+            const data = { codigo: cuentaForm.codigo.trim(), nombre: cuentaForm.nombre.trim(), tipo: cuentaForm.tipo, moneda: cuentaForm.moneda };
+            if (editingCuenta) {
+                await db.collection('cuentas_contables').doc(editingCuenta.id).update(data);
+            } else {
+                await db.collection('cuentas_contables').add({ ...data, tiendaId: activeTiendaId, activa: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+            setCuentaForm({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD' });
+            setEditingCuenta(null); setShowCuentaModal(false);
+        } catch(err) { console.error('Error guardando cuenta:', err); }
+        finally { setSavingCuenta(false); }
+    };
+    const openEditCuenta = c => { setEditingCuenta(c); setCuentaForm({ codigo:c.codigo, nombre:c.nombre, tipo:c.tipo, moneda:c.moneda }); setShowCuentaModal(true); };
+    const toggleCuentaActiva = c => db.collection('cuentas_contables').doc(c.id).update({ activa: !c.activa }).catch(console.error);
+
+    const asientoLineasValidas = asientoForm.lineas.filter(l => l.cuentaId && (parseFloat(l.debe)>0 || parseFloat(l.haber)>0));
+    const asientoTotalDebe  = asientoLineasValidas.reduce((s,l)=>s+(parseFloat(l.debe)||0),0);
+    const asientoTotalHaber = asientoLineasValidas.reduce((s,l)=>s+(parseFloat(l.haber)||0),0);
+    const asientoMonedas = [...new Set(asientoLineasValidas.map(l => cuentas.find(c=>c.id===l.cuentaId)?.moneda).filter(Boolean))];
+    const asientoMonedaMixta = asientoMonedas.length > 1;
+    const asientoBalanceado = asientoLineasValidas.length>=2 && !asientoMonedaMixta && asientoTotalDebe>0 && Math.abs(asientoTotalDebe-asientoTotalHaber)<0.005;
+
+    const addAsientoLinea = () => setAsientoForm(f => ({...f, lineas:[...f.lineas, {...ASIENTO_LINEA_VACIA}]}));
+    const removeAsientoLinea = i => setAsientoForm(f => ({...f, lineas: f.lineas.filter((_,idx)=>idx!==i)}));
+    const setAsientoLinea = (i, patch) => setAsientoForm(f => ({...f, lineas: f.lineas.map((l,idx)=> idx===i? {...l,...patch} : l)}));
+
+    const saveAsiento = async () => {
+        if (!asientoForm.fecha || !asientoBalanceado || savingAsiento) return;
+        setSavingAsiento(true);
+        try {
+            const lineas = asientoLineasValidas.map(l => {
+                const cuenta = cuentas.find(c=>c.id===l.cuentaId);
+                return { cuentaId: l.cuentaId, cuentaNombre: cuenta?.nombre||'', cuentaCodigo: cuenta?.codigo||'', moneda: cuenta?.moneda||'USD', debe: parseFloat(l.debe)||0, haber: parseFloat(l.haber)||0 };
+            });
+            await db.collection('asientos_contables').add({
+                fecha: asientoForm.fecha, descripcion: asientoForm.descripcion.trim(), tiendaId: activeTiendaId,
+                lineas, totalDebe: asientoTotalDebe, totalHaber: asientoTotalHaber, moneda: lineas[0]?.moneda||'USD',
+                creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            setAsientoForm({ fecha:'', descripcion:'', lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}] });
+            setShowAsientoModal(false);
+        } catch(err) { console.error('Error guardando asiento:', err); }
+        finally { setSavingAsiento(false); }
+    };
+    const deleteAsiento = id => { if (confirm('¿Eliminar este asiento? Esta acción no se puede deshacer.')) db.collection('asientos_contables').doc(id).delete().catch(console.error); };
+
+    // Suma débitos/créditos de un conjunto de asientos por cuenta y calcula el saldo según naturaleza de cada cuenta.
+    const sumarSaldosCtb = (cuentasScope, asientosScope) => {
+        const saldos = {};
+        asientosScope.forEach(a => a.lineas.forEach(l => {
+            if (!saldos[l.cuentaId]) saldos[l.cuentaId] = { debe:0, haber:0 };
+            saldos[l.cuentaId].debe  += l.debe  ||0;
+            saldos[l.cuentaId].haber += l.haber ||0;
+        }));
+        return cuentasScope.map(c => {
+            const s = saldos[c.id] || { debe:0, haber:0 };
+            const saldo = CUENTA_NATURALEZA[c.tipo]==='deudora' ? (s.debe-s.haber) : (s.haber-s.debe);
+            return { ...c, debe:s.debe, haber:s.haber, saldo };
+        });
+    };
+
+    const cuentasCtbScope   = contabScope==='todas' ? cuentas  : cuentas.filter(c=>c.tiendaId===activeTiendaId);
+    const asientosCtbScope  = contabScope==='todas' ? asientos : asientos.filter(a=>a.tiendaId===activeTiendaId);
+    const hoyISO = new Date().toISOString().slice(0,10);
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -1323,18 +1443,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const unsub = db.collection('productos').orderBy('creadoEn','desc').onSnapshot(
             snap => setProductos(snap.docs.map(d=>({id:d.id,...d.data()}))),
             err => console.error('Productos:', err)
-        );
-        return unsub;
-    }, []);
-
-    useEffect(() => {
-        const unsub = db.collection('campanas').onSnapshot(
-            snap => {
-                const docs = snap.docs.map(d=>({id:d.id,...d.data()}));
-                docs.sort((a,b)=>(b.creadoEn?.toDate?.()?.getTime()||0)-(a.creadoEn?.toDate?.()?.getTime()||0));
-                setCampanas(docs);
-            },
-            err => console.error('Campañas:', err)
         );
         return unsub;
     }, []);
@@ -1604,7 +1712,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             nombre: prodForm.nombre, descripcion: prodForm.descripcion,
             estado: prodForm.estado, proveedor: prodForm.proveedor,
             imagen: prodForm.imagen,
-            facebook: editingProducto?.facebook || {}, testeo: editingProducto?.testeo || {}, inventario: editingProducto?.inventario || {},
+            facebook: editingProducto?.facebook || {}, inventario: editingProducto?.inventario || {},
         };
         if (editingProducto) {
             db.collection('productos').doc(editingProducto.id).update(data).catch(console.error);
@@ -1612,7 +1720,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         } else {
             db.collection('productos').add({...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
         }
-        setProdForm({nombre:'',descripcion:'',estado:'Testeando',proveedor:'',imagen:''});
+        setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''});
         setEditingProducto(null); setShowProdModal(false);
     };
 
@@ -1623,7 +1731,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openEditProd = (p) => {
         setEditingProducto(p);
-        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Testeando', proveedor:p.proveedor||'', imagen:p.imagen||''});
+        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', imagen:p.imagen||''});
         setShowProdModal(true);
     };
 
@@ -1660,7 +1768,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const gastosScoped     = gastos.filter(perteneceATienda);
     const productosScoped  = productos.filter(perteneceATienda);
     const cierresScoped    = cierres.filter(perteneceATienda);
-    const campanasScoped   = campanas.filter(perteneceATienda);
 
     const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
     const _mesStr        = new Date().toISOString().slice(0, 7);
@@ -1677,6 +1784,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_book = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
     const I_target = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
     const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
+    const I_balanza = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M12 6 5 6l3.5 8a3.5 3.5 0 0 0 7 0L19 6l-7 0"/><line x1="7" y1="20" x2="17" y2="20"/></svg>;
 
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
@@ -1685,8 +1793,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'gastos',      label: 'Gastos',      icon: I.dollar },
             { key: 'ganadores',   label: 'Productos', icon: I_star },
-            { key: 'campanas',    label: 'Planeación Campañas', icon: I_target },
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
+            { key: 'contabilidad', label: 'Contabilidad', icon: I_balanza },
         ]},
         { label: 'Herramientas', items: [
             { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
@@ -1716,7 +1824,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             {showCmdK && (() => {
                 const acciones = [
                     { label: 'Nuevo gasto',            icon: I.dollar, kind: 'Acción', run: () => { setActiveTab('gastos'); setShowGastoModal(true); } },
-                    { label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Testeando',proveedor:'',imagen:''}); setShowProdModal(true); } },
+                    { label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''}); setShowProdModal(true); } },
                     { label: 'Nuevo vendedor',         icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
                     { label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
                     { label: 'Exportar gastos a CSV',  icon: I.chart,  kind: 'Acción', run: exportGastosCSV },
@@ -1985,7 +2093,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 {activeTab === 'tiendas' && <>
                     <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                         <div><h1>Tiendas</h1><p>Cada tienda tiene sus propios vendedores, gastos, productos, campañas y cierres</p></div>
-                        <button className="btn btn-gold" onClick={()=>{setTiendaForm({nombre:''});setShowTiendaModal(true);}}>{I.plus} Nueva tienda</button>
+                        <button className="btn btn-gold" onClick={()=>{setEditingTienda(null);setTiendaForm({nombre:''});setShowTiendaModal(true);}}>{I.plus} Nueva tienda</button>
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))',gap:12}}>
                         {tiendas.map(t => {
@@ -1998,7 +2106,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     style={{padding:'20px 22px',cursor:'pointer',border:isActive?'1.5px solid var(--orange)':undefined,background:isActive?'var(--orange-dim)':undefined}}>
                                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                                         <strong style={{fontSize:14}}>{t.nombre}</strong>
-                                        {isActive && <span className="badge badge-gold"><span className="badge-dot"/>Activa</span>}
+                                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                            {isActive && <span className="badge badge-gold"><span className="badge-dot"/>Activa</span>}
+                                            <button className="btn btn-glass btn-sm" onClick={e=>{e.stopPropagation();openEditTienda(t);}} title="Editar nombre">{I.edit}</button>
+                                        </div>
                                     </div>
                                     <div style={{fontSize:12,color:'var(--text-dim)'}}>{nVend} vendedor{nVend!==1?'es':''} · {nGasto} gasto{nGasto!==1?'s':''} · {nProd} producto{nProd!==1?'s':''}</div>
                                 </div>
@@ -2015,7 +2126,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                 <div><h1>Productos Ganadores</h1><p>Gestiona y analiza tus mejores productos</p></div>
-                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeando',proveedor:'',imagen:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
+                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
                             </div>
                             {productos.length===0 ? (
                                 <div className="card glass"><div className="empty">
@@ -2029,7 +2140,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         const vendido = parseFloat(inv.unidadesVendidas||0);
                                         const pedido  = parseFloat(inv.unidadesPedidas||0);
                                         return (
-                                            <div key={p.id} className="card glass" style={{cursor:'pointer',transition:'transform var(--t-fast),box-shadow var(--t-fast)',overflow:'visible'}}
+                                            <div key={p.id} className="card glass" style={{cursor:'pointer',transition:'transform var(--t-fast),box-shadow var(--t-fast)'}}
                                                 onClick={()=>{setActiveProducto(p);setProductoTab('general');setEditSeccion(null);}}
                                                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)';}}
                                                 onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
@@ -2043,7 +2154,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 </div>
                                                 <div style={{padding:'14px 16px'}}>
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
-                                                    {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8}}>{p.proveedor}</div>}
+                                                    {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={p.proveedor}>{p.proveedor}</div>}
                                                     <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
                                                         {pedido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span>/{pedido} vendidos</div>}
                                                         {fb.roas&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}>ROAS <span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--sand-dark)'}}>{fb.roas}x</span></div>}
@@ -2109,10 +2220,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                     // ── Detalle de producto ──
                     const p = productos.find(x=>x.id===activeProducto.id) || activeProducto;
-                    const fb = p.facebook||{}; const testeo = p.testeo||{}; const inv = p.inventario||{};
+                    const fb = p.facebook||{}; const inv = p.inventario||{};
                     const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
                     const gananciaTotal = gananciaUnit * parseFloat(inv.unidadesVendidas||0);
-                    const TABS = ['General','Análisis','Contenido','Facebook','Testeo','Inventario'];
+                    const TABS = ['General','Análisis','Contenido','Facebook','Inventario'];
                     const CONTENT_GROUPS = [
                         { key: 'shopify', label: 'SHOPIFY', items: [
                             { key: 'imagenProducto',   label: 'Imagen Producto',           desc: 'Cantidad mínima: 4 imágenes' },
@@ -2428,70 +2539,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         </div>
                                     )}
                                 </>
-                            )}
-
-                            {/* ── Tab Testeo ── */}
-                            {productoTab==='testeo' && (
-                                editSeccion==='testeo' ? (
-                                    <div className="card glass" style={{padding:'24px'}}>
-                                        <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar resultado de testeo</div>
-                                        <div className="form-group">
-                                            <label style={{color:'var(--text-dim)'}}>Resultado</label>
-                                            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                                                {['Pendiente','Exitoso','Parcial','Fallido'].map(r=>(
-                                                    <button key={r} className={`btn btn-sm ${testeoForm.resultado===r?'btn-gold':'btn-glass'}`}
-                                                        onClick={()=>setTesteoForm(f=>({...f,resultado:r}))}>{r}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div className="form-group">
-                                            <label style={{color:'var(--text-dim)'}}>Plataformas testeadas</label>
-                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                value={testeoForm.plataformas||''} onChange={e=>setTesteoForm(f=>({...f,plataformas:e.target.value}))} placeholder="Ej. Facebook, TikTok, Instagram" />
-                                        </div>
-                                        <div className="form-group">
-                                            <label style={{color:'var(--text-dim)'}}>Fecha del testeo</label>
-                                            <input type="date" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                value={testeoForm.fecha||''} onChange={e=>setTesteoForm(f=>({...f,fecha:e.target.value}))} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label style={{color:'var(--text-dim)'}}>Notas del testeo</label>
-                                            <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'100px',resize:'vertical'}}
-                                                value={testeoForm.notas||''} onChange={e=>setTesteoForm(f=>({...f,notas:e.target.value}))} placeholder="Observaciones, resultados, aprendizajes..." />
-                                        </div>
-                                        <div style={{display:'flex',gap:10,marginTop:4}}>
-                                            <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
-                                            <button className="btn btn-gold" onClick={()=>saveSeccion(p.id,'testeo',testeoForm)}>Guardar Testeo</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="card glass">
-                                        <div style={{padding:'16px 20px',display:'flex',justifyContent:'space-between',borderBottom:'1px solid var(--glass-border)'}}>
-                                            <span style={{fontWeight:'700',fontSize:'13px'}}>Resultado del testeo en redes</span>
-                                            <button className="btn btn-glass btn-sm" onClick={()=>{setTesteoForm({resultado:testeo.resultado||'Pendiente',plataformas:testeo.plataformas||'',notas:testeo.notas||'',fecha:testeo.fecha||''});setEditSeccion('testeo');}}>✎ Editar</button>
-                                        </div>
-                                        <div style={{padding:'24px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
-                                            <div>
-                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Resultado</div>
-                                                <span className={`badge ${testeo.resultado==='Exitoso'?'badge-green':testeo.resultado==='Fallido'?'badge-gray':testeo.resultado==='Parcial'?'badge-gold':'badge-gray'}`} style={{fontSize:'13px',padding:'4px 12px'}}>
-                                                    <span className="badge-dot"/>{testeo.resultado||'Sin registrar'}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Plataformas</div>
-                                                <div style={{fontSize:'13px',color:'var(--text)'}}>{testeo.plataformas||'—'}</div>
-                                            </div>
-                                            {testeo.fecha&&<div>
-                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Fecha</div>
-                                                <div style={{fontFamily:'Fira Code',fontSize:'13px',color:'var(--text)'}}>{testeo.fecha}</div>
-                                            </div>}
-                                            {testeo.notas&&<div style={{gridColumn:'1/-1'}}>
-                                                <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Notas</div>
-                                                <div style={{fontSize:'13px',color:'var(--text)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{testeo.notas}</div>
-                                            </div>}
-                                        </div>
-                                    </div>
-                                )
                             )}
 
                             {/* ── Tab Inventario ── */}
@@ -2937,99 +2984,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         </div>
                     </div>
-                    )}
-                    </>;
-                })()}
-
-                {activeTab === 'campanas' && (() => {
-                    const campanas = campanasScoped; // filtrado por tienda activa
-                    const fmtMoney = v => { const x=parseFloat(v); return isFinite(x)? 'RD$'+x.toLocaleString('es-DO') : '—'; };
-                    const procColor = p => p==='Producto nuevo'?'badge-green':p==='Relanzamiento'?'badge-gold':p==='Migración'?'badge-gold':'badge-gray';
-                    return <>
-                    <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
-                        <div><h1>Planeación de Campañas 🎯</h1><p>Control de productos en proceso: proveedor, costos, links y observaciones.</p></div>
-                        <button className="btn btn-gold" onClick={()=>{setEditingCampana(null);setCampanaForm(CAMPANA_DEFAULT);setShowCampanaModal(true);}}>{I.plus} Nueva campaña</button>
-                    </div>
-                    {campanas.length===0 ? (
-                        <div className="card glass"><div className="empty"><div className="empty-icon">{I_target}</div><h3>Sin campañas aún</h3><p>Registra tu primer producto en planeación.</p></div></div>
-                    ) : (
-                        <div className="card glass" style={{overflowX:'auto'}}>
-                            <table style={{minWidth:980}}>
-                                <thead><tr>
-                                    <th>Producto</th><th>Tienda</th><th>Proceso</th><th>Categoría</th><th>Proveedor</th><th>Costo</th><th>Precio</th><th>CPA B.E.</th><th>Links</th><th></th>
-                                </tr></thead>
-                                <tbody>
-                                    {campanas.map(c=>(
-                                        <tr key={c.id}>
-                                            <td><strong>{c.producto||'—'}</strong>{c.desarrollador && <div style={{fontSize:'11px',color:'var(--text-dimmer)'}}>{c.desarrollador}</div>}</td>
-                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{c.tienda||'—'}</td>
-                                            <td>{c.proceso ? <span className={`badge ${procColor(c.proceso)}`}><span className="badge-dot"/>{c.proceso}</span> : '—'}</td>
-                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{c.categoria||'—'}</td>
-                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{c.proveedor||'—'}</td>
-                                            <td className="td-num" style={{fontSize:'12px'}}>{fmtMoney(c.costoProveedor)}</td>
-                                            <td className="td-num" style={{fontSize:'12px'}}>{fmtMoney(c.precioVenta)}</td>
-                                            <td className="td-num" style={{fontSize:'12px',color:'var(--orange)'}}>{fmtMoney(c.cpaBreakeven)}</td>
-                                            <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>
-                                                {c.linkDrive && <a href={c.linkDrive} target="_blank" rel="noopener" style={{color:'var(--orange)',marginRight:8}}>Drive</a>}
-                                                {c.linkLanding && <a href={c.linkLanding} target="_blank" rel="noopener" style={{color:'var(--orange)'}}>Landing</a>}
-                                                {!c.linkDrive && !c.linkLanding && '—'}
-                                            </td>
-                                            <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
-                                                <button className="btn btn-glass btn-sm" onClick={()=>{setEditingCampana(c);setCampanaForm({...CAMPANA_DEFAULT,...c});setShowCampanaModal(true);}}>✎</button>
-                                                <button className="btn btn-glass btn-sm" style={{marginLeft:6,color:'#A03B3B'}} onClick={()=>{if(confirm('¿Eliminar esta campaña?'))deleteCampana(c.id);}}>×</button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                    {showCampanaModal && (
-                        <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowCampanaModal(false);setEditingCampana(null);}}}>
-                            <div className="modal glass glass-high" style={{maxWidth:680}}>
-                                <div className="modal-hd">
-                                    <h2>{editingCampana?'Editar campaña':'Nueva campaña'}</h2>
-                                    <button className="modal-close" onClick={()=>{setShowCampanaModal(false);setEditingCampana(null);}}>×</button>
-                                </div>
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                                    {[
-                                        {k:'producto',l:'Producto *',ph:'Nombre del producto'},
-                                        {k:'tienda',l:'Tienda',ph:'Ej. CHOOP COL'},
-                                        {k:'desarrollador',l:'Desarrollador',ph:'Quién lo trabaja'},
-                                        {k:'categoria',l:'Categoría',ph:'Ej. Mascotas'},
-                                        {k:'proveedor',l:'Proveedor',ph:'Ej. Dropi'},
-                                        {k:'codigoPlataforma',l:'Código plataforma',ph:''},
-                                        {k:'variaciones',l:'Variaciones',ph:'Ej. No tiene'},
-                                        {k:'fecha',l:'Fecha',ph:'',type:'date'},
-                                        {k:'costoProveedor',l:'Costo proveedor (RD$)',ph:'0',type:'number'},
-                                        {k:'precioVenta',l:'Precio de venta (RD$)',ph:'0',type:'number'},
-                                        {k:'cpaBreakeven',l:'CPA Break Even (RD$)',ph:'0',type:'number'},
-                                        {k:'reviso',l:'Revisó',ph:''},
-                                        {k:'cuentaPubli',l:'Cuenta publicitaria',ph:''},
-                                        {k:'fanpage',l:'FanPage',ph:''},
-                                        {k:'linkDrive',l:'Link carpeta Drive',ph:'https://...'},
-                                        {k:'linkLanding',l:'Link landing',ph:'https://...'},
-                                    ].map(({k,l,ph,type})=>(
-                                        <div key={k} className="form-group" style={{marginBottom:0}}>
-                                            <label style={{color:'var(--text-dim)'}}>{l}</label>
-                                            <input type={type||'text'} className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder={ph} value={campanaForm[k]||''} onChange={e=>setCampanaForm(f=>({...f,[k]:e.target.value}))} />
-                                        </div>
-                                    ))}
-                                    <div className="form-group" style={{marginBottom:0}}>
-                                        <label style={{color:'var(--text-dim)'}}>Proceso</label>
-                                        <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={campanaForm.proceso} onChange={e=>setCampanaForm(f=>({...f,proceso:e.target.value}))}>
-                                            {CAMPANA_PROCESOS.map(p=><option key={p} value={p}>{p}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="form-group" style={{marginTop:12}}><label style={{color:'var(--text-dim)'}}>Observación de landing</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'56px',resize:'vertical'}} value={campanaForm.obsLanding} onChange={e=>setCampanaForm(f=>({...f,obsLanding:e.target.value}))} /></div>
-                                <div className="form-group"><label style={{color:'var(--text-dim)'}}>Observación de creativo</label><textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'56px',resize:'vertical'}} value={campanaForm.obsCreativo} onChange={e=>setCampanaForm(f=>({...f,obsCreativo:e.target.value}))} /></div>
-                                <div className="modal-actions">
-                                    <button className="btn btn-glass" onClick={()=>{setShowCampanaModal(false);setEditingCampana(null);}}>Cancelar</button>
-                                    <button className="btn btn-gold" onClick={saveCampana} disabled={!campanaForm.producto||savingCampana} style={{flex:1,justifyContent:'center'}}>{editingCampana?'Guardar cambios':'Crear campaña'}</button>
-                                </div>
-                            </div>
-                        </div>
                     )}
                     </>;
                 })()}
@@ -3701,6 +3655,213 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                 {activeTab === 'cierre' && <CierreDiario productos={productosScoped} user={user} tiendaId={activeTiendaId} />}
 
+                {activeTab === 'contabilidad' && (() => {
+                    const fmtCtb = (v, m) => `${m==='DOP'?'RD$':'$'}${(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                    const CONTAB_SUBTABS = [['plan','Plan de Cuentas'],['diario','Libro Diario'],['balance','Balance General'],['resultados','Estado de Resultados']];
+                    return <>
+                    <div className="page-header"><h1>Contabilidad</h1><p>Plan de cuentas, libro diario y reportes por partida doble — módulo manual, independiente de Gastos y Cierre Diario.</p></div>
+                    <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
+                        {CONTAB_SUBTABS.map(([k,l]) => (
+                            <button key={k} className={`btn btn-sm ${contabTab===k?'btn-gold':'btn-glass'}`} onClick={()=>setContabTab(k)}>{l}</button>
+                        ))}
+                    </div>
+
+                    {contabTab==='plan' && (() => {
+                        const misCuentas = cuentas.filter(c=>c.tiendaId===activeTiendaId);
+                        return <>
+                        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
+                            <button className="btn btn-gold" onClick={()=>{setEditingCuenta(null);setCuentaForm({codigo:'',nombre:'',tipo:'Activo',moneda:'USD'});setShowCuentaModal(true);}}>{I.plus} Nueva cuenta</button>
+                        </div>
+                        {misCuentas.length===0 ? (
+                            <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin cuentas aún</h3><p>Crea tu plan de cuentas para empezar a registrar asientos.</p></div></div>
+                        ) : CUENTA_TIPOS.map(tipo => {
+                            const delTipo = misCuentas.filter(c=>c.tipo===tipo);
+                            if (!delTipo.length) return null;
+                            return (
+                                <div key={tipo} className="card glass" style={{marginBottom:14,overflowX:'auto'}}>
+                                    <div style={{padding:'14px 18px',borderBottom:'1px solid var(--glass-border)',fontWeight:'700',fontSize:'13px'}}>{tipo}</div>
+                                    <table style={{minWidth:520}}>
+                                        <thead><tr><th>Código</th><th>Nombre</th><th>Moneda</th><th>Estado</th><th></th></tr></thead>
+                                        <tbody>
+                                            {delTipo.map(c=>(
+                                                <tr key={c.id} style={{opacity:c.activa===false?0.5:1}}>
+                                                    <td style={{fontFamily:'Fira Code',fontSize:'12px'}}>{c.codigo}</td>
+                                                    <td><strong>{c.nombre}</strong></td>
+                                                    <td>{c.moneda}</td>
+                                                    <td><span className={`badge ${c.activa===false?'badge-gray':'badge-green'}`}><span className="badge-dot"/>{c.activa===false?'Inactiva':'Activa'}</span></td>
+                                                    <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
+                                                        <button className="btn btn-glass btn-sm" onClick={()=>openEditCuenta(c)}>{I.edit}</button>
+                                                        <button className="btn btn-glass btn-sm" style={{marginLeft:6}} onClick={()=>toggleCuentaActiva(c)}>{c.activa===false?'Activar':'Desactivar'}</button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            );
+                        })}
+                        </>;
+                    })()}
+
+                    {contabTab==='diario' && (() => {
+                        const misAsientos = asientos.filter(a=>a.tiendaId===activeTiendaId);
+                        return <>
+                        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
+                            <button className="btn btn-gold" disabled={cuentas.filter(c=>c.tiendaId===activeTiendaId).length<2}
+                                onClick={()=>{setAsientoForm({fecha:hoyISO,descripcion:'',lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}]});setShowAsientoModal(true);}}>{I.plus} Nuevo asiento</button>
+                        </div>
+                        {cuentas.filter(c=>c.tiendaId===activeTiendaId).length<2 && (
+                            <div className="card glass" style={{padding:'14px 18px',marginBottom:14,fontSize:'12px',color:'var(--text-dim)'}}>Necesitas al menos 2 cuentas en tu Plan de Cuentas antes de crear un asiento.</div>
+                        )}
+                        {misAsientos.length===0 ? (
+                            <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin asientos aún</h3><p>Registra tu primer asiento contable.</p></div></div>
+                        ) : (
+                            <div className="card glass" style={{overflowX:'auto'}}>
+                                <table style={{minWidth:640}}>
+                                    <thead><tr><th>Fecha</th><th>Descripción</th><th>Moneda</th><th>Debe</th><th>Haber</th><th></th></tr></thead>
+                                    <tbody>
+                                        {misAsientos.map(a=>(
+                                            <React.Fragment key={a.id}>
+                                                <tr style={{cursor:'pointer'}} onClick={()=>setAsientoAbierto(x=>x===a.id?null:a.id)}>
+                                                    <td style={{fontFamily:'Fira Code',fontSize:'12px'}}>{a.fecha}</td>
+                                                    <td>{a.descripcion||'—'}</td>
+                                                    <td>{a.moneda}</td>
+                                                    <td className="td-num">{fmtCtb(a.totalDebe,a.moneda)}</td>
+                                                    <td className="td-num">{fmtCtb(a.totalHaber,a.moneda)}</td>
+                                                    <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
+                                                        <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={e=>{e.stopPropagation();deleteAsiento(a.id);}}>×</button>
+                                                    </td>
+                                                </tr>
+                                                {asientoAbierto===a.id && (
+                                                    <tr><td colSpan={6} style={{background:'var(--surface-2)',padding:'10px 18px'}}>
+                                                        <table style={{width:'100%',fontSize:'12px'}}>
+                                                            <thead><tr><th>Cuenta</th><th>Debe</th><th>Haber</th></tr></thead>
+                                                            <tbody>
+                                                                {a.lineas.map((l,i)=>(
+                                                                    <tr key={i}>
+                                                                        <td>{l.cuentaCodigo} — {l.cuentaNombre}</td>
+                                                                        <td className="td-num">{l.debe>0?fmtCtb(l.debe,l.moneda):'—'}</td>
+                                                                        <td className="td-num">{l.haber>0?fmtCtb(l.haber,l.moneda):'—'}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </td></tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        </>;
+                    })()}
+
+                    {(contabTab==='balance' || contabTab==='resultados') && (() => {
+                        const cuentasScope  = cuentasCtbScope.filter(c=>c.moneda===contabMoneda);
+                        const filtrosBar = (
+                            <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:18}}>
+                                <select className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={contabScope} onChange={e=>setContabScope(e.target.value)}>
+                                    <option value="activa">Esta tienda</option>
+                                    <option value="todas">Todas las tiendas (consolidado)</option>
+                                </select>
+                                <select className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={contabMoneda} onChange={e=>setContabMoneda(e.target.value)}>
+                                    {MONEDAS_CTB.map(m=><option key={m} value={m}>{m}</option>)}
+                                </select>
+                            </div>
+                        );
+
+                        if (contabTab==='balance') {
+                            const corte = balanceFecha || hoyISO;
+                            const asientosHasta = asientosCtbScope.filter(a=>a.fecha<=corte);
+                            const saldos = sumarSaldosCtb(cuentasScope, asientosHasta);
+                            const activos    = saldos.filter(c=>c.tipo==='Activo');
+                            const pasivos    = saldos.filter(c=>c.tipo==='Pasivo');
+                            const patrimonio = saldos.filter(c=>c.tipo==='Patrimonio');
+                            const ingresos   = saldos.filter(c=>c.tipo==='Ingreso');
+                            const gastosCt   = saldos.filter(c=>c.tipo==='Gasto');
+                            const totalActivos    = activos.reduce((s,c)=>s+c.saldo,0);
+                            const totalPasivos    = pasivos.reduce((s,c)=>s+c.saldo,0);
+                            const totalPatrimBase = patrimonio.reduce((s,c)=>s+c.saldo,0);
+                            const totalIngresos   = ingresos.reduce((s,c)=>s+c.saldo,0);
+                            const totalGastosCt   = gastosCt.reduce((s,c)=>s+c.saldo,0);
+                            const utilidadAcum    = totalIngresos - totalGastosCt;
+                            const totalPatrimonio = totalPatrimBase + utilidadAcum;
+                            const cuadra = Math.abs(totalActivos-(totalPasivos+totalPatrimonio))<0.01;
+                            const Bloque = ({titulo,items,total}) => (
+                                <div className="card glass" style={{padding:'18px 20px'}}>
+                                    <div style={{fontWeight:'700',fontSize:'13px',marginBottom:12}}>{titulo}</div>
+                                    {items.length===0 ? <p style={{fontSize:'12px',color:'var(--text-dimmer)'}}>Sin cuentas</p> : items.map(c=>(
+                                        <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'4px 0',color:'var(--text-dim)'}}>
+                                            <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,contabMoneda)}</span>
+                                        </div>
+                                    ))}
+                                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',fontWeight:'700',marginTop:10,paddingTop:10,borderTop:'1px solid var(--glass-border)'}}>
+                                        <span>Total</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(total,contabMoneda)}</span>
+                                    </div>
+                                </div>
+                            );
+                            return <>
+                            {filtrosBar}
+                            <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:18}}>
+                                <label style={{fontSize:'12px',color:'var(--text-dim)'}}>Fecha de corte</label>
+                                <input type="date" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={corte} onChange={e=>setBalanceFecha(e.target.value)} />
+                                <span className={`badge ${cuadra?'badge-green':'badge-gray'}`} style={{marginLeft:'auto'}}><span className="badge-dot"/>{cuadra?'Cuadra':'No cuadra'}</span>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:14}}>
+                                <Bloque titulo="Activos" items={activos} total={totalActivos} />
+                                <Bloque titulo="Pasivos" items={pasivos} total={totalPasivos} />
+                                <Bloque titulo="Patrimonio" items={[...patrimonio, ...(utilidadAcum!==0?[{id:'_util',nombre:'Utilidad del período (no distribuida)',saldo:utilidadAcum}]:[])]} total={totalPatrimonio} />
+                            </div>
+                            </>;
+                        }
+
+                        // ── Estado de Resultados ──
+                        const desde = resultDesde || hoyISO.slice(0,8)+'01';
+                        const hasta = resultHasta || hoyISO;
+                        const asientosPeriodo = asientosCtbScope.filter(a=>a.fecha>=desde && a.fecha<=hasta);
+                        const saldosP = sumarSaldosCtb(cuentasScope, asientosPeriodo);
+                        const ingresosP = saldosP.filter(c=>c.tipo==='Ingreso');
+                        const gastosP   = saldosP.filter(c=>c.tipo==='Gasto');
+                        const totalIngP = ingresosP.reduce((s,c)=>s+c.saldo,0);
+                        const totalGasP = gastosP.reduce((s,c)=>s+c.saldo,0);
+                        const utilidad  = totalIngP - totalGasP;
+                        return <>
+                        {filtrosBar}
+                        <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:18,flexWrap:'wrap'}}>
+                            <label style={{fontSize:'12px',color:'var(--text-dim)'}}>Desde</label>
+                            <input type="date" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={desde} onChange={e=>setResultDesde(e.target.value)} />
+                            <label style={{fontSize:'12px',color:'var(--text-dim)'}}>Hasta</label>
+                            <input type="date" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={hasta} onChange={e=>setResultHasta(e.target.value)} />
+                        </div>
+                        <div className="card glass" style={{padding:'20px 22px'}}>
+                            <div style={{fontWeight:'700',fontSize:'13px',marginBottom:10}}>Ingresos</div>
+                            {ingresosP.length===0 ? <p style={{fontSize:'12px',color:'var(--text-dimmer)'}}>Sin ingresos en el período</p> : ingresosP.map(c=>(
+                                <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'4px 0',color:'var(--text-dim)'}}>
+                                    <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,contabMoneda)}</span>
+                                </div>
+                            ))}
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',fontWeight:'700',margin:'8px 0',paddingTop:8,borderTop:'1px solid var(--glass-border)'}}>
+                                <span>Total ingresos</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(totalIngP,contabMoneda)}</span>
+                            </div>
+                            <div style={{fontWeight:'700',fontSize:'13px',margin:'18px 0 10px'}}>Gastos</div>
+                            {gastosP.length===0 ? <p style={{fontSize:'12px',color:'var(--text-dimmer)'}}>Sin gastos en el período</p> : gastosP.map(c=>(
+                                <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'4px 0',color:'var(--text-dim)'}}>
+                                    <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,contabMoneda)}</span>
+                                </div>
+                            ))}
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',fontWeight:'700',margin:'8px 0',paddingTop:8,borderTop:'1px solid var(--glass-border)'}}>
+                                <span>Total gastos</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(totalGasP,contabMoneda)}</span>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:'15px',fontWeight:'800',marginTop:16,paddingTop:14,borderTop:'2px solid var(--glass-border)',color:utilidad>=0?'var(--sand-dark)':'#A03B3B'}}>
+                                <span>Utilidad neta</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(utilidad,contabMoneda)}</span>
+                            </div>
+                        </div>
+                        </>;
+                    })()}
+                    </>;
+                })()}
+
                 {showModal && (
                     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}>
                         <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
@@ -3729,11 +3890,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 )}
 
                 {showTiendaModal && (
-                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowTiendaModal(false); }}>
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowTiendaModal(false); setEditingTienda(null); } }}>
                         <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
                             <div className="modal-hd">
-                                <h2>Nueva Tienda</h2>
-                                <button className="modal-close" onClick={() => setShowTiendaModal(false)}>×</button>
+                                <h2>{editingTienda ? 'Editar Tienda' : 'Nueva Tienda'}</h2>
+                                <button className="modal-close" onClick={() => { setShowTiendaModal(false); setEditingTienda(null); }}>×</button>
                             </div>
                             <div className="form-group">
                                 <label style={{color:'var(--text-dim)'}}>Nombre de la tienda</label>
@@ -3742,9 +3903,108 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     placeholder="Ej. Brumi Shop" onKeyDown={e => e.key === 'Enter' && addTienda()} />
                             </div>
                             <div className="modal-actions">
-                                <button className="btn btn-glass" onClick={() => setShowTiendaModal(false)}>Cancelar</button>
+                                <button className="btn btn-glass" onClick={() => { setShowTiendaModal(false); setEditingTienda(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={addTienda} disabled={savingTienda}>
-                                    {savingTienda ? 'Guardando...' : <>{I.plus} Crear Tienda</>}
+                                    {savingTienda ? 'Guardando...' : (editingTienda ? <>{I.edit} Guardar</> : <>{I.plus} Crear Tienda</>)}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showCuentaModal && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowCuentaModal(false); setEditingCuenta(null); } }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
+                            <div className="modal-hd">
+                                <h2>{editingCuenta ? 'Editar Cuenta' : 'Nueva Cuenta'}</h2>
+                                <button className="modal-close" onClick={() => { setShowCuentaModal(false); setEditingCuenta(null); }}>×</button>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{color:'var(--text-dim)'}}>Código</label>
+                                    <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={cuentaForm.codigo} onChange={e=>setCuentaForm(f=>({...f,codigo:e.target.value}))} placeholder="Ej. 1000" />
+                                </div>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{color:'var(--text-dim)'}}>Moneda</label>
+                                    <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={cuentaForm.moneda} onChange={e=>setCuentaForm(f=>({...f,moneda:e.target.value}))}>
+                                        {MONEDAS_CTB.map(m=><option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Nombre de la cuenta</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={cuentaForm.nombre} onChange={e=>setCuentaForm(f=>({...f,nombre:e.target.value}))}
+                                    placeholder="Ej. Caja, Banco Popular USD, Ventas..." onKeyDown={e=>e.key==='Enter'&&saveCuenta()} />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Tipo</label>
+                                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                    {CUENTA_TIPOS.map(t=>(
+                                        <button key={t} className={`btn btn-sm ${cuentaForm.tipo===t?'btn-gold':'btn-glass'}`} onClick={()=>setCuentaForm(f=>({...f,tipo:t}))}>{t}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={() => { setShowCuentaModal(false); setEditingCuenta(null); }}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={saveCuenta} disabled={!cuentaForm.nombre.trim()||!cuentaForm.codigo.trim()||savingCuenta}>
+                                    {savingCuenta ? 'Guardando...' : (editingCuenta ? <>{I.edit} Guardar</> : <>{I.plus} Crear Cuenta</>)}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showAsientoModal && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAsientoModal(false); }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:640}}>
+                            <div className="modal-hd">
+                                <h2>Nuevo Asiento</h2>
+                                <button className="modal-close" onClick={() => setShowAsientoModal(false)}>×</button>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12,marginBottom:12}}>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{color:'var(--text-dim)'}}>Fecha</label>
+                                    <input type="date" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={asientoForm.fecha} onChange={e=>setAsientoForm(f=>({...f,fecha:e.target.value}))} />
+                                </div>
+                                <div className="form-group" style={{marginBottom:0}}>
+                                    <label style={{color:'var(--text-dim)'}}>Descripción</label>
+                                    <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={asientoForm.descripcion} onChange={e=>setAsientoForm(f=>({...f,descripcion:e.target.value}))} placeholder="Ej. Pago de alquiler de julio" />
+                                </div>
+                            </div>
+                            {asientoForm.lineas.map((l,i)=>(
+                                <div key={i} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,marginBottom:8,alignItems:'center'}}>
+                                    <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={l.cuentaId} onChange={e=>setAsientoLinea(i,{cuentaId:e.target.value})}>
+                                        <option value="">Selecciona una cuenta…</option>
+                                        {cuentas.filter(c=>c.tiendaId===activeTiendaId && c.activa!==false).map(c=>(
+                                            <option key={c.id} value={c.id}>{c.codigo} — {c.nombre} ({c.moneda})</option>
+                                        ))}
+                                    </select>
+                                    <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={l.debe} onChange={e=>setAsientoLinea(i,{debe:e.target.value, haber: e.target.value ? '' : l.haber})} placeholder="Debe" />
+                                    <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={l.haber} onChange={e=>setAsientoLinea(i,{haber:e.target.value, debe: e.target.value ? '' : l.debe})} placeholder="Haber" />
+                                    <button className="btn btn-glass btn-sm" disabled={asientoForm.lineas.length<=2} onClick={()=>removeAsientoLinea(i)}>×</button>
+                                </div>
+                            ))}
+                            <button className="btn btn-glass btn-sm" onClick={addAsientoLinea} style={{marginBottom:16}}>{I.plus} Agregar línea</button>
+                            {asientoMonedaMixta && (
+                                <div style={{fontSize:'12px',color:'#A03B3B',marginBottom:10}}>Todas las líneas de un mismo asiento deben usar cuentas de la misma moneda.</div>
+                            )}
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',padding:'10px 0',borderTop:'1px solid var(--glass-border)'}}>
+                                <span>Debe: <strong style={{fontFamily:'Fira Code'}}>{asientoTotalDebe.toFixed(2)}</strong></span>
+                                <span>Haber: <strong style={{fontFamily:'Fira Code'}}>{asientoTotalHaber.toFixed(2)}</strong></span>
+                                <span className={`badge ${asientoBalanceado?'badge-green':'badge-gray'}`}><span className="badge-dot"/>{asientoBalanceado?'Balanceado':'Descuadrado'}</span>
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={() => setShowAsientoModal(false)}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={saveAsiento} disabled={!asientoForm.fecha||!asientoBalanceado||savingAsiento}>
+                                    {savingAsiento ? 'Guardando...' : <>{I.plus} Crear Asiento</>}
                                 </button>
                             </div>
                         </div>

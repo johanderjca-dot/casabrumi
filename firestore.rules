@@ -71,6 +71,10 @@ service cloud.firestore {
     // ── campanas ── Planeacion de Campanas, solo master
     match /campanas/{id}   { allow read, write: if isMaster(); }
 
+    // ── contabilidad (partida doble, manual) ── solo el master la ve y gestiona
+    match /cuentas_contables/{id}  { allow read, write: if isMaster(); }
+    match /asientos_contables/{id} { allow read, write: if isMaster(); }
+
     // cualquier otra coleccion no listada: denegada por defecto
     match /{document=**} {
       allow read, write: if false;
