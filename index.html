@@ -394,6 +394,22 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 db.settings({ experimentalForceLongPolling: true, merge: true });
+
+// App secundaria de Firebase: crea cuentas de usuarios nuevos sin cerrar la sesión del master
+// (el SDK de cliente cambia la sesión activa a la cuenta recién creada si se usa la app principal).
+const crearUsuarioConAuth = async (email, password) => {
+    const secApp = firebase.apps.find(a => a.name === 'Secondary') || firebase.initializeApp(firebaseConfig, 'Secondary');
+    const secAuth = secApp.auth();
+    try {
+        const cred = await secAuth.createUserWithEmailAndPassword(email, password);
+        const uid = cred.user.uid;
+        await secAuth.signOut();
+        return uid;
+    } catch (err) {
+        try { await secAuth.signOut(); } catch(e) {}
+        throw err;
+    }
+};
 </script>
 
 <script type="text/babel">
@@ -768,23 +784,25 @@ function CierreDiario({ productos, user, tiendaId }) {
 // ── APP ──
 function App() {
     const [user,       setUser]       = useState(null);
+    const [vendedorAutorizado, setVendedorAutorizado] = useState(null); // null=verificando, true/false
     const [loading,    setLoading]    = useState(true);
     const [email,      setEmail]      = useState('');
     const [password,   setPassword]   = useState('');
-    const [isLogin,    setIsLogin]    = useState(true);
     const [error,      setError]      = useState('');
     const [busy,       setBusy]       = useState(false);
     const [resetSent,  setResetSent]  = useState(false);
 
     const MASTER_EMAIL = 'johanderjca@gmail.com';
 
+    // Ya NO se auto-crea una ficha de vendedor para cualquiera que inicie sesión: solo el
+    // master puede crear usuarios (ver Usuarios en el panel). Una cuenta de Firebase Auth sin
+    // una ficha 'vendedores' ya creada por el master queda sin autorizar (ver vendedorAutorizado).
     const ensureFirestoreDocs = (firebaseUser, isMaster) => {
         const uid   = firebaseUser.uid;
         const email = firebaseUser.email;
         const role  = isMaster ? 'master' : 'vendedor';
         db.collection('users').doc(uid).get().then(doc => {
             if (!doc.exists) {
-                // Crea documento de usuario si no existe
                 db.collection('users').doc(uid).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(console.error);
             } else {
                 // Repara docs incompletos (ej. creados solo con photoURL): rellena email/role faltantes
@@ -799,37 +817,23 @@ function App() {
                     photoURL: data.photoURL || prev.photoURL,
                 }));
             }
-            // Si es vendedor, verifica que exista en colección vendedores
-            // Busca por uid O por email (por si el master lo registró manualmente sin uid)
-            if (!isMaster) {
-                db.collection('vendedores').get().then(snap => {
-                    const emailNorm = (email || '').toLowerCase().trim();
-                    const matches = snap.docs.filter(d => {
-                        const v = d.data();
-                        return v.uid === uid || (v.email || '').toLowerCase().trim() === emailNorm;
-                    });
-                    if (matches.length === 0) {
-                        db.collection('vendedores').add({
-                            nombre:         email.split('@')[0],
-                            email:          emailNorm,
-                            uid,
-                            activo:         true,
-                            autoRegistrado: true,
-                            fechaAlta:      firebase.firestore.FieldValue.serverTimestamp(),
-                        }).catch(console.error);
-                    } else {
-                        // Vincula uid + normaliza email en el registro manual del master
-                        matches.forEach(d => {
-                            const data = d.data();
-                            const updates = {};
-                            if (!data.uid) updates.uid = uid;
-                            // Normalizar email a lowercase si estaba con mayúsculas
-                            if (data.email && data.email !== emailNorm) updates.email = emailNorm;
-                            if (Object.keys(updates).length > 0) d.ref.update(updates).catch(console.error);
-                        });
-                    }
-                }).catch(console.error);
-            }
+            if (isMaster) { setVendedorAutorizado(true); return; }
+            // Busca su ficha en 'vendedores' — creada previamente por el master (por uid o por email)
+            db.collection('vendedores').get().then(snap => {
+                const emailNorm = (email || '').toLowerCase().trim();
+                const match = snap.docs.find(d => {
+                    const v = d.data();
+                    return v.uid === uid || (v.email || '').toLowerCase().trim() === emailNorm;
+                });
+                if (!match) { setVendedorAutorizado(false); return; }
+                const data = match.data();
+                const updates = {};
+                if (!data.uid) updates.uid = uid;
+                if (data.email && data.email !== emailNorm) updates.email = emailNorm;
+                if (Object.keys(updates).length > 0) match.ref.update(updates).catch(console.error);
+                setVendedorAutorizado(data.activo !== false);
+                setUser(prev => ({ ...prev, permisos: data.permisos || {} }));
+            }).catch(console.error);
         }).catch(console.error);
     };
 
@@ -837,7 +841,8 @@ function App() {
         return auth.onAuthStateChanged(firebaseUser => {
             if (firebaseUser) {
                 const isMaster = firebaseUser.email === MASTER_EMAIL;
-                setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: isMaster ? 'master' : 'vendedor', photoURL: null });
+                setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: isMaster ? 'master' : 'vendedor', photoURL: null, permisos: {} });
+                setVendedorAutorizado(isMaster ? true : null);
                 setLoading(false);
                 ensureFirestoreDocs(firebaseUser, isMaster);
             } else {
@@ -851,19 +856,7 @@ function App() {
         e.preventDefault();
         setError(''); setBusy(true);
         try {
-            if (isLogin) {
-                await auth.signInWithEmailAndPassword(email, password);
-            } else {
-                const cred = await auth.createUserWithEmailAndPassword(email, password);
-                const role = email === 'johanderjca@gmail.com' ? 'master' : 'vendedor';
-                // Fire-and-forget: no bloquea el registro si Firestore tarda.
-                // El alta en 'vendedores' la hace ensureFirestoreDocs (onAuthStateChanged)
-                // para evitar duplicados por doble escritura.
-                db.collection('users').doc(cred.user.uid).set({
-                    email, role,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).catch(console.error);
-            }
+            await auth.signInWithEmailAndPassword(email, password);
         } catch (err) {
             const msgs = {
                 'auth/user-not-found':       'Usuario no encontrado.',
@@ -953,8 +946,8 @@ function App() {
             </div>
             <div className="auth-right">
                 <div className="auth-form-box glass glass-mid" style={{borderRadius:'18px', padding:'36px', boxShadow:'var(--glass-shadow-lg)'}}>
-                    <h2>{isLogin ? 'Bienvenido de vuelta' : 'Crear cuenta'}</h2>
-                    <p className="auth-subtitle">{isLogin ? 'Ingresa tus credenciales para acceder' : 'Completa los datos para registrarte'}</p>
+                    <h2>Bienvenido de vuelta</h2>
+                    <p className="auth-subtitle">Ingresa tus credenciales para acceder</p>
                     <form onSubmit={handleAuth} noValidate>
                         <div className="form-group">
                             <label htmlFor="a-email">Correo electronico</label>
@@ -976,22 +969,33 @@ function App() {
                         {resetSent && <div style={{background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.25)', borderRadius:'var(--r-sm)', padding:'10px 13px', fontSize:'12.5px', color:'#4ade80', marginBottom:14}}>Correo enviado. Revisa tu bandeja de entrada.</div>}
 
                         <button className="btn-submit" type="submit" disabled={busy}>
-                            {busy ? 'Cargando...' : (isLogin ? 'Iniciar sesion' : 'Crear cuenta')}
+                            {busy ? 'Cargando...' : 'Iniciar sesion'}
                         </button>
                     </form>
-                    {isLogin && (
-                        <p style={{textAlign:'center', marginTop:12, fontSize:'12.5px'}}>
-                            <a style={{color:'var(--text-dimmer)', cursor:'pointer'}} onClick={handleReset}>¿Olvidaste tu contraseña?</a>
-                        </p>
-                    )}
-                    <p className="auth-switch">
-                        {isLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
-                        <a onClick={() => { setIsLogin(!isLogin); setError(''); setResetSent(false); }}>{isLogin ? 'Crear una' : 'Iniciar sesion'}</a>
+                    <p style={{textAlign:'center', marginTop:12, fontSize:'12.5px'}}>
+                        <a style={{color:'var(--text-dimmer)', cursor:'pointer'}} onClick={handleReset}>¿Olvidaste tu contraseña?</a>
                     </p>
                 </div>
             </div>
         </div>
     );
+
+    if (user.role !== 'master' && vendedorAutorizado === null) {
+        return <div className="loading-screen glass"><div className="spinner"/></div>;
+    }
+    if (user.role !== 'master' && vendedorAutorizado === false) {
+        return (
+            <div className="auth-wrap">
+                <div className="auth-right" style={{margin:'auto'}}>
+                    <div className="auth-form-box glass glass-mid" style={{borderRadius:'18px', padding:'36px', boxShadow:'var(--glass-shadow-lg)', textAlign:'center'}}>
+                        <h2>Cuenta no autorizada</h2>
+                        <p className="auth-subtitle">Tu cuenta ({user.email}) no tiene acceso a este panel. Pídele al administrador que te cree como usuario.</p>
+                        <button className="btn-submit" style={{marginTop:16}} onClick={handleLogout}>Cerrar sesión</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return user.role === 'master'
         ? <AdminPanel user={user} onLogout={handleLogout} onPhotoChange={handlePhotoChange} />
@@ -1077,8 +1081,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [ventas,     setVentas]     = useState([]);
     const [cierres,    setCierres]    = useState([]);
     const [showModal,  setShowModal]  = useState(false);
-    const [form,       setForm]       = useState({ nombre: '', email: '' });
+    const [form,       setForm]       = useState({ nombre: '', email: '', password: '', permisos: { cierre: true } });
     const [saving,     setSaving]     = useState(false);
+    const [showEditUsuarioModal, setShowEditUsuarioModal] = useState(false);
+    const [editingUsuario,       setEditingUsuario]       = useState(null);
+    const [editUsuarioForm,      setEditUsuarioForm]      = useState({ nombre:'', activo:true, permisos:{} });
+    const [savingEditUsuario,    setSavingEditUsuario]    = useState(false);
     const [showCmdK,   setShowCmdK]   = useState(false);
     const [cmdQuery,   setCmdQuery]   = useState('');
     const COSTEO_DEFAULTS = {
@@ -1118,12 +1126,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [activeProducto,     setActiveProducto]     = useState(null);
     const [productoTab,        setProductoTab]        = useState('general');
     const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
+    const [contenidoGrupos,    setContenidoGrupos]    = useState(null); // null = cargando; array cuando ya llegó de Firestore
+    const [nuevoGrupoNombre,   setNuevoGrupoNombre]   = useState('');
+    const [showNuevoGrupo,     setShowNuevoGrupo]     = useState(false);
+    const [nuevoItemForm,      setNuevoItemForm]      = useState({ grupoKey:null, label:'', desc:'' });
+    const [calVista,           setCalVista]           = useState('mes'); // 'mes'|'semana'|'lista'
+    const [calFecha,           setCalFecha]           = useState(() => new Date());
+    const [calEditandoDia,     setCalEditandoDia]     = useState(null); // 'YYYY-MM-DD' del día en edición
+    const [calTextoTemp,       setCalTextoTemp]       = useState('');
     const [showProdModal,      setShowProdModal]      = useState(false);
     const [editingProducto,    setEditingProducto]    = useState(null);
     const [savingProd,         setSavingProd]         = useState(false);
     const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'' });
-    const [editSeccion,        setEditSeccion]        = useState(null); // 'facebook'|'inventario'
-    const [fbForm,             setFbForm]             = useState({ cpa:'', cpm:'', ctr:'', cpc:'', cvr:'', frecuencia:'', atc:'', ic:'', aov:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
+    const [editSeccion,        setEditSeccion]        = useState(null); // 'inventario'
     const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
     // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
     const ANALISIS_CHECKS = [
@@ -1151,6 +1166,42 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     ];
     const ANALISIS_DEFAULT = { precioProveedor:'', proveedor:'', linkAnuncio:'', checks:{}, angulo1Titulo:'', angulo1Desc:'', angulo2Titulo:'', angulo2Desc:'', angulo3Titulo:'', angulo3Desc:'', comp1Nombre:'', comp1Precio:'', comp2Nombre:'', comp2Precio:'', creativoChecks:{}, notas:'' };
     const [analisisForm, setAnalisisForm] = useState(ANALISIS_DEFAULT);
+
+    // ── Proveedores ──
+    const PROVEEDOR_PAISES = ['China','República Dominicana','Venezuela','Estados Unidos','Otro'];
+    const PROVEEDOR_DEFAULT = { nombre:'', pais:'China', contacto:'', link:'', notas:'' };
+    const [proveedores,        setProveedores]        = useState([]);
+    const [showProveedorModal, setShowProveedorModal] = useState(false);
+    const [editingProveedor,   setEditingProveedor]   = useState(null);
+    const [proveedorForm,      setProveedorForm]      = useState(PROVEEDOR_DEFAULT);
+    const [savingProveedor,    setSavingProveedor]    = useState(false);
+
+    useEffect(() => {
+        const unsub = db.collection('proveedores').orderBy('creadoEn','desc').onSnapshot(
+            snap => setProveedores(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Proveedores:', err)
+        );
+        return unsub;
+    }, []);
+
+    const saveProveedor = async () => {
+        if (!proveedorForm.nombre.trim() || savingProveedor) return;
+        setSavingProveedor(true);
+        try {
+            const data = { nombre: proveedorForm.nombre.trim(), pais: proveedorForm.pais, contacto: proveedorForm.contacto.trim(), link: proveedorForm.link.trim(), notas: proveedorForm.notas.trim() };
+            if (editingProveedor) {
+                await db.collection('proveedores').doc(editingProveedor.id).update(data);
+            } else {
+                await db.collection('proveedores').add({ ...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+            setProveedorForm(PROVEEDOR_DEFAULT);
+            setEditingProveedor(null);
+            setShowProveedorModal(false);
+        } catch(err) { console.error('Error guardando proveedor:', err); }
+        finally { setSavingProveedor(false); }
+    };
+    const openEditProveedor = pr => { setEditingProveedor(pr); setProveedorForm({ nombre:pr.nombre||'', pais:pr.pais||'China', contacto:pr.contacto||'', link:pr.link||'', notas:pr.notas||'' }); setShowProveedorModal(true); };
+    const deleteProveedor = id => { if (confirm('¿Eliminar este proveedor?')) db.collection('proveedores').doc(id).delete().catch(console.error); };
 
     // ── Tiendas (multi-negocio) ──
     const [tiendas,         setTiendas]         = useState([]);
@@ -1503,6 +1554,63 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         await db.collection('users').doc(uid).set({ role: nuevoRol }, { merge: true });
     };
 
+    const MODULOS_PERMISOS = [
+        ['vendedores','Usuarios'], ['proveedores','Proveedores'], ['ganadores','Productos'],
+        ['cierre','Cierre Diario'], ['contabilidad','Contabilidad'], ['costeo','Calculadora Costeo'],
+        ['diccionario','Diccionario'], ['accesos','Accesos Rápidos'], ['tiendas','Tiendas'],
+    ];
+
+    const crearUsuario = async () => {
+        if (!form.nombre || !form.email || !form.password || saving) return;
+        setSaving(true);
+        try {
+            const emailNorm = form.email.toLowerCase().trim();
+            const uid = await crearUsuarioConAuth(emailNorm, form.password);
+            await db.collection('users').doc(uid).set({ email: emailNorm, role: 'vendedor', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            await db.collection('vendedores').add({
+                nombre: form.nombre.trim(),
+                email:  emailNorm,
+                uid,
+                activo: true,
+                permisos: form.permisos || {},
+                tiendaId: activeTiendaId,
+                fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            setForm({ nombre: '', email: '', password: '', permisos: { cierre: true } });
+            setShowModal(false);
+        } catch(err) {
+            const msgs = {
+                'auth/email-already-in-use': 'Ese correo ya tiene una cuenta.',
+                'auth/invalid-email':        'Correo inválido.',
+                'auth/weak-password':        'La contraseña debe tener al menos 6 caracteres.',
+            };
+            alert(msgs[err.code] || ('Error al crear el usuario: ' + (err.message||err.code||err)));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const openEditUsuario = (v) => {
+        setEditingUsuario(v);
+        setEditUsuarioForm({ nombre: v.nombre||'', activo: v.activo!==false, permisos: { ...(v.permisos||{}) } });
+        setShowEditUsuarioModal(true);
+    };
+
+    const guardarEditUsuario = async () => {
+        if (!editingUsuario || savingEditUsuario) return;
+        setSavingEditUsuario(true);
+        try {
+            await db.collection('vendedores').doc(editingUsuario.id).update({
+                nombre: editUsuarioForm.nombre.trim(),
+                activo: editUsuarioForm.activo,
+                permisos: editUsuarioForm.permisos,
+            });
+            setShowEditUsuarioModal(false);
+            setEditingUsuario(null);
+        } catch(err) { console.error('Error guardando permisos:', err); }
+        finally { setSavingEditUsuario(false); }
+    };
+
     // Reparación puntual: cuenta de Stephanie con users doc incompleto/inexistente.
     // Crea su doc en 'users' y vincula su uid al registro manual en 'vendedores'.
     useEffect(() => {
@@ -1558,6 +1666,46 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         );
         return unsub;
     }, []);
+
+    // Checklist de Contenido: plantilla compartida por todos los productos, editable por el master.
+    useEffect(() => {
+        const ref = db.collection('configuracion').doc('contenidoGrupos');
+        const unsub = ref.onSnapshot(doc => {
+            if (doc.exists && doc.data().grupos) {
+                setContenidoGrupos(doc.data().grupos);
+            } else {
+                const grupoInicial = [{ key:'shopify', label:'SHOPIFY', items:[
+                    { key:'imagenProducto',   label:'Imagen Producto',           desc:'Cantidad mínima: 4 imágenes' },
+                    { key:'resenas',          label:'Reseñas',                   desc:'Fotos de personas (buscar en internet)' },
+                    { key:'clientesProbaron', label:'Clientes que Probaron',     desc:'Busca o genera mínimo 4' },
+                    { key:'videoProducto',    label:'Video Producto (Clientes)', desc:'GIF o VIDEO para landing (2) + FB ADS' },
+                    { key:'beneficios',       label:'Beneficios',                desc:'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
+                    { key:'usos',             label:'Usos',                      desc:'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
+                ]}];
+                ref.set({ grupos: grupoInicial }).catch(console.error);
+            }
+        }, err => console.error('Contenido grupos:', err));
+        return unsub;
+    }, []);
+
+    const agregarGrupoContenido = async () => {
+        if (!nuevoGrupoNombre.trim() || !contenidoGrupos) return;
+        const key = 'g_' + Date.now();
+        const nuevo = [...contenidoGrupos, { key, label: nuevoGrupoNombre.trim().toUpperCase(), items: [] }];
+        await db.collection('configuracion').doc('contenidoGrupos').set({ grupos: nuevo });
+        setNuevoGrupoNombre(''); setShowNuevoGrupo(false);
+        setCGroupsOpen(o => ({ ...o, [key]: true }));
+    };
+
+    const agregarItemContenido = async () => {
+        if (!nuevoItemForm.label.trim() || !nuevoItemForm.grupoKey || !contenidoGrupos) return;
+        const itemKey = 'i_' + Date.now();
+        const nuevo = contenidoGrupos.map(g => g.key === nuevoItemForm.grupoKey
+            ? { ...g, items: [...g.items, { key: itemKey, label: nuevoItemForm.label.trim(), desc: nuevoItemForm.desc.trim() }] }
+            : g);
+        await db.collection('configuracion').doc('contenidoGrupos').set({ grupos: nuevo });
+        setNuevoItemForm({ grupoKey:null, label:'', desc:'' });
+    };
 
     useEffect(() => {
         const unsub = db.collection('links').onSnapshot(
@@ -1716,7 +1864,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const navSections = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
         { label: 'Gestion',   items: [
-            { key: 'vendedores',  label: 'Vendedores',  icon: I.users  },
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'ganadores',   label: 'Productos', icon: I_star },
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
@@ -1728,6 +1875,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'accesos', label: 'Accesos Rápidos', icon: I_link },
         ]},
         { label: 'Administracion', items: [
+            { key: 'vendedores', label: 'Usuarios', icon: I.users },
             { key: 'tiendas', label: 'Tiendas', icon: I.box },
         ]},
     ];
@@ -1744,7 +1892,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             {showCmdK && (() => {
                 const acciones = [
                     { label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''}); setShowProdModal(true); } },
-                    { label: 'Nuevo vendedor',         icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
+                    { label: 'Nuevo usuario',          icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
                     { label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
                 ];
                 const navCmds = navSections.flatMap(s => s.items).map(i => ({ label: i.label, icon: i.icon, kind: 'Ir a', run: () => { setActiveTab(i.key); if (i.key === 'ganadores') setActiveProducto(null); } }));
@@ -1931,22 +2079,24 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const porEmail = byEmail; // alias para compatibilidad con código de renderizado siguiente
                     const lista = Object.values(porEmail).sort((a, b) => (b.fechaAlta?.toDate?.()?.getTime() || 0) - (a.fechaAlta?.toDate?.()?.getTime() || 0));
                     return <>
-                    <div className="page-header"><h1>Vendedores</h1><p>Equipo de ventas y control de acceso</p></div>
+                    <div className="page-header"><h1>Usuarios</h1><p>Solo tú puedes crear usuarios — cada uno con su propia contraseña y permisos por módulo</p></div>
                     <div className="sec-header">
-                        <h2>{lista.length} vendedor{lista.length !== 1 ? 'es' : ''} registrado{lista.length !== 1 ? 's' : ''}</h2>
-                        <button className="btn btn-gold" onClick={() => setShowModal(true)}>{I.plus} Agregar vendedor</button>
+                        <h2>{lista.length} usuario{lista.length !== 1 ? 's' : ''} registrado{lista.length !== 1 ? 's' : ''}</h2>
+                        <button className="btn btn-gold" onClick={() => setShowModal(true)}>{I.plus} Nuevo usuario</button>
                     </div>
-                    <div className="card glass">
+                    <div className="card glass" style={{overflowX:'auto'}}>
                         {lista.length > 0 ? (
                             <table>
-                                <thead><tr><th>Nombre</th><th>Correo</th><th>Alta</th><th>Cuenta</th><th>Herramientas / Rol</th></tr></thead>
+                                <thead><tr><th>Nombre</th><th>Correo</th><th>Alta</th><th>Cuenta</th><th>Rol</th><th>Permisos</th><th></th></tr></thead>
                                 <tbody>
                                     {lista.map((v, i) => {
                                         const userDoc = usuarios.find(u => (norm(u.email) && norm(u.email) === norm(v.email)) || (v.uid && u.id === v.uid));
+                                        const permisosActivos = MODULOS_PERMISOS.filter(([k]) => (v.permisos||{})[k]).length;
                                         return (
                                             <tr key={i}>
                                                 <td>
                                                     <strong>{v.nombre}</strong>
+                                                    {v.activo===false && <span className="badge badge-gray" style={{marginLeft:8,fontSize:'9.5px'}}><span className="badge-dot"/>Inactivo</span>}
                                                     {v.autoRegistrado && <span className="badge badge-gold" style={{marginLeft:8,fontSize:'9.5px'}}><span className="badge-dot"/>Auto-reg.</span>}
                                                 </td>
                                                 <td style={{color:'var(--text-dim)'}}>{v.email}</td>
@@ -1970,6 +2120,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         <span style={{fontSize:'12px',color:'var(--text-dimmer)'}}>—</span>
                                                     )}
                                                 </td>
+                                                <td style={{fontSize:'12px',color:'var(--text-dim)'}}>{permisosActivos}/{MODULOS_PERMISOS.length}</td>
+                                                <td style={{textAlign:'right'}}>
+                                                    <button className="btn btn-glass btn-sm" onClick={()=>openEditUsuario(v)}>{I.edit} Permisos</button>
+                                                </td>
                                             </tr>
                                         );
                                     })}
@@ -1978,18 +2132,44 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         ) : (
                             <div className="empty">
                                 <div className="empty-icon">{I.users}</div>
-                                <h3>Sin vendedores aun</h3>
-                                <p>Agrega tu primer vendedor para comenzar.</p>
+                                <h3>Sin usuarios aún</h3>
+                                <p>Crea tu primer usuario para comenzar.</p>
                             </div>
                         )}
                     </div>
                     </>;
                 })()}
 
-                {activeTab === 'proveedores' && <>
-                    <div className="page-header"><h1>Proveedores</h1><p>Gestion por pais de origen</p></div>
-                    <div className="card glass"><div className="coming-soon"><div className="cs-icon">{I.truck}</div><h3>Modulo de Proveedores</h3><div className="cs-bar"/><p>Proxima fase — Republica Dominicana y Venezuela</p></div></div>
-                </>}
+                {activeTab === 'proveedores' && (() => {
+                    const misProveedores = proveedores.filter(perteneceATienda);
+                    return <>
+                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                        <div><h1>Proveedores</h1><p>Gestión por país de origen</p></div>
+                        <button className="btn btn-gold" onClick={()=>{setEditingProveedor(null);setProveedorForm(PROVEEDOR_DEFAULT);setShowProveedorModal(true);}}>{I.plus} Nuevo proveedor</button>
+                    </div>
+                    {misProveedores.length===0 ? (
+                        <div className="card glass"><div className="empty"><div className="empty-icon">{I.truck}</div><h3>Sin proveedores aún</h3><p>Agrega tu primer proveedor para comenzar.</p></div></div>
+                    ) : (
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:14}}>
+                            {misProveedores.map(pr => (
+                                <div key={pr.id} className="card glass" style={{padding:'18px 20px'}}>
+                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                                        <strong style={{fontSize:14}}>{pr.nombre}</strong>
+                                        <span className="badge badge-gold" style={{fontSize:10}}><span className="badge-dot"/>{pr.pais}</span>
+                                    </div>
+                                    {pr.contacto && <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:4}}>{pr.contacto}</p>}
+                                    {pr.link && <a href={pr.link} target="_blank" rel="noopener" style={{fontSize:12,color:'var(--orange)',display:'block',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pr.link} ↗</a>}
+                                    {pr.notas && <p style={{fontSize:12,color:'var(--text-dimmer)',marginTop:8,whiteSpace:'pre-wrap'}}>{pr.notas}</p>}
+                                    <div style={{display:'flex',gap:8,marginTop:14}}>
+                                        <button className="btn btn-glass btn-sm" onClick={()=>openEditProveedor(pr)}>{I.edit} Editar</button>
+                                        <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={()=>deleteProveedor(pr.id)}>Eliminar</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    </>;
+                })()}
 
                 {activeTab === 'tiendas' && <>
                     <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -2120,22 +2300,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                     // ── Detalle de producto ──
                     const p = productos.find(x=>x.id===activeProducto.id) || activeProducto;
-                    const fb = p.facebook||{}; const inv = p.inventario||{};
+                    const inv = p.inventario||{};
                     // Unidades vendidas = suma de lo registrado para este producto en Cierre Diario (por nombre exacto), no un campo manual.
                     const unidadesVendidasCalc = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
                     const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
                     const gananciaTotal = gananciaUnit * unidadesVendidasCalc;
-                    const TABS = ['General','Análisis','Contenido','Facebook','Inventario'];
-                    const CONTENT_GROUPS = [
-                        { key: 'shopify', label: 'SHOPIFY', items: [
-                            { key: 'imagenProducto',   label: 'Imagen Producto',           desc: 'Cantidad mínima: 4 imágenes' },
-                            { key: 'resenas',          label: 'Reseñas',                   desc: 'Fotos de personas (buscar en internet)' },
-                            { key: 'clientesProbaron', label: 'Clientes que Probaron',     desc: 'Busca o genera mínimo 4' },
-                            { key: 'videoProducto',    label: 'Video Producto (Clientes)', desc: 'GIF o VIDEO para landing (2) + FB ADS' },
-                            { key: 'beneficios',       label: 'Beneficios',                desc: 'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
-                            { key: 'usos',             label: 'Usos',                      desc: 'Máx. 3 imágenes — Canva / Firefly / Photoshop' },
-                        ]},
-                    ];
+                    const TABS = ['General','Análisis','Contenido','Inventario'];
+                    const CONTENT_GROUPS = contenidoGrupos || [];
                     const analisis = p.analisis || {};
                     const analisisScore = ANALISIS_CHECKS.filter(([k,,,favorable='si'])=>(analisis.checks||{})[k]===favorable).length;
                     const angulosValidos = !!(analisis.angulo1Titulo && analisis.angulo1Titulo.trim());
@@ -2373,80 +2544,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 )
                             )}
 
-                            {/* ── Tab Facebook ── */}
-                            {productoTab==='facebook' && (
-                                <>
-                                    <div style={{background:'rgba(24,119,242,0.06)',border:'1px solid rgba(24,119,242,0.18)',borderRadius:'var(--r)',padding:'14px 18px',marginBottom:16,display:'flex',alignItems:'center',gap:12}}>
-                                        <span style={{fontSize:'20px'}}>📘</span>
-                                        <div style={{fontSize:'12.5px',color:'var(--text-dim)'}}>
-                                            Métricas de campaña en Facebook Ads. <strong style={{color:'var(--text)'}}>Próximamente:</strong> conexión directa con Meta Marketing API para actualización en tiempo real.
-                                        </div>
-                                    </div>
-                                    {editSeccion==='facebook' ? (
-                                        <div className="card glass" style={{padding:'24px'}}>
-                                            <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar métricas de Facebook</div>
-                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-                                                {[
-                                                    {key:'cpa',label:'CPA — Costo por compra (USD)',ph:'Ej. 2.50',dx:'cpa'},
-                                                    {key:'ctr',label:'CTR (%)',ph:'Ej. 2.4',dx:'ctr'},
-                                                    {key:'cpc',label:'CPC (USD)',ph:'Ej. 0.12',dx:'cpc'},
-                                                    {key:'cpm',label:'CPM (USD)',ph:'Ej. 5',dx:'cpm'},
-                                                    {key:'cvr',label:'CVR — Conversión web (%)',ph:'Ej. 3',dx:'cvr'},
-                                                    {key:'frecuencia',label:'Frecuencia',ph:'Ej. 1.8',dx:'frecuencia'},
-                                                    {key:'atc',label:'Add To Cart',ph:'0'},
-                                                    {key:'ic',label:'Initiate Checkout',ph:'0'},
-                                                    {key:'aov',label:'Ticket promedio AOV (RD$)',ph:'0'},
-                                                    {key:'conversiones',label:'Conversiones (compras)',ph:'0'},
-                                                    {key:'alcance',label:'Alcance',ph:'0'},
-                                                    {key:'impresiones',label:'Impresiones',ph:'0'},
-                                                ].map(({key,label,ph,dx})=>(
-                                                    <div key={key} className="form-group" style={{marginBottom:0}}>
-                                                        <label style={{color:'var(--text-dim)',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>{label} {dx && <DxBadge tipo={dx} valor={fbForm[key]} />}</label>
-                                                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                            type="number" placeholder={ph} value={fbForm[key]||''}
-                                                            onChange={e=>setFbForm(f=>({...f,[key]:e.target.value}))} />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div style={{display:'flex',gap:10,marginTop:20}}>
-                                                <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
-                                                <button className="btn btn-gold" onClick={()=>saveSeccion(p.id,'facebook',fbForm)}>Guardar Métricas</button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="card glass">
-                                            <div style={{padding:'16px 20px',display:'flex',justifyContent:'space-between',borderBottom:'1px solid var(--glass-border)'}}>
-                                                <span style={{fontWeight:'700',fontSize:'13px'}}>Métricas de campaña <span style={{fontWeight:'500',color:'var(--text-dimmer)',fontSize:'11px'}}>· diagnóstico automático RD</span></span>
-                                                <button className="btn btn-glass btn-sm" onClick={()=>{setFbForm({cpa:fb.cpa||'',cpm:fb.cpm||'',cpc:fb.cpc||'',ctr:fb.ctr||'',cvr:fb.cvr||'',frecuencia:fb.frecuencia||'',atc:fb.atc||'',ic:fb.ic||'',aov:fb.aov||'',alcance:fb.alcance||'',impresiones:fb.impresiones||'',conversiones:fb.conversiones||''});setEditSeccion('facebook');}}>✎ Editar</button>
-                                            </div>
-                                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:0}}>
-                                                {[
-                                                    {label:'CPA', val:fb.cpa?`$${fb.cpa}`:'—', dx:'cpa', raw:fb.cpa},
-                                                    {label:'CTR', val:fb.ctr?`${fb.ctr}%`:'—', dx:'ctr', raw:fb.ctr},
-                                                    {label:'CPC', val:fb.cpc?`$${fb.cpc}`:'—', dx:'cpc', raw:fb.cpc},
-                                                    {label:'CPM', val:fb.cpm?`$${fb.cpm}`:'—', dx:'cpm', raw:fb.cpm},
-                                                    {label:'CVR', val:fb.cvr?`${fb.cvr}%`:'—', dx:'cvr', raw:fb.cvr},
-                                                    {label:'Frecuencia', val:fb.frecuencia||'—', dx:'frecuencia', raw:fb.frecuencia},
-                                                    {label:'Add To Cart', val:fb.atc?fmtNum(fb.atc):'—'},
-                                                    {label:'Init. Checkout', val:fb.ic?fmtNum(fb.ic):'—'},
-                                                    {label:'Ticket AOV', val:fb.aov?`RD$${fmtNum(fb.aov)}`:'—'},
-                                                    {label:'Conversiones', val:fb.conversiones?fmtNum(fb.conversiones):'—'},
-                                                ].map(({label,val,dx,raw})=>{
-                                                    const d = dx ? DX(dx, raw) : null;
-                                                    return (
-                                                    <div key={label} style={{padding:'16px 20px',borderBottom:'1px solid var(--glass-border)',borderRight:'1px solid var(--glass-border)'}}>
-                                                        <div style={{fontSize:'10px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:6}}>{label}</div>
-                                                        <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'18px',color:d?DX_COLORS[d.nivel].fg:'var(--text)'}}>{val}</div>
-                                                        {d && <div style={{marginTop:6}}><DxBadge tipo={dx} valor={raw} /></div>}
-                                                    </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-
                             {/* ── Tab Inventario ── */}
                             {productoTab==='inventario' && (
                                 editSeccion==='inventario' ? (
@@ -2510,23 +2607,82 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 const completados  = CONTENT_GROUPS.reduce((s,g)=>s+g.items.filter(i=>contenido[i.key]).length,0);
                                 const toggleItem   = (key, val) => db.collection('productos').doc(p.id).update({ [`contenido.${key}`]: val }).catch(console.error);
                                 const toggleGroup  = key => setCGroupsOpen(o=>({...o,[key]:!o[key]}));
+
+                                // ── Calendario de campañas (texto libre por día) ──
+                                const calendario = p.calendario || {};
+                                const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                const hoyIso = iso(new Date());
+                                const guardarDia = async (fechaStr, texto) => {
+                                    const val = texto.trim();
+                                    await db.collection('productos').doc(p.id).update({
+                                        [`calendario.${fechaStr}`]: val ? val : firebase.firestore.FieldValue.delete(),
+                                    }).catch(console.error);
+                                    setCalEditandoDia(null);
+                                };
+                                const abrirDia = fechaStr => { setCalEditandoDia(fechaStr); setCalTextoTemp(calendario[fechaStr]||''); };
+                                const DIAS_SEM = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+                                const renderCeldaDia = (d, atenuado) => {
+                                    const fechaStr = iso(d);
+                                    const texto = calendario[fechaStr];
+                                    const editando = calEditandoDia === fechaStr;
+                                    return (
+                                        <div key={fechaStr} onClick={()=>!editando && abrirDia(fechaStr)}
+                                            style={{minHeight:74,padding:'6px 8px',borderRadius:8,border:'1px solid var(--glass-border)',cursor:editando?'default':'pointer',
+                                                background:fechaStr===hoyIso?'var(--orange-dim)':(atenuado?'var(--surface-1)':'var(--surface-2)'),opacity:atenuado?0.45:1}}>
+                                            <div style={{fontSize:11,fontWeight:fechaStr===hoyIso?800:600,color:fechaStr===hoyIso?'var(--orange)':'var(--text-dim)',marginBottom:4}}>{d.getDate()}</div>
+                                            {editando ? (
+                                                <div onClick={e=>e.stopPropagation()}>
+                                                    <textarea autoFocus value={calTextoTemp} onChange={e=>setCalTextoTemp(e.target.value)}
+                                                        style={{width:'100%',fontSize:11,padding:4,borderRadius:4,border:'1px solid var(--glass-border)',resize:'vertical',minHeight:40,fontFamily:'inherit'}} />
+                                                    <div style={{display:'flex',gap:4,marginTop:4}}>
+                                                        <button className="btn btn-glass btn-sm" style={{fontSize:10,padding:'2px 6px'}} onClick={()=>setCalEditandoDia(null)}>×</button>
+                                                        <button className="btn btn-gold btn-sm" style={{fontSize:10,padding:'2px 6px'}} onClick={()=>guardarDia(fechaStr,calTextoTemp)}>✓</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                texto && <div style={{fontSize:10.5,color:'var(--text)',lineHeight:1.3,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{texto}</div>
+                                            )}
+                                        </div>
+                                    );
+                                };
+
                                 return (
                                     <div>
+                                        <div className="card glass" style={{padding:'14px 18px',marginBottom:20,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                                            <span style={{fontSize:12,fontWeight:700,color:'var(--text-dim)',flexShrink:0}}>Administrador de anuncios</span>
+                                            <input className="form-input glass no-icon" style={{flex:1,minWidth:220,border:'1px solid var(--glass-border)'}}
+                                                defaultValue={p.adsManagerLink||''} placeholder="https://adsmanager.facebook.com/..."
+                                                onBlur={e=>{ if(e.target.value.trim()!==(p.adsManagerLink||'')) db.collection('productos').doc(p.id).update({adsManagerLink:e.target.value.trim()}).catch(console.error); }} />
+                                            {p.adsManagerLink && <a href={p.adsManagerLink} target="_blank" rel="noopener" className="btn btn-glass btn-sm">Abrir ↗</a>}
+                                        </div>
+
                                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                                             <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>Checklist de contenido</div>
-                                            <span className={`badge ${completados===totalItems?'badge-green':'badge-gold'}`}>
-                                                <span className="badge-dot"/>{completados}/{totalItems} completados
-                                            </span>
+                                            <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                                <span className={`badge ${completados===totalItems&&totalItems>0?'badge-green':'badge-gold'}`}>
+                                                    <span className="badge-dot"/>{completados}/{totalItems} completados
+                                                </span>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>setShowNuevoGrupo(v=>!v)}>{I.plus} Grupo</button>
+                                            </div>
                                         </div>
+                                        {showNuevoGrupo && (
+                                            <div style={{display:'flex',gap:8,marginBottom:14}}>
+                                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                    autoFocus value={nuevoGrupoNombre} onChange={e=>setNuevoGrupoNombre(e.target.value)}
+                                                    placeholder="Nombre del grupo (ej. TIKTOK ADS)" onKeyDown={e=>e.key==='Enter'&&agregarGrupoContenido()} />
+                                                <button className="btn btn-gold btn-sm" onClick={agregarGrupoContenido}>Crear</button>
+                                            </div>
+                                        )}
                                         <div style={{height:4,borderRadius:99,background:'var(--stone)',marginBottom:20,overflow:'hidden'}}>
                                             <div style={{height:'100%',borderRadius:99,background:'var(--orange)',width:`${totalItems?((completados/totalItems)*100):0}%`,transition:'width 0.3s ease'}}/>
                                         </div>
-                                        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                                        <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:28}}>
                                             {CONTENT_GROUPS.map(group => {
                                                 const open     = !!cGroupsOpen[group.key];
                                                 const gTotal   = group.items.length;
                                                 const gDone    = group.items.filter(i=>contenido[i.key]).length;
-                                                const allDone  = gDone === gTotal;
+                                                const allDone  = gDone === gTotal && gTotal>0;
                                                 return (
                                                     <div key={group.key} className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}>
                                                         {/* Group header */}
@@ -2560,12 +2716,115 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                         </div>
                                                                     );
                                                                 })}
+                                                                <div style={{padding:'10px 18px',borderTop: gTotal>0 ? '1px solid var(--glass-border)' : undefined}} onClick={e=>e.stopPropagation()}>
+                                                                    {nuevoItemForm.grupoKey===group.key ? (
+                                                                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:'1 1 140px'}}
+                                                                                autoFocus value={nuevoItemForm.label} onChange={e=>setNuevoItemForm(f=>({...f,label:e.target.value}))} placeholder="Nombre del item" />
+                                                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:'1 1 140px'}}
+                                                                                value={nuevoItemForm.desc} onChange={e=>setNuevoItemForm(f=>({...f,desc:e.target.value}))} placeholder="Descripción (opcional)"
+                                                                                onKeyDown={e=>e.key==='Enter'&&agregarItemContenido()} />
+                                                                            <button className="btn btn-gold btn-sm" onClick={agregarItemContenido}>Agregar</button>
+                                                                            <button className="btn btn-glass btn-sm" onClick={()=>setNuevoItemForm({grupoKey:null,label:'',desc:''})}>Cancelar</button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button className="btn btn-glass btn-sm" onClick={()=>setNuevoItemForm({grupoKey:group.key,label:'',desc:''})}>{I.plus} Item</button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
                                                 );
                                             })}
+                                            {CONTENT_GROUPS.length===0 && (
+                                                <div className="card glass"><div className="empty"><h3>Sin grupos aún</h3><p>Crea tu primer grupo para armar el checklist.</p></div></div>
+                                            )}
                                         </div>
+
+                                        {/* ── Programación de campañas ── */}
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+                                            <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>Programación de campañas</div>
+                                            <div style={{display:'flex',gap:6}}>
+                                                {[['mes','Mes'],['semana','Semana'],['lista','Lista']].map(([k,l])=>(
+                                                    <button key={k} className={`btn btn-sm ${calVista===k?'btn-gold':'btn-glass'}`} onClick={()=>setCalVista(k)}>{l}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {calVista!=='lista' && (
+                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>setCalFecha(d=>{const n=new Date(d); calVista==='mes'?n.setMonth(n.getMonth()-1):n.setDate(n.getDate()-7); return n;})}>← Anterior</button>
+                                                <strong style={{fontSize:13,textTransform:'capitalize'}}>
+                                                    {calVista==='mes' ? calFecha.toLocaleDateString('es-DO',{month:'long',year:'numeric'})
+                                                        : `Semana del ${(()=>{const d=new Date(calFecha);d.setDate(d.getDate()-d.getDay());return d.toLocaleDateString('es-DO',{day:'numeric',month:'long'});})()}`}
+                                                </strong>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>setCalFecha(d=>{const n=new Date(d); calVista==='mes'?n.setMonth(n.getMonth()+1):n.setDate(n.getDate()+7); return n;})}>Siguiente →</button>
+                                            </div>
+                                        )}
+
+                                        {calVista==='mes' && (() => {
+                                            const year = calFecha.getFullYear(), month = calFecha.getMonth();
+                                            const primerDia = new Date(year, month, 1);
+                                            const inicioGrid = new Date(primerDia); inicioGrid.setDate(inicioGrid.getDate()-primerDia.getDay());
+                                            const celdas = Array.from({length:42}, (_,i) => { const d=new Date(inicioGrid); d.setDate(d.getDate()+i); return d; });
+                                            return (
+                                                <div>
+                                                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6,marginBottom:6}}>
+                                                        {DIAS_SEM.map(d=><div key={d} style={{fontSize:10.5,fontWeight:700,color:'var(--text-dimmer)',textAlign:'center',textTransform:'uppercase'}}>{d}</div>)}
+                                                    </div>
+                                                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6}}>
+                                                        {celdas.map(d => renderCeldaDia(d, d.getMonth()!==month))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {calVista==='semana' && (() => {
+                                            const inicio = new Date(calFecha); inicio.setDate(inicio.getDate()-inicio.getDay());
+                                            const dias = Array.from({length:7}, (_,i) => { const d=new Date(inicio); d.setDate(d.getDate()+i); return d; });
+                                            return (
+                                                <div>
+                                                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6,marginBottom:6}}>
+                                                        {DIAS_SEM.map(d=><div key={d} style={{fontSize:10.5,fontWeight:700,color:'var(--text-dimmer)',textAlign:'center',textTransform:'uppercase'}}>{d}</div>)}
+                                                    </div>
+                                                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6}}>
+                                                        {dias.map(d => renderCeldaDia(d, false))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {calVista==='lista' && (() => {
+                                            const entradas = Object.entries(calendario).filter(([,t])=>t).sort(([a],[b])=>a.localeCompare(b));
+                                            return entradas.length===0 ? (
+                                                <div className="card glass"><div className="empty"><h3>Sin nada programado</h3><p>Agrega notas desde la vista de Mes o Semana.</p></div></div>
+                                            ) : (
+                                                <div className="card glass" style={{overflow:'hidden'}}>
+                                                    {entradas.map(([fechaStr,texto],idx)=>{
+                                                        const editando = calEditandoDia===fechaStr;
+                                                        return (
+                                                        <div key={fechaStr} style={{display:'flex',gap:14,padding:'12px 18px',borderTop:idx>0?'1px solid var(--glass-border)':undefined,cursor:editando?'default':'pointer'}} onClick={()=>!editando && abrirDia(fechaStr)}>
+                                                            <div style={{fontSize:12,fontWeight:700,color:fechaStr===hoyIso?'var(--orange)':'var(--text)',flexShrink:0,width:110}}>
+                                                                {new Date(fechaStr+'T12:00:00').toLocaleDateString('es-DO',{weekday:'short',day:'numeric',month:'short'})}
+                                                            </div>
+                                                            {editando ? (
+                                                                <div style={{flex:1}} onClick={e=>e.stopPropagation()}>
+                                                                    <textarea autoFocus value={calTextoTemp} onChange={e=>setCalTextoTemp(e.target.value)}
+                                                                        style={{width:'100%',fontSize:12.5,padding:6,borderRadius:6,border:'1px solid var(--glass-border)',resize:'vertical',minHeight:50,fontFamily:'inherit'}} />
+                                                                    <div style={{display:'flex',gap:6,marginTop:6}}>
+                                                                        <button className="btn btn-glass btn-sm" onClick={()=>setCalEditandoDia(null)}>Cancelar</button>
+                                                                        <button className="btn btn-gold btn-sm" onClick={()=>guardarDia(fechaStr,calTextoTemp)}>Guardar</button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div style={{fontSize:12.5,color:'var(--text-dim)',whiteSpace:'pre-wrap'}}>{texto}</div>
+                                                            )}
+                                                        </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 );
                             })()}
@@ -3320,7 +3579,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}>
                         <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
                             <div className="modal-hd">
-                                <h2>Nuevo Vendedor</h2>
+                                <h2>Nuevo Usuario</h2>
                                 <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
                             </div>
                             <div className="form-group">
@@ -3333,10 +3592,66 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
                                     type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="maria@casabrumi.com" />
                             </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Contraseña temporal</label>
+                                <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)', border:'1px solid var(--glass-border)'}}
+                                    type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="Mínimo 6 caracteres" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Permisos por módulo</label>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                                    {MODULOS_PERMISOS.map(([k,label])=>(
+                                        <label key={k} style={{display:'flex',alignItems:'center',gap:8,fontSize:'12.5px',color:'var(--text-dim)',cursor:'pointer',padding:'6px 8px',borderRadius:6,background:'var(--surface-2)'}}>
+                                            <input type="checkbox" checked={!!form.permisos[k]}
+                                                onChange={e=>setForm(f=>({...f,permisos:{...f.permisos,[k]:e.target.checked}}))} />
+                                            {label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="modal-actions">
                                 <button className="btn btn-glass" onClick={() => setShowModal(false)}>Cancelar</button>
-                                <button className="btn btn-gold" onClick={addVendedor} disabled={saving}>
-                                    {saving ? 'Guardando...' : <>{I.plus} Crear Vendedor</>}
+                                <button className="btn btn-gold" onClick={crearUsuario} disabled={saving||!form.nombre||!form.email||!form.password}>
+                                    {saving ? 'Creando...' : <>{I.plus} Crear Usuario</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showEditUsuarioModal && editingUsuario && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowEditUsuarioModal(false); setEditingUsuario(null); } }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
+                            <div className="modal-hd">
+                                <h2>Permisos de {editingUsuario.nombre}</h2>
+                                <button className="modal-close" onClick={() => { setShowEditUsuarioModal(false); setEditingUsuario(null); }}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Nombre</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={editUsuarioForm.nombre} onChange={e=>setEditUsuarioForm(f=>({...f,nombre:e.target.value}))} />
+                            </div>
+                            <label style={{display:'flex',alignItems:'center',gap:8,fontSize:'12.5px',color:'var(--text-dim)',cursor:'pointer',marginBottom:14}}>
+                                <input type="checkbox" checked={editUsuarioForm.activo}
+                                    onChange={e=>setEditUsuarioForm(f=>({...f,activo:e.target.checked}))} />
+                                Cuenta activa (desmarca para bloquear el acceso sin borrar al usuario)
+                            </label>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Permisos por módulo</label>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                                    {MODULOS_PERMISOS.map(([k,label])=>(
+                                        <label key={k} style={{display:'flex',alignItems:'center',gap:8,fontSize:'12.5px',color:'var(--text-dim)',cursor:'pointer',padding:'6px 8px',borderRadius:6,background:'var(--surface-2)'}}>
+                                            <input type="checkbox" checked={!!editUsuarioForm.permisos[k]}
+                                                onChange={e=>setEditUsuarioForm(f=>({...f,permisos:{...f.permisos,[k]:e.target.checked}}))} />
+                                            {label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={() => { setShowEditUsuarioModal(false); setEditingUsuario(null); }}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={guardarEditUsuario} disabled={savingEditUsuario}>
+                                    {savingEditUsuario ? 'Guardando...' : <>{I.edit} Guardar</>}
                                 </button>
                             </div>
                         </div>
@@ -3360,6 +3675,51 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <button className="btn btn-glass" onClick={() => { setShowTiendaModal(false); setEditingTienda(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={addTienda} disabled={savingTienda}>
                                     {savingTienda ? 'Guardando...' : (editingTienda ? <>{I.edit} Guardar</> : <>{I.plus} Crear Tienda</>)}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showProveedorModal && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowProveedorModal(false); setEditingProveedor(null); } }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
+                            <div className="modal-hd">
+                                <h2>{editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h2>
+                                <button className="modal-close" onClick={() => { setShowProveedorModal(false); setEditingProveedor(null); }}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Nombre del proveedor</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={proveedorForm.nombre} onChange={e=>setProveedorForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Shaanxi Natural Cuikang" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>País de origen</label>
+                                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                    {PROVEEDOR_PAISES.map(pais=>(
+                                        <button key={pais} className={`btn btn-sm ${proveedorForm.pais===pais?'btn-gold':'btn-glass'}`} onClick={()=>setProveedorForm(f=>({...f,pais}))}>{pais}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Contacto (teléfono, email, WhatsApp...)</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={proveedorForm.contacto} onChange={e=>setProveedorForm(f=>({...f,contacto:e.target.value}))} placeholder="Ej. +86 123 456 789" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Link (Alibaba, sitio web...)</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={proveedorForm.link} onChange={e=>setProveedorForm(f=>({...f,link:e.target.value}))} placeholder="https://..." />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Notas</label>
+                                <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}}
+                                    value={proveedorForm.notas} onChange={e=>setProveedorForm(f=>({...f,notas:e.target.value}))} placeholder="Condiciones de pago, tiempos de entrega..." />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={() => { setShowProveedorModal(false); setEditingProveedor(null); }}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={saveProveedor} disabled={savingProveedor||!proveedorForm.nombre.trim()}>
+                                    {savingProveedor ? 'Guardando...' : (editingProveedor ? <>{I.edit} Guardar</> : <>{I.plus} Crear Proveedor</>)}
                                 </button>
                             </div>
                         </div>

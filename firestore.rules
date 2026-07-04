@@ -15,9 +15,10 @@ service cloud.firestore {
     }
 
     // ── users ── perfil de cada cuenta (uid, email, role, photoURL)
+    // el master crea la cuenta de otros usuarios (Usuarios en el panel) además de la propia
     match /users/{uid} {
       allow read:   if isMaster() || (isSignedIn() && request.auth.uid == uid);
-      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isMaster() || (isSignedIn() && request.auth.uid == uid);
       // el propio usuario puede actualizar su perfil (ej. foto) pero NO su rol;
       // solo el master puede cambiar el campo role (ver cambiarRol en el panel)
       allow update: if isMaster() ||
@@ -26,16 +27,16 @@ service cloud.firestore {
       allow delete: if isMaster();
     }
 
-    // ── vendedores ── ficha de cada vendedor (puede o no tener cuenta en /users)
-    // lectura abierta a cualquier logueado: el login de cada vendedor hace un
+    // ── vendedores ── ficha de cada usuario (nombre, email, permisos por módulo, activo)
+    // ya no hay auto-registro: solo el master crea usuarios desde el panel.
+    // lectura abierta a cualquier logueado: el login de cada usuario hace un
     // get() sin filtro sobre toda la coleccion para vincular su cuenta (uid/email),
     // y Firestore no puede permitir eso con una regla restringida por campo
     match /vendedores/{id} {
       allow read:   if isSignedIn();
-      // el master crea vendedores desde el panel; el auto-registro crea su propia ficha
-      allow create: if isMaster() || (isSignedIn() && request.resource.data.email == request.auth.token.email);
-      // el propio vendedor puede vincular su uid/normalizar su email en su ficha (login);
-      // el master puede editar cualquier ficha
+      allow create: if isMaster();
+      // el propio usuario puede vincular su uid/normalizar su email en su ficha (login);
+      // el master puede editar cualquier ficha (incluyendo permisos/activo)
       allow update: if isMaster() ||
         (isSignedIn() && (resource.data.email == request.auth.token.email || resource.data.uid == request.auth.uid));
       allow delete: if isMaster();
@@ -68,12 +69,22 @@ service cloud.firestore {
     match /links/{id}      { allow read, write: if isSignedIn(); }
     match /productos/{id}  { allow read, write: if isSignedIn(); }
 
+    // ── proveedores ── ficha de cada proveedor, cualquier usuario logueado gestiona
+    match /proveedores/{id} { allow read, write: if isSignedIn(); }
+
     // ── campanas ── Planeacion de Campanas, solo master
     match /campanas/{id}   { allow read, write: if isMaster(); }
 
     // ── contabilidad (partida doble, manual) ── solo el master la ve y gestiona
     match /cuentas_contables/{id}  { allow read, write: if isMaster(); }
     match /asientos_contables/{id} { allow read, write: if isMaster(); }
+
+    // ── configuracion ── plantilla compartida del checklist de Contenido; cualquier
+    // usuario logueado la lee (la necesita para ver el checklist), solo el master la edita
+    match /configuracion/{id} {
+      allow read:  if isSignedIn();
+      allow write: if isMaster();
+    }
 
     // cualquier otra coleccion no listada: denegada por defecto
     match /{document=**} {
