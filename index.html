@@ -424,7 +424,6 @@ const DX = (tipo, valor) => {
     const r = (nivel, label) => ({ nivel, label });
     switch (tipo) {
         case 'cpa':         return v<=1 ? r('green','Winner élite') : v<=3 ? r('green','Muy rentable') : v<=5 ? r('gold','Rentable (límite)') : v<=8 ? r('orange','Margen apretado') : r('red','No sostenible');
-        case 'roas':        return v>=4 ? r('green','Escalable fuerte') : v>=3 ? r('green','Winner') : v>=2 ? r('gold','Bueno') : v>=1.5 ? r('orange','Muy justo') : r('red','Pérdida');
         case 'ctr':         return v>=3 ? r('green','Creativo ganador') : v>=2 ? r('green','Bueno') : v>=1 ? r('gold','Normal') : r('red','Anuncio débil');
         case 'cpc':         return v<=0.15 ? r('green','Muy bueno') : v<=0.30 ? r('gold','Aceptable') : r('red','Tráfico caro');
         case 'cpm':         return v<=6 ? r('green','Normal RD') : v<=10 ? r('gold','Competencia media') : r('red','Público saturado');
@@ -1124,27 +1123,29 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [savingProd,         setSavingProd]         = useState(false);
     const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'' });
     const [editSeccion,        setEditSeccion]        = useState(null); // 'facebook'|'inventario'
-    const [fbForm,             setFbForm]             = useState({ gastoAds:'', cpa:'', cpm:'', ctr:'', cpc:'', roas:'', cvr:'', frecuencia:'', atc:'', ic:'', aov:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
-    const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', unidadesVendidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
+    const [fbForm,             setFbForm]             = useState({ cpa:'', cpm:'', ctr:'', cpc:'', cvr:'', frecuencia:'', atc:'', ic:'', aov:'', alcance:'', impresiones:'', conversiones:'', moneda:'USD' });
+    const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
+    // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
     const ANALISIS_CHECKS = [
         ['noVenden','¿No lo están vendiendo en mi mercado?','Poca o ninguna competencia pautándolo activamente en RD. Si nadie más lo vende, tienes ventaja; si muchos lo venden, evalúa si puedes diferenciarte.'],
         ['solucionaNicho','¿Soluciona un problema a un nicho?','¿El producto resuelve un problema significativo para muchas personas, para un nicho grande?'],
         ['competirPrecio','¿Puedo competir en precio?','¿Puedes ofrecer un precio competitivo en tu mercado y aún así dejar buen margen de ganancia?'],
         ['altaPercepcion','¿Alta percepción de valor?','Cuando ves este producto y el problema que resuelve, ¿parece un producto de alta calidad? ¿Crees que puedes venderlo a un precio elevado?'],
-        ['creativoNoUsado','¿Mi creativo no está siendo usado en mi mercado?','El ángulo o creativo que usarás no está saturado/quemado en tu mercado todavía.'],
+        ['creativoNoUsado','¿Tu ángulo o creativo está fresco (sin usar) en tu mercado?','Responde SI si el ángulo/creativo que usarás todavía NO está saturado/quemado en tu mercado. Responde NO si ya lo está usando mucha gente.'],
         ['efectoWow','¿Efecto WOW?','Factor sorpresa visual + conexión emocional. Las 6 necesidades humanas que motivan la compra: 1) Certeza (evitar dolor, obtener placer), 2) Variedad/novedad, 3) Significado (sentirse único/importante), 4) Conexión/amor, 5) Crecimiento, 6) Contribución.'],
-        ['disponibleMarketplace','¿Disponible en marketplace de tu país?','Valida si el artículo está en Facebook Marketplace del país. Ventaja: puedes comprar al por mayor ya disponible y revender rápido. Desventaja: otros también pueden hacerlo, aumenta la competencia.'],
+        ['disponibleMarketplace','¿Disponible en marketplace de tu país?','Si NO está disponible todavía, tienes exclusividad temporal antes de que otros lo repliquen — cuenta a tu favor. Si SI está disponible, ya hay más competencia.','no'],
         ['generaRecompra','¿Genera recompra?','Producto consumible o de uso que pueda generar recompra del mismo cliente.'],
         ['resuelveNecesidad','¿Resuelve necesidad?','¿Es una solución que ningún otro producto ofrece de esta manera a ese problema?'],
         ['ticketBajo','¿Ticket bajo?','Precio de venta accesible para compra impulsiva. RD: inferior a 300 · (COL: <$100.000 · MEX: <$999).'],
-        ['noEsBlack','¿No es black? (producto permitido)','El producto cumple las políticas: NO muestra antes/después, NO es de salud, NO es agresivo al cuerpo humano. Revisa políticas de TikTok y Facebook Ads.'],
+        ['noEsBlack','¿Es un producto permitido (no black)?','Responde SI si el producto cumple las políticas: no muestra antes/después, no es de salud, no es agresivo al cuerpo humano. Responde NO si es un producto "black" / prohibido. Revisa políticas de TikTok y Facebook Ads.'],
         ['facilImportar','¿Fácil de importar o fabricar?','¿El producto no mide más de 15 cm x 15 cm? Tamaño pequeño = más fácil y barato de importar.'],
     ];
+    // El 3er valor indica qué respuesta ('si' o 'no') es la favorable; por defecto 'si'.
     const CREATIVO_CHECKS = [
-        ['c5dias',      '¿Lleva +5 días activo en otro mercado?'],
+        ['c5dias',      '¿Lleva +5 días activo en otro mercado?', 'no'],
         ['cVistas',     '¿Tiene buenas vistas o reacciones (+1K)?'],
         ['cComentarios','¿Tiene comentarios positivos?'],
-        ['cNoQuemado',  '¿El ángulo no está quemado en RD?'],
+        ['cNoQuemado',  '¿El ángulo está fresco (no quemado) en RD?'],
         ['cIdioma',     '¿Tiene subtítulos o texto adaptado al cliente?'],
         ['cHispano',    '¿Funciona en mercado hispano similar?'],
     ];
@@ -1584,6 +1585,37 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         return () => window.removeEventListener('keydown', h);
     }, []);
 
+    useEffect(() => { if (showModal && firstInputRef.current) firstInputRef.current.focus(); }, [showModal]);
+
+    useEffect(() => {
+        if (activeTab !== 'dashboard' || !chartRef.current || typeof Chart === 'undefined') return;
+        const days = Array.from({length:7}, (_,i) => { const d=new Date(); d.setDate(d.getDate()-(6-i)); return d; });
+        const cierresTienda = cierres.filter(perteneceATienda);
+        const data = days.map(d => {
+            const iso = d.toISOString().slice(0,10);
+            return cierresTienda.find(c => c.fechaStr === iso)?.totalMonto || 0;
+        });
+        const labels = days.map(d => d.toLocaleDateString('es-CO',{weekday:'short',day:'numeric'}));
+        if (chartInst.current) chartInst.current.destroy();
+        chartInst.current = new Chart(chartRef.current, {
+            type: 'bar',
+            data: { labels, datasets: [{ data, backgroundColor: labels.map((_,i)=>i===labels.length-1?'#C85C1A':'rgba(92,61,30,0.55)'), hoverBackgroundColor:'#D97340', borderRadius:6, borderSkipped:false }] },
+            options: {
+                responsive:true, maintainAspectRatio:false,
+                plugins: {
+                    legend:{ display:false },
+                    tooltip:{ backgroundColor:'#1C1814', titleColor:'#fff', bodyColor:'rgba(255,255,255,0.65)', padding:10, cornerRadius:8,
+                        callbacks:{ label: ctx => ` RD$${ctx.raw.toFixed(2)}` } }
+                },
+                scales: {
+                    y: { grid:{ color:'rgba(92,61,30,0.07)' }, ticks:{ color:'rgba(92,61,30,0.38)', font:{family:'Fira Code',size:11} }, border:{ display:false } },
+                    x: { grid:{ display:false }, ticks:{ color:'rgba(92,61,30,0.45)', font:{size:11} }, border:{ display:false } }
+                }
+            }
+        });
+        return () => { if (chartInst.current) { chartInst.current.destroy(); chartInst.current=null; } };
+    }, [activeTab, cierres, activeTiendaId]);
+
     const handleProdImage = (file, cb) => {
         if (!file) return;
         const reader = new FileReader();
@@ -1701,12 +1733,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     ];
 
     // Métricas ejecutivas para el dashboard
-    const _hoy = new Date();
-    const _gastosMes = gastosScoped.filter(g => { const d = g.fecha?.toDate?.(); return d && d.getMonth() === _hoy.getMonth() && d.getFullYear() === _hoy.getFullYear(); });
-    const gastoMesUSD = _gastosMes.filter(g => g.moneda !== 'DOP').reduce((s,g) => s + (g.monto||0), 0);
-    const gastoMesDOP = _gastosMes.filter(g => g.moneda === 'DOP').reduce((s,g) => s + (g.monto||0), 0);
-    const deudaUSD = gastosScoped.filter(g => g.esCredito && g.moneda !== 'DOP').reduce((s,g) => s + Math.max(0, (g.monto||0) - (g.montoAbonado||0)), 0);
-    const deudaDOP = gastosScoped.filter(g => g.esCredito && g.moneda === 'DOP').reduce((s,g) => s + Math.max(0, (g.monto||0) - (g.montoAbonado||0)), 0);
     const nGanadores = productosScoped.filter(p => p.estado === 'Ganador').length;
 
     return (
@@ -1765,8 +1791,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         {/* BENTO GRID */}
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1.4fr',gridAutoRows:'min-content',gap:'12px',position:'relative',zIndex:1}}>
 
-                            {/* ── FEATURE CARD — naranja, col 4, filas 1-3 ── */}
-                            <div style={{gridColumn:'4',gridRow:'1/4',borderRadius:'16px',padding:'26px',background:'var(--orange)',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',position:'relative',boxShadow:'0 16px 40px -10px rgba(200,92,26,0.45)'}}>
+                            {/* ── FEATURE CARD — naranja, col 4, filas 1-2 ── */}
+                            <div style={{gridColumn:'4',gridRow:'1/3',borderRadius:'16px',padding:'26px',background:'var(--orange)',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',position:'relative',boxShadow:'0 16px 40px -10px rgba(200,92,26,0.45)'}}>
                                 <div style={{position:'absolute',top:'-40px',left:'-40px',width:'180px',height:'180px',borderRadius:'50%',background:'rgba(255,255,255,0.08)',pointerEvents:'none'}} />
                                 <div style={{position:'absolute',bottom:'-30px',right:'-30px',width:'140px',height:'140px',borderRadius:'50%',background:'rgba(0,0,0,0.10)',pointerEvents:'none'}} />
                                 <div style={{position:'relative',zIndex:1}}>
@@ -1790,34 +1816,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
 
                             {/* ── ROW 1 — 3 stat cards ── */}
-                            <div style={{gridColumn:'1',borderRadius:'14px',padding:'18px 20px',background:'var(--earth)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px',boxShadow:'0 8px 24px -8px rgba(92,61,30,0.30)'}}>
-                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'rgba(247,242,234,0.45)',textTransform:'uppercase',letterSpacing:'2px'}}>Gasto mes USD</p>
-                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:'var(--cream)',lineHeight:1}}><KpiVal value={`$${gastoMesUSD.toFixed(0)}`}/></div>
-                                <p style={{fontSize:'10px',color:'rgba(247,242,234,0.38)'}}>{_gastosMes.filter(g=>g.moneda!=='DOP').length} gastos registrados</p>
-                            </div>
-                            <div style={{gridColumn:'2',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
+                            <div style={{gridColumn:'1',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
                                 <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Vendedores</p>
                                 <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:'var(--text)',lineHeight:1}}><KpiVal value={vendedoresScoped.length}/></div>
                                 <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>en el equipo</p>
                             </div>
-                            <div style={{gridColumn:'3',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
-                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Deuda USD</p>
-                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:deudaUSD>0?'var(--orange)':'var(--text)',lineHeight:1}}><KpiVal value={`$${deudaUSD.toFixed(0)}`}/></div>
-                                <p style={{fontSize:'10px',color:deudaUSD>0?'var(--orange)':'var(--text-dimmer)',opacity:0.7}}>pendiente de pago</p>
-                            </div>
-
-                            {/* ── ROW 2 — 3 stat cards ── */}
-                            <div style={{gridColumn:'1',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px'}}>
-                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Gasto mes DOP</p>
-                                <div style={{fontSize:'24px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--text)',lineHeight:1}}><KpiVal value={`RD$${gastoMesDOP.toFixed(0)}`}/></div>
-                                <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{_gastosMes.filter(g=>g.moneda==='DOP').length} gastos</p>
-                            </div>
-                            <div style={{gridColumn:'2',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px'}}>
+                            <div style={{gridColumn:'2',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
                                 <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Productos</p>
-                                <div style={{fontSize:'24px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--text)',lineHeight:1}}><KpiVal value={productosScoped.length}/></div>
+                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:'var(--text)',lineHeight:1}}><KpiVal value={productosScoped.length}/></div>
                                 <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{nGanadores} ganadores</p>
                             </div>
-                            <div style={{gridColumn:'3',borderRadius:'14px',padding:'18px 20px',background:'var(--orange-dim)',border:'1px solid var(--orange-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px'}}>
+                            <div style={{gridColumn:'3',borderRadius:'14px',padding:'18px 20px',background:'var(--orange-dim)',border:'1px solid var(--orange-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
                                 <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--orange)',textTransform:'uppercase',letterSpacing:'2px'}}>Cierre ayer</p>
                                 <div style={{fontSize:'20px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--orange)',lineHeight:1}}>
                                     <KpiVal value={cierreHoyDash ? `RD$${(cierreHoyDash.totalMonto||0).toLocaleString()}` : '—'}/>
@@ -1825,11 +1834,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <p style={{fontSize:'10px',color:'var(--orange)',opacity:0.7}}>{cierreHoyDash ? `${cierreHoyDash.totalCantidad||0} unidades` : 'sin cierre aún'}</p>
                             </div>
 
-                            {/* ── ROW 3 — Chart spans cols 1-3 ── */}
+                            {/* ── ROW 2 — Chart spans cols 1-3 ── */}
                             <div style={{gridColumn:'1/4',borderRadius:'14px',padding:'20px 22px',background:'var(--surface-2)',border:'1px solid var(--glass-border)'}}>
                                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
                                     <p style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Ventas — últimos 7 días</p>
-                                    <span style={{fontSize:'11px',color:'var(--text-dimmer)'}}>USD</span>
+                                    <span style={{fontSize:'11px',color:'var(--text-dimmer)'}}>DOP</span>
                                 </div>
                                 <div style={{height:'140px'}}><canvas ref={chartRef}></canvas></div>
                             </div>
@@ -2028,8 +2037,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             ) : (
                                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:16}}>
                                     {productos.map(p => {
-                                        const inv = p.inventario||{}; const fb = p.facebook||{};
-                                        const vendido = parseFloat(inv.unidadesVendidas||0);
+                                        const inv = p.inventario||{};
+                                        const vendido = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
                                         const pedido  = parseFloat(inv.unidadesPedidas||0);
                                         return (
                                             <div key={p.id} className="card glass" style={{cursor:'pointer',transition:'transform var(--t-fast),box-shadow var(--t-fast)'}}
@@ -2049,7 +2058,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={p.proveedor}>{p.proveedor}</div>}
                                                     <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
                                                         {pedido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span>/{pedido} vendidos</div>}
-                                                        {fb.roas&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}>ROAS <span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--sand-dark)'}}>{fb.roas}x</span></div>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2113,8 +2121,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     // ── Detalle de producto ──
                     const p = productos.find(x=>x.id===activeProducto.id) || activeProducto;
                     const fb = p.facebook||{}; const inv = p.inventario||{};
+                    // Unidades vendidas = suma de lo registrado para este producto en Cierre Diario (por nombre exacto), no un campo manual.
+                    const unidadesVendidasCalc = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
                     const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
-                    const gananciaTotal = gananciaUnit * parseFloat(inv.unidadesVendidas||0);
+                    const gananciaTotal = gananciaUnit * unidadesVendidasCalc;
                     const TABS = ['General','Análisis','Contenido','Facebook','Inventario'];
                     const CONTENT_GROUPS = [
                         { key: 'shopify', label: 'SHOPIFY', items: [
@@ -2127,7 +2137,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         ]},
                     ];
                     const analisis = p.analisis || {};
-                    const analisisScore = ANALISIS_CHECKS.filter(([k])=>(analisis.checks||{})[k]==='si').length;
+                    const analisisScore = ANALISIS_CHECKS.filter(([k,,,favorable='si'])=>(analisis.checks||{})[k]===favorable).length;
                     const angulosValidos = !!(analisis.angulo1Titulo && analisis.angulo1Titulo.trim());
                     const posibleGanador = analisisScore >= 6 && angulosValidos;
                     return (
@@ -2179,9 +2189,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                                             {[
                                                 {label:'Unidades pedidas', val: inv.unidadesPedidas||'—'},
-                                                {label:'Unidades vendidas', val: inv.unidadesVendidas||'—'},
-                                                {label:'ROAS', val: fb.roas ? `${fb.roas}x` : '—'},
-                                                {label:'Gasto en Ads', val: fb.gastoAds ? `$${fb.gastoAds}` : '—'},
+                                                {label:'Unidades vendidas', val: unidadesVendidasCalc||'—'},
                                             ].map(({label,val})=>(
                                                 <div key={label} className="kpi-card glass glass-mid" style={{padding:'16px'}}>
                                                     <div className="kpi-label">{label}</div>
@@ -2206,20 +2214,23 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                                         <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'20px 0 12px'}}>Características de un producto ganador</div>
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 16px'}}>
-                                            {ANALISIS_CHECKS.map(([k,label,nota])=>{
+                                            {ANALISIS_CHECKS.map(([k,label,nota,favorable='si'])=>{
                                                 const v = (analisisForm.checks||{})[k] || '';
                                                 return (
                                                 <div key={k} style={{padding:'10px 12px',borderRadius:10,background:'var(--surface-3)',border:'1px solid var(--glass-border)'}}>
                                                     <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:10}}>
                                                         <span style={{fontSize:'12px',fontWeight:'600',color:'var(--text)',lineHeight:1.3}}>{label}</span>
                                                         <div style={{display:'flex',gap:5,flexShrink:0}}>
-                                                            {['si','no'].map(opt=>(
-                                                                <button key={opt} onClick={()=>setAnalisisForm(f=>({...f,checks:{...(f.checks||{}),[k]:opt}}))}
-                                                                    style={{padding:'4px 11px',borderRadius:7,fontSize:'10.5px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',
-                                                                        border:'1px solid '+(v===opt?(opt==='si'?'rgba(74,120,89,0.4)':'rgba(160,56,56,0.35)'):'var(--glass-border)'),
-                                                                        background:v===opt?(opt==='si'?'rgba(74,120,89,0.14)':'rgba(160,56,56,0.10)'):'transparent',
-                                                                        color:v===opt?(opt==='si'?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>{opt}</button>
-                                                            ))}
+                                                            {['si','no'].map(opt=>{
+                                                                const bueno = opt===favorable;
+                                                                return (
+                                                                    <button key={opt} onClick={()=>setAnalisisForm(f=>({...f,checks:{...(f.checks||{}),[k]:opt}}))}
+                                                                        style={{padding:'4px 11px',borderRadius:7,fontSize:'10.5px',fontWeight:'700',cursor:'pointer',fontFamily:'inherit',textTransform:'uppercase',
+                                                                            border:'1px solid '+(v===opt?(bueno?'rgba(74,120,89,0.4)':'rgba(160,56,56,0.35)'):'var(--glass-border)'),
+                                                                            background:v===opt?(bueno?'rgba(74,120,89,0.14)':'rgba(160,56,56,0.10)'):'transparent',
+                                                                            color:v===opt?(bueno?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>{opt}</button>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                     {nota && <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',lineHeight:1.45,marginTop:6}}>{nota}</div>}
@@ -2249,22 +2260,25 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                                         <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',margin:'22px 0 12px'}}>Creativo validado</div>
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
-                                            {CREATIVO_CHECKS.map(([k,label])=>{
+                                            {CREATIVO_CHECKS.map(([k,label,favorable='si'])=>{
                                                 const v = (analisisForm.creativoChecks||{})[k];
                                                 const setV = val => setAnalisisForm(f=>({...f, creativoChecks:{...(f.creativoChecks||{}),[k]:val}}));
                                                 return (
                                                     <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderRadius:'var(--r-sm)',border:'1px solid var(--glass-border)',background:'var(--surface-2)',gap:8}}>
                                                         <span style={{fontSize:'12px',color:'var(--text)',flex:1}}>{label}</span>
                                                         <div style={{display:'flex',gap:4,flexShrink:0}}>
-                                                            {['si','no'].map(opt=>(
-                                                                <button key={opt} onClick={()=>setV(v===opt?'':opt)}
-                                                                    style={{padding:'3px 10px',borderRadius:6,border:'1.5px solid',fontSize:'11px',fontWeight:'700',cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.5px',
-                                                                        borderColor: v===opt?(opt==='si'?'#4A9050':'#A03B3B'):'var(--glass-border)',
-                                                                        background:  v===opt?(opt==='si'?'rgba(74,144,80,0.12)':'rgba(160,56,56,0.10)'):'transparent',
-                                                                        color:       v===opt?(opt==='si'?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>
-                                                                    {opt}
-                                                                </button>
-                                                            ))}
+                                                            {['si','no'].map(opt=>{
+                                                                const bueno = opt===favorable;
+                                                                return (
+                                                                    <button key={opt} onClick={()=>setV(v===opt?'':opt)}
+                                                                        style={{padding:'3px 10px',borderRadius:6,border:'1.5px solid',fontSize:'11px',fontWeight:'700',cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.5px',
+                                                                            borderColor: v===opt?(bueno?'#4A9050':'#A03B3B'):'var(--glass-border)',
+                                                                            background:  v===opt?(bueno?'rgba(74,144,80,0.12)':'rgba(160,56,56,0.10)'):'transparent',
+                                                                            color:       v===opt?(bueno?'#3D6646':'#A03B3B'):'var(--text-dimmer)'}}>
+                                                                        {opt}
+                                                                    </button>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                 );
@@ -2294,13 +2308,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 <button className="btn btn-glass btn-sm" onClick={()=>{setAnalisisForm({...ANALISIS_DEFAULT, ...analisis, checks:{...(analisis.checks||{})}, creativoChecks:{...(analisis.creativoChecks||{})}}); setEditSeccion('analisis');}}>✎ Editar análisis</button>
                                             </div>
                                             <div style={{padding:'10px 22px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:0}}>
-                                                {ANALISIS_CHECKS.map(([k,label])=>{
+                                                {ANALISIS_CHECKS.map(([k,label,,favorable='si'])=>{
                                                     const v=(analisis.checks||{})[k];
+                                                    const bueno = v && v===favorable;
+                                                    const malo  = v && v!==favorable;
                                                     return (
                                                     <div key={k} style={{display:'flex',alignItems:'center',gap:9,padding:'9px 0',fontSize:'12px',color:'var(--text-dim)'}}>
                                                         <span style={{width:18,height:18,borderRadius:5,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'800',
-                                                            background:v==='si'?'rgba(74,120,89,0.14)':v==='no'?'rgba(160,56,56,0.10)':'var(--cream-dark)',
-                                                            color:v==='si'?'#3D6646':v==='no'?'#A03B3B':'var(--text-dimmer)'}}>{v==='si'?'✓':v==='no'?'✕':'·'}</span>
+                                                            background:bueno?'rgba(74,120,89,0.14)':malo?'rgba(160,56,56,0.10)':'var(--cream-dark)',
+                                                            color:bueno?'#3D6646':malo?'#A03B3B':'var(--text-dimmer)'}}>{bueno?'✓':malo?'✕':'·'}</span>
                                                         {label}
                                                     </div>
                                                     );
@@ -2336,13 +2352,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 </div>
                                                 <div className="card glass" style={{padding:'20px'}}>
                                                     <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:12}}>Creativo validado</div>
-                                                    {CREATIVO_CHECKS.map(([k,label])=>{
+                                                    {CREATIVO_CHECKS.map(([k,label,favorable='si'])=>{
                                                         const v=(analisis.creativoChecks||{})[k];
+                                                        const bueno = v && v===favorable;
+                                                        const malo  = v && v!==favorable;
                                                         return (
                                                             <div key={k} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,fontSize:'12px'}}>
                                                                 <span style={{width:16,height:16,borderRadius:4,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:'800',
-                                                                    background:v==='si'?'rgba(74,144,80,0.14)':v==='no'?'rgba(160,56,56,0.10)':'var(--cream-dark)',
-                                                                    color:v==='si'?'#3D6646':v==='no'?'#A03B3B':'var(--text-dimmer)'}}>{v==='si'?'✓':v==='no'?'✕':'·'}</span>
+                                                                    background:bueno?'rgba(74,144,80,0.14)':malo?'rgba(160,56,56,0.10)':'var(--cream-dark)',
+                                                                    color:bueno?'#3D6646':malo?'#A03B3B':'var(--text-dimmer)'}}>{bueno?'✓':malo?'✕':'·'}</span>
                                                                 <span style={{color:'var(--text-dim)'}}>{label}</span>
                                                             </div>
                                                         );
@@ -2369,9 +2387,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar métricas de Facebook</div>
                                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
                                                 {[
-                                                    {key:'gastoAds',label:'Gasto en Ads (USD)',ph:'0.00'},
                                                     {key:'cpa',label:'CPA — Costo por compra (USD)',ph:'Ej. 2.50',dx:'cpa'},
-                                                    {key:'roas',label:'ROAS',ph:'Ej. 3.5',dx:'roas'},
                                                     {key:'ctr',label:'CTR (%)',ph:'Ej. 2.4',dx:'ctr'},
                                                     {key:'cpc',label:'CPC (USD)',ph:'Ej. 0.12',dx:'cpc'},
                                                     {key:'cpm',label:'CPM (USD)',ph:'Ej. 5',dx:'cpm'},
@@ -2401,18 +2417,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div className="card glass">
                                             <div style={{padding:'16px 20px',display:'flex',justifyContent:'space-between',borderBottom:'1px solid var(--glass-border)'}}>
                                                 <span style={{fontWeight:'700',fontSize:'13px'}}>Métricas de campaña <span style={{fontWeight:'500',color:'var(--text-dimmer)',fontSize:'11px'}}>· diagnóstico automático RD</span></span>
-                                                <button className="btn btn-glass btn-sm" onClick={()=>{setFbForm({gastoAds:fb.gastoAds||'',cpa:fb.cpa||'',roas:fb.roas||'',cpm:fb.cpm||'',cpc:fb.cpc||'',ctr:fb.ctr||'',cvr:fb.cvr||'',frecuencia:fb.frecuencia||'',atc:fb.atc||'',ic:fb.ic||'',aov:fb.aov||'',alcance:fb.alcance||'',impresiones:fb.impresiones||'',conversiones:fb.conversiones||''});setEditSeccion('facebook');}}>✎ Editar</button>
+                                                <button className="btn btn-glass btn-sm" onClick={()=>{setFbForm({cpa:fb.cpa||'',cpm:fb.cpm||'',cpc:fb.cpc||'',ctr:fb.ctr||'',cvr:fb.cvr||'',frecuencia:fb.frecuencia||'',atc:fb.atc||'',ic:fb.ic||'',aov:fb.aov||'',alcance:fb.alcance||'',impresiones:fb.impresiones||'',conversiones:fb.conversiones||''});setEditSeccion('facebook');}}>✎ Editar</button>
                                             </div>
                                             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:0}}>
                                                 {[
                                                     {label:'CPA', val:fb.cpa?`$${fb.cpa}`:'—', dx:'cpa', raw:fb.cpa},
-                                                    {label:'ROAS', val:fb.roas?`${fb.roas}x`:'—', dx:'roas', raw:fb.roas},
                                                     {label:'CTR', val:fb.ctr?`${fb.ctr}%`:'—', dx:'ctr', raw:fb.ctr},
                                                     {label:'CPC', val:fb.cpc?`$${fb.cpc}`:'—', dx:'cpc', raw:fb.cpc},
                                                     {label:'CPM', val:fb.cpm?`$${fb.cpm}`:'—', dx:'cpm', raw:fb.cpm},
                                                     {label:'CVR', val:fb.cvr?`${fb.cvr}%`:'—', dx:'cvr', raw:fb.cvr},
                                                     {label:'Frecuencia', val:fb.frecuencia||'—', dx:'frecuencia', raw:fb.frecuencia},
-                                                    {label:'Gasto Ads', val:fb.gastoAds?`$${fb.gastoAds}`:'—'},
                                                     {label:'Add To Cart', val:fb.atc?fmtNum(fb.atc):'—'},
                                                     {label:'Init. Checkout', val:fb.ic?fmtNum(fb.ic):'—'},
                                                     {label:'Ticket AOV', val:fb.aov?`RD$${fmtNum(fb.aov)}`:'—'},
@@ -2441,7 +2455,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                                             {[
                                                 {key:'unidadesPedidas', label:'Unidades pedidas', ph:'0'},
-                                                {key:'unidadesVendidas', label:'Unidades vendidas', ph:'0'},
                                                 {key:'precioCompra', label:'Precio de compra', ph:'0.00'},
                                                 {key:'precioVenta', label:'Precio de venta', ph:'0.00'},
                                             ].map(({key,label,ph})=>(
@@ -2470,8 +2483,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:16}}>
                                             {[
                                                 {label:'Pedidos', val:inv.unidadesPedidas||'0', sub:'unidades'},
-                                                {label:'Vendidos', val:inv.unidadesVendidas||'0', sub:'unidades', ok:true},
-                                                {label:'Stock disponible', val:Math.max(0,(parseFloat(inv.unidadesPedidas||0)-parseFloat(inv.unidadesVendidas||0))).toString(), sub:'unidades'},
+                                                {label:'Vendidos', val:String(unidadesVendidasCalc), sub:'unidades — suma de Cierre Diario', ok:true},
+                                                {label:'Stock disponible', val:Math.max(0,(parseFloat(inv.unidadesPedidas||0)-unidadesVendidasCalc)).toString(), sub:'unidades'},
                                                 {label:'Ganancia unitaria', val:gananciaUnit>0?`${inv.moneda==='DOP'?'RD$':'$'}${gananciaUnit.toFixed(2)}`:'—', sub:'por unidad', ok:gananciaUnit>0},
                                                 {label:'Ganancia total', val:gananciaTotal>0?`${inv.moneda==='DOP'?'RD$':'$'}${gananciaTotal.toFixed(2)}`:'—', sub:'acumulada', ok:gananciaTotal>0},
                                                 {label:'Precio venta', val:inv.precioVenta?`${inv.moneda==='DOP'?'RD$':'$'}${inv.precioVenta}`:'—', sub:'por unidad'},
@@ -2484,7 +2497,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             ))}
                                         </div>
                                         <div style={{textAlign:'right'}}>
-                                            <button className="btn btn-glass" onClick={()=>{setInvForm({unidadesPedidas:inv.unidadesPedidas||'',unidadesVendidas:inv.unidadesVendidas||'',precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||'',moneda:inv.moneda||'USD'});setEditSeccion('inventario');}}>✎ Editar Inventario</button>
+                                            <button className="btn btn-glass" onClick={()=>{setInvForm({unidadesPedidas:inv.unidadesPedidas||'',precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||'',moneda:inv.moneda||'USD'});setEditSeccion('inventario');}}>✎ Editar Inventario</button>
                                         </div>
                                     </>
                                 )
