@@ -1343,6 +1343,29 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (confirm('¿Eliminar este asiento? Esta acción no se puede deshacer.')) db.collection('asientos_contables').doc(a.id).delete().catch(console.error);
     };
 
+    // Borra en bloque los asientos que la sincronización automática generó desde Gastos
+    // (no toca los que vienen de Cierre Diario). No revive solos: los gastos ya sincronizados
+    // conservan su marca de sincronización aunque el asiento se borre, así que no se vuelven a crear.
+    const [limpiandoAsientosGastos, setLimpiandoAsientosGastos] = useState(false);
+    const limpiarAsientosGastos = async () => {
+        if (!confirm('¿Eliminar todos los asientos generados automáticamente desde Gastos en esta tienda? Esta acción no se puede deshacer.')) return;
+        setLimpiandoAsientosGastos(true);
+        try {
+            const [snapInicial, snapAbono] = await Promise.all([
+                db.collection('asientos_contables').where('tiendaId','==',activeTiendaId).where('origen.tipo','==','gasto').get(),
+                db.collection('asientos_contables').where('tiendaId','==',activeTiendaId).where('origen.tipo','==','gasto-abono').get(),
+            ]);
+            const docs = [...snapInicial.docs, ...snapAbono.docs];
+            for (let i = 0; i < docs.length; i += 400) {
+                const batch = db.batch();
+                docs.slice(i, i+400).forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+            alert(`${docs.length} asiento(s) de Gastos eliminado(s).`);
+        } catch(err) { console.error('Error limpiando asientos de gastos:', err); alert('Error al eliminar. Revisa la consola.'); }
+        finally { setLimpiandoAsientosGastos(false); }
+    };
+
     // Suma débitos/créditos de un conjunto de asientos por cuenta y calcula el saldo según naturaleza de cada cuenta.
     const sumarSaldosCtb = (cuentasScope, asientosScope) => {
         const saldos = {};
@@ -3065,7 +3088,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     {contabTab==='diario' && (() => {
                         const misAsientos = asientos.filter(a=>a.tiendaId===activeTiendaId);
                         return <>
-                        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
+                        <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginBottom:14}}>
+                            <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} disabled={limpiandoAsientosGastos} onClick={limpiarAsientosGastos}>
+                                {limpiandoAsientosGastos ? 'Eliminando...' : 'Eliminar asientos automáticos de Gastos'}
+                            </button>
                             <button className="btn btn-gold"
                                 onClick={()=>{setAsientoForm({fecha:hoyISO,descripcion:'',lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}]});setShowAsientoModal(true);}}>{I.plus} Nuevo asiento</button>
                         </div>
