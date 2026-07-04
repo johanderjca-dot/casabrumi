@@ -1285,7 +1285,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [editingCuenta,    setEditingCuenta]    = useState(null);
     const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD' });
     const [savingCuenta,     setSavingCuenta]     = useState(false);
-    const ASIENTO_LINEA_VACIA = { cuentaId:'', debe:'', haber:'' };
+    const ASIENTO_LINEA_VACIA = { cuentaId:'', tercero:'', debe:'', haber:'' };
     const [showAsientoModal, setShowAsientoModal] = useState(false);
     const [asientoForm,      setAsientoForm]      = useState({ fecha:'', descripcion:'', lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}] });
     const [savingAsiento,    setSavingAsiento]    = useState(false);
@@ -1293,6 +1293,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [balanceFecha,     setBalanceFecha]     = useState('');
     const [resultDesde,      setResultDesde]      = useState('');
     const [resultHasta,      setResultHasta]      = useState('');
+    const [auxCuentaId,      setAuxCuentaId]      = useState('');
+    const [auxFecha,         setAuxFecha]         = useState('');
 
     useEffect(() => {
         const unsub = db.collection('cuentas_contables').orderBy('codigo','asc').onSnapshot(
@@ -1345,7 +1347,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         try {
             const lineas = asientoLineasValidas.map(l => {
                 const cuenta = cuentas.find(c=>c.id===l.cuentaId);
-                return { cuentaId: l.cuentaId, cuentaNombre: cuenta?.nombre||'', cuentaCodigo: cuenta?.codigo||'', moneda: cuenta?.moneda||'USD', debe: parseFloat(l.debe)||0, haber: parseFloat(l.haber)||0 };
+                return { cuentaId: l.cuentaId, cuentaNombre: cuenta?.nombre||'', cuentaCodigo: cuenta?.codigo||'', moneda: cuenta?.moneda||'USD', debe: parseFloat(l.debe)||0, haber: parseFloat(l.haber)||0, tercero: (l.tercero||'').trim() };
             });
             await db.collection('asientos_contables').add({
                 fecha: asientoForm.fecha, descripcion: asientoForm.descripcion.trim(), tiendaId: activeTiendaId,
@@ -1425,13 +1427,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             const nombreMedio = (g.medioPago==='Tarjeta' && g.terminal) ? `Banco/Tarjeta — ${g.terminal}` : (CUENTA_MEDIO_PAGO[g.medioPago]||'Caja Efectivo');
             const cMedio = await ensureCuentaCtb(nombreMedio, 'Activo', moneda);
             const updates = {};
+            const tercero = (g.proveedor||'').trim();
             if (necesitaInicial) {
-                const lineas = [{ cuentaId:cGasto.id, cuentaNombre:cGasto.nombre, cuentaCodigo:cGasto.codigo, moneda, debe:g.monto||0, haber:0 }];
+                const lineas = [{ cuentaId:cGasto.id, cuentaNombre:cGasto.nombre, cuentaCodigo:cGasto.codigo, moneda, debe:g.monto||0, haber:0, tercero }];
                 if (g.esCredito) {
                     const cPP = await ensureCuentaCtb('Cuentas por Pagar', 'Pasivo', moneda);
-                    lineas.push({ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:g.monto||0 });
+                    lineas.push({ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:g.monto||0, tercero });
                 } else {
-                    lineas.push({ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:g.monto||0 });
+                    lineas.push({ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:g.monto||0, tercero });
                 }
                 updates.ctbAsientoInicialId = await postAsientoAuto(fecha, `Gasto: ${g.descripcion||g.categoria||''}`, lineas, { tipo:'gasto', id:g.id, parte:'inicial' });
                 updates.ctbAbonoSincronizado = 0;
@@ -1439,10 +1442,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             if (g.esCredito && Math.abs(deltaAbono) >= 0.005) {
                 const cPP = await ensureCuentaCtb('Cuentas por Pagar', 'Pasivo', moneda);
                 const lineas = deltaAbono > 0
-                    ? [{ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:deltaAbono, haber:0 },
-                       { cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:deltaAbono }]
-                    : [{ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:-deltaAbono, haber:0 },
-                       { cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:-deltaAbono }];
+                    ? [{ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:deltaAbono, haber:0, tercero },
+                       { cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:deltaAbono, tercero }]
+                    : [{ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:-deltaAbono, haber:0, tercero },
+                       { cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:-deltaAbono, tercero }];
                 await postAsientoAuto(fecha, `Abono: ${g.descripcion||g.categoria||''}`, lineas, { tipo:'gasto-abono', id:g.id });
                 updates.ctbAbonoSincronizado = abonado;
             }
@@ -3763,7 +3766,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                 {activeTab === 'contabilidad' && (() => {
                     const fmtCtb = (v, m) => `${m==='DOP'?'RD$':'$'}${(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-                    const CONTAB_SUBTABS = [['plan','Plan de Cuentas'],['diario','Libro Diario'],['balance','Balance General'],['resultados','Estado de Resultados']];
+                    const CONTAB_SUBTABS = [['plan','Plan de Cuentas'],['diario','Libro Diario'],['auxiliar','Libro Auxiliar'],['balance','Balance General'],['resultados','Estado de Resultados']];
                     return <>
                     <div className="page-header"><h1>Contabilidad</h1><p>Plan de cuentas, libro diario y reportes por partida doble — módulo manual, independiente de Gastos y Cierre Diario.</p></div>
                     <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
@@ -3813,12 +3816,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const misAsientos = asientos.filter(a=>a.tiendaId===activeTiendaId);
                         return <>
                         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
-                            <button className="btn btn-gold" disabled={cuentas.filter(c=>c.tiendaId===activeTiendaId).length<2}
+                            <button className="btn btn-gold"
                                 onClick={()=>{setAsientoForm({fecha:hoyISO,descripcion:'',lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}]});setShowAsientoModal(true);}}>{I.plus} Nuevo asiento</button>
                         </div>
-                        {cuentas.filter(c=>c.tiendaId===activeTiendaId).length<2 && (
-                            <div className="card glass" style={{padding:'14px 18px',marginBottom:14,fontSize:'12px',color:'var(--text-dim)'}}>Necesitas al menos 2 cuentas en tu Plan de Cuentas antes de crear un asiento.</div>
-                        )}
                         {misAsientos.length===0 ? (
                             <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin asientos aún</h3><p>Registra tu primer asiento contable.</p></div></div>
                         ) : (
@@ -3857,6 +3857,65 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             </React.Fragment>
                                         ))}
                                     </tbody>
+                                </table>
+                            </div>
+                        )}
+                        </>;
+                    })()}
+
+                    {contabTab==='auxiliar' && (() => {
+                        const misCuentasAux = cuentas.filter(c=>c.tiendaId===activeTiendaId);
+                        const cuenta = misCuentasAux.find(c=>c.id===auxCuentaId);
+                        const corte = auxFecha || hoyISO;
+                        const lineasCuenta = cuenta ? asientos
+                            .filter(a=>a.tiendaId===activeTiendaId && a.fecha<=corte)
+                            .flatMap(a => (a.lineas||[]).filter(l=>l.cuentaId===cuenta.id).map(l=>({...l, asientoFecha:a.fecha, asientoDescripcion:a.descripcion})))
+                            : [];
+                        const porTercero = {};
+                        lineasCuenta.forEach(l => {
+                            const key = l.tercero || '(Sin tercero)';
+                            if (!porTercero[key]) porTercero[key] = { debe:0, haber:0, movimientos:[] };
+                            porTercero[key].debe += l.debe||0;
+                            porTercero[key].haber += l.haber||0;
+                            porTercero[key].movimientos.push(l);
+                        });
+                        const naturaleza = cuenta ? CUENTA_NATURALEZA[cuenta.tipo] : 'deudora';
+                        const terceros = Object.entries(porTercero).map(([nombre,v]) => ({
+                            nombre, ...v, saldo: naturaleza==='deudora' ? (v.debe-v.haber) : (v.haber-v.debe),
+                        })).sort((a,b)=>b.saldo-a.saldo);
+                        const totalCuenta = terceros.reduce((s,t)=>s+t.saldo,0);
+                        return <>
+                        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:18}}>
+                            <select className="form-input glass no-icon" style={{width:'auto',minWidth:260,border:'1px solid var(--glass-border)'}}
+                                value={auxCuentaId} onChange={e=>setAuxCuentaId(e.target.value)}>
+                                <option value="">Selecciona una cuenta…</option>
+                                {misCuentasAux.map(c=><option key={c.id} value={c.id}>{c.codigo} — {c.nombre} ({c.moneda})</option>)}
+                            </select>
+                            <label style={{fontSize:'12px',color:'var(--text-dim)'}}>Hasta</label>
+                            <input type="date" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={corte} onChange={e=>setAuxFecha(e.target.value)} />
+                        </div>
+                        {!cuenta ? (
+                            <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Elige una cuenta</h3><p>Verás el saldo desglosado por tercero (proveedor, cliente, banco...).</p></div></div>
+                        ) : terceros.length===0 ? (
+                            <div className="card glass"><div className="empty"><h3>Sin movimientos con tercero</h3><p>Esta cuenta no tiene líneas con un tercero asignado todavía.</p></div></div>
+                        ) : (
+                            <div className="card glass" style={{overflowX:'auto'}}>
+                                <table style={{minWidth:520}}>
+                                    <thead><tr><th>Tercero</th><th>Debe</th><th>Haber</th><th>Saldo</th></tr></thead>
+                                    <tbody>
+                                        {terceros.map(t=>(
+                                            <tr key={t.nombre}>
+                                                <td><strong>{t.nombre}</strong></td>
+                                                <td className="td-num">{fmtCtb(t.debe,cuenta.moneda)}</td>
+                                                <td className="td-num">{fmtCtb(t.haber,cuenta.moneda)}</td>
+                                                <td className="td-num" style={{fontWeight:'700'}}>{fmtCtb(t.saldo,cuenta.moneda)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot><tr style={{borderTop:'2px solid var(--glass-border)'}}>
+                                        <td style={{fontWeight:'700'}}>Total {cuenta.nombre}</td><td></td><td></td>
+                                        <td className="td-num" style={{fontWeight:'800'}}>{fmtCtb(totalCuenta,cuenta.moneda)}</td>
+                                    </tr></tfoot>
                                 </table>
                             </div>
                         )}
@@ -4089,21 +4148,30 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 </div>
                             </div>
                             {asientoForm.lineas.map((l,i)=>(
-                                <div key={i} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,marginBottom:8,alignItems:'center'}}>
-                                    <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                        value={l.cuentaId} onChange={e=>setAsientoLinea(i,{cuentaId:e.target.value})}>
-                                        <option value="">Selecciona una cuenta…</option>
-                                        {cuentas.filter(c=>c.tiendaId===activeTiendaId && c.activa!==false).map(c=>(
-                                            <option key={c.id} value={c.id}>{c.codigo} — {c.nombre} ({c.moneda})</option>
-                                        ))}
-                                    </select>
-                                    <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                        value={l.debe} onChange={e=>setAsientoLinea(i,{debe:e.target.value, haber: e.target.value ? '' : l.haber})} placeholder="Debe" />
-                                    <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                        value={l.haber} onChange={e=>setAsientoLinea(i,{haber:e.target.value, debe: e.target.value ? '' : l.debe})} placeholder="Haber" />
-                                    <button className="btn btn-glass btn-sm" disabled={asientoForm.lineas.length<=2} onClick={()=>removeAsientoLinea(i)}>×</button>
+                                <div key={i} style={{border:'1px solid var(--glass-border)',borderRadius:'var(--r-sm)',padding:10,marginBottom:8}}>
+                                    <div style={{display:'flex',gap:8,marginBottom:8}}>
+                                        <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:1}}
+                                            value={l.cuentaId} onChange={e=>setAsientoLinea(i,{cuentaId:e.target.value})}>
+                                            <option value="">Selecciona una cuenta…</option>
+                                            {cuentas.filter(c=>c.tiendaId===activeTiendaId && c.activa!==false).map(c=>(
+                                                <option key={c.id} value={c.id}>{c.codigo} — {c.nombre} ({c.moneda})</option>
+                                            ))}
+                                        </select>
+                                        <button className="btn btn-glass btn-sm" disabled={asientoForm.lineas.length<=2} onClick={()=>removeAsientoLinea(i)}>×</button>
+                                    </div>
+                                    <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr',gap:8}}>
+                                        <input className="form-input glass no-icon" list="terceros-sugeridos" style={{border:'1px solid var(--glass-border)'}}
+                                            value={l.tercero} onChange={e=>setAsientoLinea(i,{tercero:e.target.value})} placeholder="Tercero (opcional)" />
+                                        <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                            value={l.debe} onChange={e=>setAsientoLinea(i,{debe:e.target.value, haber: e.target.value ? '' : l.haber})} placeholder="Debe" />
+                                        <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                            value={l.haber} onChange={e=>setAsientoLinea(i,{haber:e.target.value, debe: e.target.value ? '' : l.debe})} placeholder="Haber" />
+                                    </div>
                                 </div>
                             ))}
+                            <datalist id="terceros-sugeridos">
+                                {[...new Set(asientos.flatMap(a=>a.lineas||[]).map(l=>l.tercero).filter(Boolean))].map(t=><option key={t} value={t} />)}
+                            </datalist>
                             <button className="btn btn-glass btn-sm" onClick={addAsientoLinea} style={{marginBottom:16}}>{I.plus} Agregar línea</button>
                             {asientoMonedaMixta && (
                                 <div style={{fontSize:'12px',color:'#A03B3B',marginBottom:10}}>Todas las líneas de un mismo asiento deben usar cuentas de la misma moneda.</div>
