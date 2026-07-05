@@ -1269,6 +1269,102 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     }, []);
     const PEDIDO_PAGO_COLOR = { paid:'badge-green', pending:'badge-gold', refunded:'badge-red', partially_refunded:'badge-orange', voided:'badge-gray', authorized:'badge-gold' };
     const PEDIDO_PREP_COLOR = { fulfilled:'badge-green', partial:'badge-orange', unfulfilled:'badge-gray', restocked:'badge-red' };
+    const [importandoPedidos, setImportandoPedidos] = useState(false);
+    const [resultadoImportPedidos, setResultadoImportPedidos] = useState(null);
+
+    // Parser CSV genérico (RFC4180): soporta campos entre comillas con comas y saltos de línea internos,
+    // que el export de pedidos de Shopify usa en columnas de dirección/notas.
+    const parseCSV = text => {
+        const rows = []; let row = []; let field = ''; let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+            const c = text[i];
+            if (inQuotes) {
+                if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else { inQuotes = false; } }
+                else field += c;
+            } else {
+                if (c === '"') inQuotes = true;
+                else if (c === ',') { row.push(field); field = ''; }
+                else if (c === '\n' || c === '\r') {
+                    if (c === '\r' && text[i+1] === '\n') i++;
+                    row.push(field); field = '';
+                    if (row.length > 1 || row[0] !== '') rows.push(row);
+                    row = [];
+                } else field += c;
+            }
+        }
+        if (field !== '' || row.length) { row.push(field); rows.push(row); }
+        return rows;
+    };
+
+    // Shopify exporta "2026-06-01 10:23:45 -0400" — lo normaliza a ISO "2026-06-01T10:23:45-04:00"
+    // (mismo formato que ya manda el webhook en tiempo real) para que ambas rutas sean consistentes.
+    const parseFechaShopifyCsv = s => {
+        if (!s) return null;
+        const m = s.trim().match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})$/);
+        return m ? `${m[1]}T${m[2]}${m[3]}:${m[4]}` : s.trim();
+    };
+
+    // El export de pedidos de Shopify trae una fila por artículo, repitiendo los datos del pedido
+    // en cada una; se agrupa por "Name" (numero de pedido) y se cuentan las filas como articulos.
+    const importarPedidosCSV = async file => {
+        if (!file || importandoPedidos) return;
+        setImportandoPedidos(true);
+        setResultadoImportPedidos(null);
+        try {
+            const text = await file.text();
+            const filas = parseCSV(text).filter(r => r.some(v => v !== ''));
+            const headers = filas[0];
+            const idx = nombre => headers.indexOf(nombre);
+            const iId = idx('Id'), iName = idx('Name'), iEmail = idx('Email'), iTotal = idx('Total'),
+                  iMoneda = idx('Currency'), iPago = idx('Financial Status'), iPrep = idx('Fulfillment Status'),
+                  iCreado = idx('Created at'), iCancelado = idx('Cancelled at'), iTags = idx('Tags'),
+                  iEnvio = idx('Shipping Method'), iCanal = idx('Source'), iBillingName = idx('Billing Name');
+
+            const grupos = {};
+            for (let r = 1; r < filas.length; r++) {
+                const fila = filas[r];
+                const numero = fila[iName];
+                if (!numero) continue;
+                if (!grupos[numero]) grupos[numero] = [];
+                grupos[numero].push(fila);
+            }
+
+            const pedidos = Object.values(grupos).map(filasPedido => {
+                const base = filasPedido.find(f => f[iId]) || filasPedido[0];
+                return {
+                    shopifyId: base[iId],
+                    numero: base[iName],
+                    cliente: base[iBillingName] || base[iEmail] || '—',
+                    total: parseFloat(base[iTotal] || 0),
+                    moneda: base[iMoneda] || 'USD',
+                    canal: base[iCanal] || '—',
+                    estadoPago: (base[iPago] || '—').toLowerCase(),
+                    estadoPreparacion: (base[iPrep] || 'unfulfilled').toLowerCase() || 'unfulfilled',
+                    formaEntrega: base[iEnvio] || '—',
+                    etiquetas: base[iTags] || '',
+                    articulos: filasPedido.length,
+                    cancelado: !!base[iCancelado],
+                    fechaShopify: parseFechaShopifyCsv(base[iCreado]),
+                    ultimoTopic: 'import_csv',
+                };
+            }).filter(p => p.shopifyId);
+
+            let escritos = 0;
+            for (let i = 0; i < pedidos.length; i += 400) {
+                const lote = pedidos.slice(i, i + 400);
+                const batch = db.batch();
+                lote.forEach(p => batch.set(db.collection('pedidos_shopify').doc(p.shopifyId), p, { merge: true }));
+                await batch.commit();
+                escritos += lote.length;
+            }
+            setResultadoImportPedidos({ ok: true, cantidad: escritos });
+        } catch (err) {
+            console.error('Error importando CSV de pedidos:', err);
+            setResultadoImportPedidos({ ok: false, error: err.message });
+        } finally {
+            setImportandoPedidos(false);
+        }
+    };
 
     // ── Tiendas (multi-negocio) ──
     const [tiendas,         setTiendas]         = useState([]);
@@ -2209,9 +2305,33 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     return <>
                     <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
                         <div><h1>Pedidos</h1><p>Sincronizado en tiempo real desde Shopify</p></div>
-                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',maxWidth:260}}
-                            placeholder="Buscar por # o cliente..." value={pedidosBusqueda} onChange={e=>setPedidosBusqueda(e.target.value)} />
+                        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',maxWidth:260}}
+                                placeholder="Buscar por # o cliente..." value={pedidosBusqueda} onChange={e=>setPedidosBusqueda(e.target.value)} />
+                            {user.role === 'master' && <>
+                                <input id="pedidos-csv-input" type="file" accept=".csv" style={{display:'none'}}
+                                    onChange={e => { if (e.target.files[0]) importarPedidosCSV(e.target.files[0]); e.target.value = ''; }} />
+                                <button className="btn btn-glass btn-sm" disabled={importandoPedidos}
+                                    onClick={() => document.getElementById('pedidos-csv-input').click()}
+                                    title="En Shopify: Pedidos → Exportar → descarga el CSV y súbelo aquí">
+                                    {importandoPedidos ? 'Importando…' : 'Importar historial (CSV)'}
+                                </button>
+                            </>}
+                        </div>
                     </div>
+                    {user.role === 'master' && !resultadoImportPedidos && (
+                        <p style={{fontSize:12,color:'var(--text-dimmer)',marginTop:-8,marginBottom:14}}>
+                            Para traer pedidos de antes de hoy: en Shopify ve a Pedidos → Exportar → descarga el CSV y súbelo con "Importar historial (CSV)".
+                        </p>
+                    )}
+                    {resultadoImportPedidos && (
+                        <div className="card glass" style={{padding:'12px 16px',marginBottom:14,fontSize:13,
+                            color: resultadoImportPedidos.ok ? '#3C7840' : '#A03B3B'}}>
+                            {resultadoImportPedidos.ok
+                                ? `Se importaron ${resultadoImportPedidos.cantidad} pedidos del historial.`
+                                : `Error al importar: ${resultadoImportPedidos.error}`}
+                        </div>
+                    )}
                     <div className="card glass" style={{overflowX:'auto'}}>
                         {lista.length > 0 ? (
                             <table>

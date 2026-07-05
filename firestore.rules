@@ -81,11 +81,12 @@ service cloud.firestore {
     // ── proveedores ── ficha de cada proveedor, gateada por su permiso
     match /proveedores/{id} { allow read, write: if tienePermiso('proveedores'); }
 
-    // ── pedidos_shopify ── los escribe el Cloud Function shopifyWebhook (Admin SDK, ignora estas
-    // reglas); el panel solo lee, gateado por el permiso de Pedidos
+    // ── pedidos_shopify ── los pedidos nuevos los escribe el Cloud Function shopifyWebhook
+    // (Admin SDK, ignora estas reglas); solo el master puede escribir desde el panel, usado
+    // únicamente para la importación única del historial vía CSV
     match /pedidos_shopify/{id} {
       allow read:  if tienePermiso('pedidos');
-      allow write: if false;
+      allow write: if isMaster();
     }
 
     // ── campanas ── Planeacion de Campanas, solo master
