@@ -310,6 +310,7 @@
         thead th { padding: 10px 16px; text-align: left; font-size: 9px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1.5px solid var(--stone); background: var(--cream-dark); white-space: nowrap; }
         tbody td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid rgba(92,61,30,0.06); color: var(--text); transition: background 120ms ease; }
         tbody tr:last-child td { border-bottom: none; }
+        tfoot td { padding: 14px 16px; font-size: 13px; }
         tbody td:first-child { position: relative; }
         tbody td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2.5px; background: var(--orange); opacity: 0; transition: opacity 150ms ease; }
         @media (hover: hover) and (pointer: fine) { tbody tr:hover td { background: rgba(200,92,26,0.04); } tbody tr:hover td:first-child::before { opacity: 1; } }
@@ -440,6 +441,8 @@ const I = {
     mail:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
     lock:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
     key:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
+    trendUp:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+    trendDown: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>,
 };
 
 // ── MOTOR DE DIAGNÓSTICO (rangos saludables RD — del Diccionario COD + FB Ads) ──
@@ -1121,6 +1124,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showCmdK,   setShowCmdK]   = useState(false);
     const [cmdQuery,   setCmdQuery]   = useState('');
     const COSTEO_DEFAULTS = {
+        productoIdCargado: '',
         precioVenta: '1500',
         costoProducto: '400',
         cpaAds: '300',
@@ -1139,6 +1143,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     useEffect(() => { try { localStorage.setItem('costeoCalcV2', JSON.stringify(costeo)); } catch {} }, [costeo]);
     const [costeoMoneda, setCosteoMoneda] = useState('DOP');
     const [costeoTab,    setCosteoTab]    = useState('calculadora');
+    const [proyeccionCantidad, setProyeccionCantidad] = useState(50);
     const [diccQuery,    setDiccQuery]    = useState('');
     const [diccCat,      setDiccCat]      = useState('Todas');
     const firstInputRef  = useRef(null);
@@ -1172,7 +1177,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [savingProd,         setSavingProd]         = useState(false);
     const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'', codigo:'' });
     const [editSeccion,        setEditSeccion]        = useState(null); // 'inventario'
-    const [invForm,            setInvForm]            = useState({ precioCompra:'', precioVenta:'', moneda:'USD' });
+    const [invForm,            setInvForm]            = useState({ precioCompra:'', precioVenta:'' });
     // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
     const ANALISIS_CHECKS = [
         ['noVenden','¿No lo están vendiendo en mi mercado?','Poca o ninguna competencia pautándolo activamente en RD. Si nadie más lo vende, tienes ventaja; si muchos lo venden, evalúa si puedes diferenciarte.'],
@@ -1330,17 +1335,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const CUENTA_TIPOS = ['Activo','Pasivo','Patrimonio','Ingreso','Gasto'];
     const CUENTA_NATURALEZA = { Activo:'deudora', Gasto:'deudora', Pasivo:'acreedora', Patrimonio:'acreedora', Ingreso:'acreedora' };
     const CUENTA_TIPO_COLOR = { Activo:'badge-green', Gasto:'badge-gray', Pasivo:'badge-gold', Patrimonio:'badge-gold', Ingreso:'badge-green' };
-    const MONEDAS_CTB = ['USD','DOP'];
     const [cuentas,          setCuentas]          = useState([]);
     const [asientos,         setAsientos]         = useState([]);
     const [contabTab,        setContabTab]        = useState('plan'); // 'plan'|'diario'|'balance'|'resultados'
     const [contabScope,      setContabScope]      = useState('activa'); // 'activa'|'todas' — solo afecta los reportes
-    const [contabMoneda,     setContabMoneda]     = useState('USD');
+    const contabMoneda = 'DOP'; // el negocio opera solo en pesos dominicanos
     const [showCuentaModal,  setShowCuentaModal]  = useState(false);
     const [editingCuenta,    setEditingCuenta]    = useState(null);
-    const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD', operativo:true });
+    const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'DOP', operativo:true });
     const [savingCuenta,     setSavingCuenta]     = useState(false);
-    const ASIENTO_LINEA_VACIA = { cuentaId:'', tercero:'', debe:'', haber:'' };
+    const ASIENTO_LINEA_VACIA = { cuentaId:'', productoId:'', tercero:'', debe:'', haber:'' };
     const [showAsientoModal, setShowAsientoModal] = useState(false);
     const [asientoForm,      setAsientoForm]      = useState({ fecha:'', descripcion:'', lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}] });
     const [savingAsiento,    setSavingAsiento]    = useState(false);
@@ -1348,6 +1352,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [balanceFecha,     setBalanceFecha]     = useState('');
     const [resultDesde,      setResultDesde]      = useState('');
     const [resultHasta,      setResultHasta]      = useState('');
+    const [porProductoFiltro, setPorProductoFiltro] = useState('');
     const [auxCuentaId,      setAuxCuentaId]      = useState('');
     const [auxFecha,         setAuxFecha]         = useState('');
     const [salariosMes,      setSalariosMes]      = useState(() => fechaLocalISO().slice(0,7));
@@ -1379,7 +1384,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             } else {
                 await db.collection('cuentas_contables').add({ ...data, tiendaId: activeTiendaId, activa: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
             }
-            setCuentaForm({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD', operativo:true });
+            setCuentaForm({ codigo:'', nombre:'', tipo:'Activo', moneda:'DOP', operativo:true });
             setEditingCuenta(null); setShowCuentaModal(false);
         } catch(err) { console.error('Error guardando cuenta:', err); }
         finally { setSavingCuenta(false); }
@@ -1400,9 +1405,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const asientoLineasValidas = asientoForm.lineas.filter(l => l.cuentaId && (parseFloat(l.debe)>0 || parseFloat(l.haber)>0));
     const asientoTotalDebe  = asientoLineasValidas.reduce((s,l)=>s+(parseFloat(l.debe)||0),0);
     const asientoTotalHaber = asientoLineasValidas.reduce((s,l)=>s+(parseFloat(l.haber)||0),0);
-    const asientoMonedas = [...new Set(asientoLineasValidas.map(l => cuentas.find(c=>c.id===l.cuentaId)?.moneda).filter(Boolean))];
-    const asientoMonedaMixta = asientoMonedas.length > 1;
-    const asientoBalanceado = asientoLineasValidas.length>=2 && !asientoMonedaMixta && asientoTotalDebe>0 && Math.abs(asientoTotalDebe-asientoTotalHaber)<0.005;
+    const asientoBalanceado = asientoLineasValidas.length>=2 && asientoTotalDebe>0 && Math.abs(asientoTotalDebe-asientoTotalHaber)<0.005;
 
     const addAsientoLinea = () => setAsientoForm(f => ({...f, lineas:[...f.lineas, {...ASIENTO_LINEA_VACIA}]}));
     const removeAsientoLinea = i => setAsientoForm(f => ({...f, lineas: f.lineas.filter((_,idx)=>idx!==i)}));
@@ -1414,11 +1417,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         try {
             const lineas = asientoLineasValidas.map(l => {
                 const cuenta = cuentas.find(c=>c.id===l.cuentaId);
-                return { cuentaId: l.cuentaId, cuentaNombre: cuenta?.nombre||'', cuentaCodigo: cuenta?.codigo||'', moneda: cuenta?.moneda||'USD', debe: parseFloat(l.debe)||0, haber: parseFloat(l.haber)||0, tercero: (l.tercero||'').trim() };
+                const producto = productos.find(p=>p.id===l.productoId);
+                return { cuentaId: l.cuentaId, cuentaNombre: cuenta?.nombre||'', cuentaCodigo: cuenta?.codigo||'', moneda: cuenta?.moneda||'DOP', debe: parseFloat(l.debe)||0, haber: parseFloat(l.haber)||0, tercero: (l.tercero||'').trim(), productoId: l.productoId||'', productoCodigo: producto?.codigo||'', productoNombre: producto?.nombre||'' };
             });
             await db.collection('asientos_contables').add({
                 fecha: asientoForm.fecha, descripcion: asientoForm.descripcion.trim(), tiendaId: activeTiendaId,
-                lineas, totalDebe: asientoTotalDebe, totalHaber: asientoTotalHaber, moneda: lineas[0]?.moneda||'USD',
+                lineas, totalDebe: asientoTotalDebe, totalHaber: asientoTotalHaber, moneda: lineas[0]?.moneda||'DOP',
                 creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
             });
             setAsientoForm({ fecha:'', descripcion:'', lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}] });
@@ -1470,6 +1474,34 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         finally { setLimpiandoAsientosCierre(false); }
     };
 
+    // Limpieza única: el formulario de cuentas tenía USD como moneda por defecto, así que cuentas
+    // y asientos creados sin cambiar el selector quedaron mal etiquetados — el negocio solo opera
+    // en pesos, así que se re-etiquetan a DOP sin tocar los montos.
+    const [convirtiendoUsdDop, setConvirtiendoUsdDop] = useState(false);
+    const convertirCuentasUsdADop = async () => {
+        if (!confirm('¿Convertir a DOP todas las cuentas y asientos marcados en USD? Los montos no cambian, solo la etiqueta de moneda. Esta acción no se puede deshacer.')) return;
+        setConvirtiendoUsdDop(true);
+        try {
+            const snapCuentas = await db.collection('cuentas_contables').where('moneda','==','USD').get();
+            for (let i = 0; i < snapCuentas.docs.length; i += 400) {
+                const batch = db.batch();
+                snapCuentas.docs.slice(i, i+400).forEach(d => batch.update(d.ref, { moneda: 'DOP' }));
+                await batch.commit();
+            }
+            const snapAsientos = await db.collection('asientos_contables').where('moneda','==','USD').get();
+            for (let i = 0; i < snapAsientos.docs.length; i += 400) {
+                const batch = db.batch();
+                snapAsientos.docs.slice(i, i+400).forEach(d => {
+                    const lineas = (d.data().lineas||[]).map(l => l.moneda==='USD' ? {...l, moneda:'DOP'} : l);
+                    batch.update(d.ref, { moneda: 'DOP', lineas });
+                });
+                await batch.commit();
+            }
+            alert(`${snapCuentas.docs.length} cuenta(s) y ${snapAsientos.docs.length} asiento(s) convertidos de USD a DOP.`);
+        } catch(err) { console.error('Error convirtiendo USD a DOP:', err); alert('Error al convertir. Revisa la consola.'); }
+        finally { setConvirtiendoUsdDop(false); }
+    };
+
     // Suma débitos/créditos de un conjunto de asientos por cuenta y calcula el saldo según naturaleza de cada cuenta.
     const sumarSaldosCtb = (cuentasScope, asientosScope) => {
         const saldos = {};
@@ -1483,6 +1515,37 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             const saldo = CUENTA_NATURALEZA[c.tipo]==='deudora' ? (s.debe-s.haber) : (s.haber-s.debe);
             return { ...c, debe:s.debe, haber:s.haber, saldo };
         });
+    };
+
+    // Ingresos/gastos por producto a partir de asientos contables — el gasto sin producto asignado
+    // (ej. suscripciones/operación) se reparte en partes iguales entre los productos activos.
+    // Se comparte entre Contabilidad → Por Producto y el indicador rojo/verde de cada tarjeta en Productos.
+    const calcularUtilidadesPorProducto = (cuentasScope, asientosScope, productosActivosScope) => {
+        const cuentasById = Object.fromEntries(cuentasScope.map(c=>[c.id,c]));
+        const porProducto = {};
+        productosActivosScope.forEach(p => {
+            porProducto[p.id] = { id:p.id, nombre:p.nombre||'—', codigo:p.codigo||'', ingresos:0, gastosDirectos:0, esActivo:true };
+        });
+        let gastoGeneral = 0;
+        asientosScope.forEach(a => (a.lineas||[]).forEach(l => {
+            const cuenta = cuentasById[l.cuentaId];
+            if (!cuenta || (cuenta.tipo!=='Ingreso' && cuenta.tipo!=='Gasto')) return;
+            if (!l.productoId) {
+                if (cuenta.tipo==='Gasto') gastoGeneral += (l.debe||0) - (l.haber||0);
+                return;
+            }
+            if (!porProducto[l.productoId]) porProducto[l.productoId] = { id:l.productoId, nombre:l.productoNombre||'—', codigo:l.productoCodigo||'', ingresos:0, gastosDirectos:0, esActivo:false };
+            const acc = porProducto[l.productoId];
+            if (cuenta.tipo==='Ingreso') acc.ingresos += (l.haber||0) - (l.debe||0);
+            else acc.gastosDirectos += (l.debe||0) - (l.haber||0);
+        }));
+        const gastoGeneralPorProducto = productosActivosScope.length>0 ? gastoGeneral/productosActivosScope.length : 0;
+        const filas = Object.values(porProducto).map(p=>{
+            const gastoAsignado = p.esActivo ? gastoGeneralPorProducto : 0;
+            const gastos = p.gastosDirectos + gastoAsignado;
+            return {...p, gastoAsignado, gastos, utilidad: p.ingresos - gastos};
+        });
+        return { filas, gastoGeneral, gastoGeneralPorProducto };
     };
 
     const cuentasCtbScope   = contabScope==='todas' ? cuentas  : cuentas.filter(c=>c.tiendaId===activeTiendaId);
@@ -2196,11 +2259,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 {activeTab === 'ganadores' && (() => {
                     const productos = productosScoped; // filtrado por tienda activa
                     const fmtNum = v => v ? parseFloat(v).toLocaleString('es-CO') : '—';
+                    // Utilidad histórica por producto (Contabilidad) para el indicador rojo/verde de cada tarjeta.
+                    const utilidadPorId = Object.fromEntries(
+                        calcularUtilidadesPorProducto(
+                            cuentas.filter(perteneceATienda),
+                            asientos.filter(perteneceATienda),
+                            productos.filter(pr=>pr.estado==='Activo'),
+                        ).filas.map(f=>[f.id, f.utilidad])
+                    );
                     // ── Lista de productos ──
                     if (!activeProducto) return (
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                                <div><h1>Productos Ganadores</h1><p>Gestiona y analiza tus mejores productos</p></div>
+                                <div><h1>Productos</h1><p>Gestiona y analiza tus mejores productos</p></div>
                                 <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
                             </div>
                             {productos.length===0 ? (
@@ -2229,6 +2300,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`} style={{position:'absolute',top:8,right:8,fontSize:'10px'}}>
                                                         <span className="badge-dot"/>{p.estado||'Sin estado'}
                                                     </span>
+                                                    {utilidadPorId[p.id]!==undefined && (
+                                                        <span title={`Utilidad histórica: RD$${utilidadPorId[p.id].toFixed(2)}`}
+                                                            style={{
+                                                                position:'absolute',top:8,left:8,width:26,height:26,borderRadius:'50%',
+                                                                display:'flex',alignItems:'center',justifyContent:'center',
+                                                                background: utilidadPorId[p.id]>=0 ? '#3C7840' : '#A03B3B',
+                                                                boxShadow:'0 2px 6px rgba(0,0,0,0.22)',color:'#fff',
+                                                            }}>
+                                                            <span style={{width:13,height:13,display:'flex'}}>{utilidadPorId[p.id]>=0?I.trendUp:I.trendDown}</span>
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div style={{padding:'14px 16px'}}>
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
@@ -2600,8 +2682,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar inventario y ventas</div>
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                                             {[
-                                                {key:'precioCompra', label:'Precio de compra', ph:'0.00'},
-                                                {key:'precioVenta', label:'Precio de venta', ph:'0.00'},
+                                                {key:'precioCompra', label:'Precio de compra (RD$)', ph:'0.00'},
+                                                {key:'precioVenta', label:'Precio de venta (RD$)', ph:'0.00'},
                                             ].map(({key,label,ph})=>(
                                                 <div key={key} className="form-group" style={{marginBottom:0}}>
                                                     <label style={{color:'var(--text-dim)'}}>{label}</label>
@@ -2610,13 +2692,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         onChange={e=>setInvForm(f=>({...f,[key]:e.target.value}))} />
                                                 </div>
                                             ))}
-                                            <div className="form-group" style={{marginBottom:0}}>
-                                                <label style={{color:'var(--text-dim)'}}>Moneda</label>
-                                                <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                    value={invForm.moneda||'USD'} onChange={e=>setInvForm(f=>({...f,moneda:e.target.value}))}>
-                                                    <option value="USD">USD $</option><option value="DOP">DOP RD$</option>
-                                                </select>
-                                            </div>
                                         </div>
                                         <div style={{display:'flex',gap:10,marginTop:20}}>
                                             <button className="btn btn-glass" onClick={()=>setEditSeccion(null)}>Cancelar</button>
@@ -2642,7 +2717,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             ))}
                                         </div>
                                         <div style={{textAlign:'right',marginBottom:24}}>
-                                            <button className="btn btn-glass" onClick={()=>{setInvForm({precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||'',moneda:inv.moneda||'USD'});setEditSeccion('inventario');}}>✎ Editar Precios</button>
+                                            <button className="btn btn-glass" onClick={()=>{setInvForm({precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||''});setEditSeccion('inventario');}}>✎ Editar Precios</button>
                                         </div>
 
                                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
@@ -3013,7 +3088,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const updExtra = (i,k,v) => setCosteo(c=>({...c, costosExtra:c.costosExtra.map((e,idx)=>idx===i?{...e,[k]:v}:e)}));
                     const addExtra = () => setCosteo(c=>({...c, costosExtra:[...(c.costosExtra||[]),{nombre:'Nuevo costo',monto:'0'}]}));
                     const delExtra = (i) => setCosteo(c=>({...c, costosExtra:c.costosExtra.filter((_,idx)=>idx!==i)}));
-                    const tabs = [['calculadora','Calculadora Precio'],['proyeccion','Proyección'],['cierre','Cierre Diario'],['control','Control'],['historial','Historial']];
+                    const tabs = [['calculadora','Calculadora Precio'],['proyeccion','Proyección']];
 
                     return <>
                     <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
@@ -3030,17 +3105,28 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     <div className="cst-tabbar">
                         {tabs.map(([k,label])=>(
                             <button key={k} className={`cst-tab ${costeoTab===k?'active':''}`} onClick={()=>setCosteoTab(k)}>
-                                {label}{k!=='calculadora' && <span style={{fontSize:'8.5px',opacity:0.6,marginLeft:2}}>(Free)</span>}
+                                {label}
                             </button>
                         ))}
                     </div>
 
-                    {costeoTab!=='calculadora' ? (
-                        <div className="card glass"><div className="empty" style={{padding:'72px 40px'}}>
-                            <div className="empty-icon">{I_calc}</div>
-                            <h3>{tabs.find(t=>t[0]===costeoTab)[1]} — próximamente</h3>
-                            <p>Esta sección se construye en la siguiente fase. La Calculadora de Precio ya está 100% operativa.</p>
-                        </div></div>
+                    {costeoTab==='proyeccion' ? (
+                        <div className="card glass" style={{padding:'32px 28px'}}>
+                            <div style={{fontSize:14,fontWeight:800,marginBottom:6}}>¿Cuántas unidades planeas vender?</div>
+                            <p style={{fontSize:12,color:'var(--text-dimmer)',marginBottom:24}}>Basado en la utilidad neta por unidad de Calculadora Precio: <strong style={{color:profit>=0?'var(--orange)':'#A03B3B'}}>{money(profit)}</strong> c/u.</p>
+                            <input type="range" min="1" max="1000" step="1" value={proyeccionCantidad}
+                                onChange={e=>setProyeccionCantidad(parseInt(e.target.value)||1)}
+                                style={{width:'100%',accentColor:'var(--orange)'}} />
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:10}}>
+                                <span style={{fontSize:11,color:'var(--text-dimmer)'}}>1</span>
+                                <span style={{fontSize:22,fontWeight:800,fontFamily:'Fira Code',color:'var(--text)'}}>{proyeccionCantidad} unidades</span>
+                                <span style={{fontSize:11,color:'var(--text-dimmer)'}}>1000</span>
+                            </div>
+                            <div style={{marginTop:28,padding:'22px 26px',borderRadius:14,background:profit>=0?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${profit>=0?'var(--orange-border)':'rgba(160,56,56,0.24)'}`}}>
+                                <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:6}}>Utilidad neta proyectada</div>
+                                <div style={{fontSize:34,fontWeight:800,fontFamily:'Fira Code',color:profit>=0?'var(--orange)':'#A03B3B'}}>{money(profit*proyeccionCantidad)}</div>
+                            </div>
+                        </div>
                     ) : (
                     <div className="cst-grid">
                         {/* ── PANEL DE PARÁMETROS ── */}
@@ -3053,18 +3139,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             {productos.length>0 && (
                                 <div style={{marginBottom:18,padding:'12px 14px',borderRadius:12,background:'var(--orange-dim)',border:'1px solid var(--orange-border)'}}>
                                     <label className="cst-field-label" style={{color:'var(--orange)'}}>⭐ Cargar producto guardado</label>
-                                    <select className="cst-input" style={{fontFamily:'inherit',fontWeight:'600',fontSize:'13px'}} value=""
+                                    <select className="cst-input" style={{fontFamily:'inherit',fontWeight:'600',fontSize:'13px'}} value={costeo.productoIdCargado||''}
                                         onChange={e=>{
                                             const prod = productos.find(x=>x.id===e.target.value); if(!prod) return;
                                             const a = prod.analisis||{}; const inv = prod.inventario||{};
-                                            const pv = a.precioVenta || inv.precioVenta || '';
                                             const pp = a.precioProveedor || inv.precioCompra || '';
-                                            setCosteo(c=>({...c, precioVenta:String(pv||c.precioVenta), costoProducto:String(pp||c.costoProducto), productoCargado:prod.nombre}));
+                                            setCosteo(c=>({...c, costoProducto:String(pp||c.costoProducto), productoIdCargado:prod.id}));
                                         }}>
                                         <option value="">Selecciona un producto…</option>
                                         {productos.map(prod=>(<option key={prod.id} value={prod.id}>{prod.nombre}</option>))}
                                     </select>
-                                    {costeo.productoCargado && <div style={{fontSize:'10.5px',color:'var(--text-dim)',marginTop:7}}>Cargado: <strong style={{color:'var(--orange)'}}>{costeo.productoCargado}</strong> — precio y costo actualizados.</div>}
                                 </div>
                             )}
 
@@ -3400,7 +3484,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                 {activeTab === 'contabilidad' && (() => {
                     const fmtCtb = (v, m) => `${m==='DOP'?'RD$':'$'}${(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-                    const CONTAB_SUBTABS = [['plan','Plan de Cuentas'],['diario','Libro Diario'],['auxiliar','Libro Auxiliar'],['balance','Balance General'],['resultados','Estado de Resultados'],['salarios','Salarios']];
+                    const CONTAB_SUBTABS = [['plan','Plan de Cuentas'],['diario','Libro Diario'],['auxiliar','Libro Auxiliar'],['balance','Balance General'],['resultados','Estado de Resultados'],['porProducto','Por Producto'],['salarios','Salarios']];
                     return <>
                     <div className="page-header"><h1>Contabilidad</h1><p>Plan de cuentas, libro diario y reportes por partida doble — módulo manual, independiente de Gastos y Cierre Diario.</p></div>
                     <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
@@ -3413,7 +3497,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const misCuentas = cuentas.filter(c=>c.tiendaId===activeTiendaId);
                         return <>
                         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
-                            <button className="btn btn-gold" onClick={()=>{setEditingCuenta(null);setCuentaForm({codigo:'',nombre:'',tipo:'Activo',moneda:'USD',operativo:true});setShowCuentaModal(true);}}>{I.plus} Nueva cuenta</button>
+                            <button className="btn btn-gold" onClick={()=>{setEditingCuenta(null);setCuentaForm({codigo:'',nombre:'',tipo:'Activo',moneda:'DOP',operativo:true});setShowCuentaModal(true);}}>{I.plus} Nueva cuenta</button>
                         </div>
                         {misCuentas.length===0 ? (
                             <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin cuentas aún</h3><p>Crea tu plan de cuentas para empezar a registrar asientos.</p></div></div>
@@ -3435,13 +3519,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     {open && (
                                         <div style={{overflowX:'auto'}}>
                                             <table style={{minWidth:520}}>
-                                                <thead><tr><th>Código</th><th>Nombre</th><th>Moneda</th><th>Estado</th><th></th></tr></thead>
+                                                <thead><tr><th>Código</th><th>Nombre</th><th>Estado</th><th></th></tr></thead>
                                                 <tbody>
                                                     {delTipo.map(c=>(
                                                         <tr key={c.id} style={{opacity:c.activa===false?0.5:1}}>
                                                             <td style={{fontFamily:'Fira Code',fontSize:'12px'}}>{c.codigo}</td>
                                                             <td><strong>{c.nombre}</strong>{c.tipo==='Gasto'&&c.operativo===false&&<span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>No operativo</span>}</td>
-                                                            <td>{c.moneda}</td>
                                                             <td><span className={`badge ${c.activa===false?'badge-gray':'badge-green'}`}><span className="badge-dot"/>{c.activa===false?'Inactiva':'Activa'}</span></td>
                                                             <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
                                                                 <button className="btn btn-glass btn-sm" onClick={()=>openEditCuenta(c)}>{I.edit}</button>
@@ -3470,6 +3553,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} disabled={limpiandoAsientosCierre} onClick={limpiarAsientosCierre}>
                                 {limpiandoAsientosCierre ? 'Eliminando...' : 'Eliminar asientos automáticos de Cierre Diario'}
                             </button>
+                            <button className="btn btn-glass btn-sm" disabled={convirtiendoUsdDop} onClick={convertirCuentasUsdADop}>
+                                {convirtiendoUsdDop ? 'Convirtiendo...' : 'Convertir cuentas/asientos en USD a DOP'}
+                            </button>
                             <button className="btn btn-gold"
                                 onClick={()=>{setAsientoForm({fecha:hoyISO,descripcion:'',lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}]});setShowAsientoModal(true);}}>{I.plus} Nuevo asiento</button>
                         </div>
@@ -3495,11 +3581,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 {asientoAbierto===a.id && (
                                                     <tr><td colSpan={6} style={{background:'var(--surface-2)',padding:'10px 18px'}}>
                                                         <table style={{width:'100%',fontSize:'12px'}}>
-                                                            <thead><tr><th>Cuenta</th><th>Debe</th><th>Haber</th></tr></thead>
+                                                            <thead><tr><th>Cuenta</th><th>Producto</th><th>Debe</th><th>Haber</th></tr></thead>
                                                             <tbody>
                                                                 {a.lineas.map((l,i)=>(
                                                                     <tr key={i}>
                                                                         <td>{l.cuentaCodigo} — {l.cuentaNombre}</td>
+                                                                        <td>{l.productoCodigo || '—'}</td>
                                                                         <td className="td-num">{l.debe>0?fmtCtb(l.debe,l.moneda):'—'}</td>
                                                                         <td className="td-num">{l.haber>0?fmtCtb(l.haber,l.moneda):'—'}</td>
                                                                     </tr>
@@ -3583,9 +3670,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <select className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={contabScope} onChange={e=>setContabScope(e.target.value)}>
                                     <option value="activa">Esta tienda</option>
                                     <option value="todas">Todas las tiendas (consolidado)</option>
-                                </select>
-                                <select className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={contabMoneda} onChange={e=>setContabMoneda(e.target.value)}>
-                                    {MONEDAS_CTB.map(m=><option key={m} value={m}>{m}</option>)}
                                 </select>
                             </div>
                         );
@@ -3679,21 +3763,91 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         </>;
                     })()}
 
-                    {contabTab==='salarios' && (() => {
-                        const productosActivos = productos.filter(p => p.estado === 'Activo');
-                        const nombresActivos = new Set(productosActivos.map(p => p.nombre));
-                        const cierresParaSalarios = contabScope==='todas' ? cierres : cierres.filter(perteneceATienda);
-                        const cierresDelMes = cierresParaSalarios.filter(c => c.fechaStr?.startsWith(salariosMes));
-                        const gananciaTotalMes = cierresDelMes.reduce((s,c) => s + (c.productos||[]).filter(f=>nombresActivos.has(f.nombre)).reduce((s2,f)=>s2+(f.monto||0),0), 0);
+                    {contabTab==='porProducto' && (() => {
+                        const cuentasScope   = cuentasCtbScope.filter(c=>c.moneda===contabMoneda);
+                        const desde = resultDesde || hoyISO.slice(0,8)+'01';
+                        const hasta = resultHasta || hoyISO;
+                        const asientosPeriodo = asientosCtbScope.filter(a=>a.fecha>=desde && a.fecha<=hasta);
 
+                        // Productos activos en el scope elegido — reciben una parte igual del gasto
+                        // general (gastos sin producto asignado, ej. suscripciones/operación del negocio).
+                        const productosActivosScope = (contabScope==='todas' ? productos : productos.filter(perteneceATienda)).filter(p=>p.estado==='Activo');
+                        const nProductosActivos = productosActivosScope.length;
+
+                        const { filas: filasProdSinOrdenar, gastoGeneral, gastoGeneralPorProducto } = calcularUtilidadesPorProducto(cuentasScope, asientosPeriodo, productosActivosScope);
+                        const filasProd = [...filasProdSinOrdenar].sort((a,b)=>b.utilidad-a.utilidad);
+
+                        // Lista para el dropdown: todos los productos del scope, activos o no,
+                        // para poder aislar uno específico aunque no tenga movimientos todavía.
+                        const productosParaFiltro = contabScope==='todas' ? productos : productos.filter(perteneceATienda);
+                        const filasMostradas = porProductoFiltro ? filasProd.filter(p=>p.id===porProductoFiltro) : filasProd;
+                        const totalIngProd = filasMostradas.reduce((s,p)=>s+p.ingresos,0);
+                        const totalGasProd = filasMostradas.reduce((s,p)=>s+p.gastos,0);
+                        const totalUtilProd = totalIngProd - totalGasProd;
+
+                        return <>
+                        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:18}}>
+                            <select className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={contabScope} onChange={e=>setContabScope(e.target.value)}>
+                                <option value="activa">Esta tienda</option>
+                                <option value="todas">Todas las tiendas (consolidado)</option>
+                            </select>
+                            <select className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={porProductoFiltro} onChange={e=>setPorProductoFiltro(e.target.value)}>
+                                <option value="">Todos los productos</option>
+                                {productosParaFiltro.map(p=>(
+                                    <option key={p.id} value={p.id}>{p.codigo?`${p.codigo} — ${p.nombre}`:p.nombre}</option>
+                                ))}
+                            </select>
+                            <label style={{fontSize:'12px',color:'var(--text-dim)'}}>Desde</label>
+                            <input type="date" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={desde} onChange={e=>setResultDesde(e.target.value)} />
+                            <label style={{fontSize:'12px',color:'var(--text-dim)'}}>Hasta</label>
+                            <input type="date" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={hasta} onChange={e=>setResultHasta(e.target.value)} />
+                        </div>
+                        {gastoGeneral>0 && (
+                            <p style={{fontSize:12,color:'var(--text-dimmer)',marginTop:-8,marginBottom:14}}>
+                                {nProductosActivos>0
+                                    ? <>Gasto general del período (sin producto asignado, ej. suscripciones/operación): <strong>{fmtCtb(gastoGeneral,contabMoneda)}</strong> — dividido entre {nProductosActivos} producto{nProductosActivos===1?'':'s'} activo{nProductosActivos===1?'':'s'} ({fmtCtb(gastoGeneralPorProducto,contabMoneda)} c/u).</>
+                                    : <>Hay {fmtCtb(gastoGeneral,contabMoneda)} en gastos generales sin producto asignado, pero no hay productos activos para repartirlos.</>}
+                            </p>
+                        )}
+                        {filasMostradas.length===0 ? (
+                            <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin movimientos por producto</h3><p>{porProductoFiltro ? 'Este producto no tiene ingresos, gastos directos ni parte de gasto general en el período.' : 'Activa un producto en Productos, o asigna un producto a las líneas de Ventas/Gastos en el Libro Diario, para ver aquí la utilidad por producto.'}</p></div></div>
+                        ) : (
+                            <div className="card glass" style={{overflowX:'auto'}}>
+                                <table style={{minWidth:520}}>
+                                    <thead><tr><th>Producto</th><th className="td-num">Ingresos</th><th className="td-num">Gastos</th><th className="td-num">Utilidad</th></tr></thead>
+                                    <tbody>
+                                        {filasMostradas.map(p=>(
+                                            <tr key={p.id}>
+                                                <td>{p.codigo?`${p.codigo} — ${p.nombre}`:p.nombre}</td>
+                                                <td className="td-num">{fmtCtb(p.ingresos,contabMoneda)}</td>
+                                                <td className="td-num">{fmtCtb(p.gastos,contabMoneda)}</td>
+                                                <td className="td-num" style={{fontWeight:'700',color:p.utilidad>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(p.utilidad,contabMoneda)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot><tr style={{borderTop:'2px solid var(--glass-border)'}}>
+                                        <td style={{fontWeight:'700'}}>Total</td>
+                                        <td className="td-num" style={{fontWeight:'800'}}>{fmtCtb(totalIngProd,contabMoneda)}</td>
+                                        <td className="td-num" style={{fontWeight:'800'}}>{fmtCtb(totalGasProd,contabMoneda)}</td>
+                                        <td className="td-num" style={{fontWeight:'800',color:totalUtilProd>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(totalUtilProd,contabMoneda)}</td>
+                                    </tr></tfoot>
+                                </table>
+                            </div>
+                        )}
+                        </>;
+                    })()}
+
+                    {contabTab==='salarios' && (() => {
+                        // La comisión sale de la ganancia neta de TODOS los productos activos en el mes
+                        // (ingresos del Libro Diario menos sus gastos directos y su parte de gasto general),
+                        // no de Cierre Diario — misma fórmula que Contabilidad → Por Producto, sumada.
                         const asientosDelMes = asientosCtbScope.filter(a => a.fecha?.startsWith(salariosMes));
-                        const cuentasGastoOpDOP = cuentasCtbScope.filter(c=>c.tipo==='Gasto' && c.operativo!==false && c.moneda==='DOP');
-                        const cuentasGastoOpUSD = cuentasCtbScope.filter(c=>c.tipo==='Gasto' && c.operativo!==false && c.moneda==='USD');
-                        const saldosOpDOP = sumarSaldosCtb(cuentasGastoOpDOP, asientosDelMes).filter(c=>c.saldo!==0);
-                        const saldosOpUSD = sumarSaldosCtb(cuentasGastoOpUSD, asientosDelMes).filter(c=>c.saldo!==0);
-                        const totalGastosOpDOP = saldosOpDOP.reduce((s,c)=>s+c.saldo,0);
-                        const totalGastosOpUSD = saldosOpUSD.reduce((s,c)=>s+c.saldo,0);
-                        const gananciaNetaComision = gananciaTotalMes - totalGastosOpDOP;
+                        const productosActivosSalarios = (contabScope==='todas' ? productos : productos.filter(perteneceATienda)).filter(p=>p.estado==='Activo');
+                        const { filas: filasSalarios } = calcularUtilidadesPorProducto(cuentasCtbScope, asientosDelMes, productosActivosSalarios);
+                        const filasSalariosOrdenadas = [...filasSalarios].sort((a,b)=>b.utilidad-a.utilidad);
+                        const totalIngSalarios = filasSalarios.reduce((s,p)=>s+p.ingresos,0);
+                        const totalGasSalarios = filasSalarios.reduce((s,p)=>s+p.gastos,0);
+                        const gananciaNetaComision = totalIngSalarios - totalGasSalarios;
                         const montoComision = gananciaNetaComision * (parseFloat(comisionPct)||0) / 100;
 
                         return <>
@@ -3710,15 +3864,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                         <div className="card glass" style={{padding:'20px 22px',marginBottom:16}}>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0'}}>
-                                <span style={{color:'var(--text-dim)'}}>Ganancia Total (productos Activos, Cierre Diario)</span>
-                                <span style={{fontFamily:'Fira Code',fontWeight:700}}>{fmtCtb(gananciaTotalMes,'DOP')}</span>
+                                <span style={{color:'var(--text-dim)'}}>Ingresos totales (productos activos, Libro Diario)</span>
+                                <span style={{fontFamily:'Fira Code',fontWeight:700}}>{fmtCtb(totalIngSalarios,'DOP')}</span>
                             </div>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0',color:'#A03B3B'}}>
-                                <span>− Gastos operativos (DOP)</span>
-                                <span style={{fontFamily:'Fira Code',fontWeight:700}}>{fmtCtb(totalGastosOpDOP,'DOP')}</span>
+                                <span>− Gastos totales (directos + gasto general repartido)</span>
+                                <span style={{fontFamily:'Fira Code',fontWeight:700}}>{fmtCtb(totalGasSalarios,'DOP')}</span>
                             </div>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:14,fontWeight:800,padding:'10px 0',marginTop:6,borderTop:'1px solid var(--glass-border)'}}>
-                                <span>Ganancia neta para comisión</span>
+                                <span>Ganancia neta de todos los productos (mes)</span>
                                 <span style={{fontFamily:'Fira Code',color:gananciaNetaComision>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(gananciaNetaComision,'DOP')}</span>
                             </div>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:16,fontWeight:800,padding:'12px 0',marginTop:8,borderTop:'2px solid var(--orange)',color:'var(--orange)'}}>
@@ -3727,25 +3881,21 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         </div>
 
-                        {saldosOpDOP.length>0 && (
-                            <div className="card glass" style={{padding:'16px 20px',marginBottom:16}}>
-                                <div style={{fontSize:12,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Gastos operativos descontados (DOP)</div>
-                                {saldosOpDOP.map(c=>(
-                                    <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'4px 0',color:'var(--text-dim)'}}>
-                                        <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,'DOP')}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {saldosOpUSD.length>0 && (
-                            <div className="card glass" style={{padding:'16px 20px',fontSize:12.5,color:'var(--text-dim)'}}>
-                                <strong style={{color:'var(--text)'}}>Nota:</strong> también hay {fmtCtb(totalGastosOpUSD,'USD')} en gastos operativos en USD este mes — no se restaron automáticamente (moneda distinta a la venta), pero considéralos aparte:
-                                {saldosOpUSD.map(c=>(
-                                    <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'4px 0',marginTop:6}}>
-                                        <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,'USD')}</span>
-                                    </div>
-                                ))}
+                        {filasSalariosOrdenadas.length>0 && (
+                            <div className="card glass" style={{overflowX:'auto'}}>
+                                <table style={{minWidth:480}}>
+                                    <thead><tr><th>Producto</th><th className="td-num">Ingresos</th><th className="td-num">Gastos</th><th className="td-num">Utilidad</th></tr></thead>
+                                    <tbody>
+                                        {filasSalariosOrdenadas.map(p=>(
+                                            <tr key={p.id}>
+                                                <td>{p.codigo?`${p.codigo} — ${p.nombre}`:p.nombre}</td>
+                                                <td className="td-num">{fmtCtb(p.ingresos,'DOP')}</td>
+                                                <td className="td-num">{fmtCtb(p.gastos,'DOP')}</td>
+                                                <td className="td-num" style={{fontWeight:700,color:p.utilidad>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(p.utilidad,'DOP')}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                         </>;
@@ -3911,25 +4061,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <h2>{editingCuenta ? 'Editar Cuenta' : 'Nueva Cuenta'}</h2>
                                 <button className="modal-close" onClick={() => { setShowCuentaModal(false); setEditingCuenta(null); }}>×</button>
                             </div>
-                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                                <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{color:'var(--text-dim)'}}>Código</label>
-                                    <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                        value={cuentaForm.codigo} onChange={e=>setCuentaForm(f=>({...f,codigo:e.target.value}))} placeholder="Ej. 1000" />
-                                </div>
-                                <div className="form-group" style={{marginBottom:0}}>
-                                    <label style={{color:'var(--text-dim)'}}>Moneda</label>
-                                    <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                        value={cuentaForm.moneda} onChange={e=>setCuentaForm(f=>({...f,moneda:e.target.value}))}>
-                                        {MONEDAS_CTB.map(m=><option key={m} value={m}>{m}</option>)}
-                                    </select>
-                                </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Código</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={cuentaForm.codigo} onChange={e=>setCuentaForm(f=>({...f,codigo:e.target.value}))} placeholder="Ej. 1000" />
                             </div>
                             <div className="form-group">
                                 <label style={{color:'var(--text-dim)'}}>Nombre de la cuenta</label>
                                 <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                     value={cuentaForm.nombre} onChange={e=>setCuentaForm(f=>({...f,nombre:e.target.value}))}
-                                    placeholder="Ej. Caja, Banco Popular USD, Ventas..." onKeyDown={e=>e.key==='Enter'&&saveCuenta()} />
+                                    placeholder="Ej. Caja, Banco Popular, Ventas..." onKeyDown={e=>e.key==='Enter'&&saveCuenta()} />
                             </div>
                             <div className="form-group">
                                 <label style={{color:'var(--text-dim)'}}>Tipo</label>
@@ -3986,7 +4127,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         </select>
                                         <button className="btn btn-glass btn-sm" disabled={asientoForm.lineas.length<=2} onClick={()=>removeAsientoLinea(i)}>×</button>
                                     </div>
-                                    <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr 1fr',gap:8}}>
+                                    <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.3fr 1fr 1fr',gap:8}}>
+                                        <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                            value={l.productoId} onChange={e=>setAsientoLinea(i,{productoId:e.target.value})}>
+                                            <option value="">Producto (opcional)</option>
+                                            {productosScoped.map(p=>(
+                                                <option key={p.id} value={p.id}>{p.codigo} — {p.nombre}</option>
+                                            ))}
+                                        </select>
                                         <input className="form-input glass no-icon" list="terceros-sugeridos" style={{border:'1px solid var(--glass-border)'}}
                                             value={l.tercero} onChange={e=>setAsientoLinea(i,{tercero:e.target.value})} placeholder="Tercero (opcional)" />
                                         <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
@@ -4000,9 +4148,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 {[...new Set(asientos.flatMap(a=>a.lineas||[]).map(l=>l.tercero).filter(Boolean))].map(t=><option key={t} value={t} />)}
                             </datalist>
                             <button className="btn btn-glass btn-sm" onClick={addAsientoLinea} style={{marginBottom:16}}>{I.plus} Agregar línea</button>
-                            {asientoMonedaMixta && (
-                                <div style={{fontSize:'12px',color:'#A03B3B',marginBottom:10}}>Todas las líneas de un mismo asiento deben usar cuentas de la misma moneda.</div>
-                            )}
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',padding:'10px 0',borderTop:'1px solid var(--glass-border)'}}>
                                 <span>Debe: <strong style={{fontFamily:'Fira Code'}}>{asientoTotalDebe.toFixed(2)}</strong></span>
                                 <span>Haber: <strong style={{fontFamily:'Fira Code'}}>{asientoTotalHaber.toFixed(2)}</strong></span>
