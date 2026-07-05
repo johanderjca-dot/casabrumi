@@ -1190,7 +1190,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showProdModal,      setShowProdModal]      = useState(false);
     const [editingProducto,    setEditingProducto]    = useState(null);
     const [savingProd,         setSavingProd]         = useState(false);
-    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'' });
+    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'', codigo:'' });
     const [editSeccion,        setEditSeccion]        = useState(null); // 'inventario'
     const [invForm,            setInvForm]            = useState({ precioCompra:'', precioVenta:'', moneda:'USD' });
     // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
@@ -1891,7 +1891,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const data = {
             nombre: prodForm.nombre, descripcion: prodForm.descripcion,
             estado: prodForm.estado, proveedor: prodForm.proveedor,
-            imagen: prodForm.imagen,
+            imagen: prodForm.imagen, codigo: prodForm.codigo.trim(),
             facebook: editingProducto?.facebook || {}, inventario: editingProducto?.inventario || {},
         };
         if (editingProducto) {
@@ -1900,7 +1900,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         } else {
             db.collection('productos').add({...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
         }
-        setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''});
+        setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''});
         setEditingProducto(null); setShowProdModal(false);
     };
 
@@ -1911,7 +1911,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openEditProd = (p) => {
         setEditingProducto(p);
-        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', imagen:p.imagen||''});
+        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', imagen:p.imagen||'', codigo:p.codigo||''});
         setShowProdModal(true);
     };
 
@@ -2026,7 +2026,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
             {showCmdK && (() => {
                 const acciones = [
-                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''}); setShowProdModal(true); } },
+                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''}); setShowProdModal(true); } },
                     { key:'vendedores', label: 'Nuevo usuario',          icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
                     { key:'accesos', label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
                 ].filter(a => tienePermiso(a.key));
@@ -2368,9 +2368,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{p.formaEntrega || '—'}</td>
                                             <td style={{color:'var(--text-dimmer)',fontSize:'11px'}}>{p.etiquetas || '—'}</td>
                                             <td>
-                                                <input key={p.id+'-cod'} className="form-input glass no-icon" defaultValue={p.codigoInterno||''}
-                                                    placeholder="Ej. CB-014" style={{border:'1px solid var(--glass-border)',fontSize:'12px',padding:'5px 8px',minWidth:100}}
-                                                    onBlur={e=>{ if(e.target.value.trim()!==(p.codigoInterno||'')) guardarCodigoInterno(p.id, e.target.value); }} />
+                                                <select value={p.codigoInterno||''} onChange={e=>guardarCodigoInterno(p.id, e.target.value)}
+                                                    style={{fontSize:'12px',padding:'5px 8px',border:'1px solid var(--glass-border)',borderRadius:'6px',background:'var(--glass-bg-mid)',color:'var(--text)',fontFamily:'inherit',cursor:'pointer',outline:'none',minWidth:150}}>
+                                                    <option value="">— Sin código —</option>
+                                                    {p.codigoInterno && !productosScoped.some(pr=>(pr.codigo||pr.nombre)===p.codigoInterno) &&
+                                                        <option value={p.codigoInterno}>{p.codigoInterno} (sin match)</option>}
+                                                    {productosScoped.map(pr => (
+                                                        <option key={pr.id} value={pr.codigo||pr.nombre}>{pr.codigo ? `${pr.codigo} — ${pr.nombre}` : pr.nombre}</option>
+                                                    ))}
+                                                </select>
                                             </td>
                                         </tr>
                                     ))}
@@ -2423,7 +2429,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                 <div><h1>Productos Ganadores</h1><p>Gestiona y analiza tus mejores productos</p></div>
-                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
+                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
                             </div>
                             {productos.length===0 ? (
                                 <div className="card glass"><div className="empty">
@@ -2451,6 +2457,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`} style={{position:'absolute',top:8,right:8,fontSize:'10px'}}>
                                                         <span className="badge-dot"/>{p.estado||'Sin estado'}
                                                     </span>
+                                                    {p.codigo&&<span className="badge badge-gold" style={{position:'absolute',top:8,left:8,fontSize:'10px'}}>{p.codigo}</span>}
                                                 </div>
                                                 <div style={{padding:'14px 16px'}}>
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
@@ -2491,6 +2498,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <label style={{color:'var(--text-dim)'}}>Proveedor</label>
                                             <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                                 value={prodForm.proveedor} onChange={e=>setProdForm(f=>({...f,proveedor:e.target.value}))} placeholder="Nombre del proveedor" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Código interno</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.codigo} onChange={e=>setProdForm(f=>({...f,codigo:e.target.value}))} placeholder="Ej. CB-014" />
                                         </div>
                                         <div className="form-group">
                                             <label style={{color:'var(--text-dim)'}}>Estado inicial</label>
@@ -3198,6 +3210,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <label style={{color:'var(--text-dim)'}}>Proveedor</label>
                                             <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                                 value={prodForm.proveedor} onChange={e=>setProdForm(f=>({...f,proveedor:e.target.value}))} placeholder="Nombre del proveedor" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Código interno</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.codigo} onChange={e=>setProdForm(f=>({...f,codigo:e.target.value}))} placeholder="Ej. CB-014" />
                                         </div>
                                         <div className="form-group">
                                             <label style={{color:'var(--text-dim)'}}>Estado inicial</label>
