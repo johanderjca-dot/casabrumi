@@ -414,6 +414,11 @@ const crearUsuarioConAuth = async (email, password) => {
 
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
+// Fecha de HOY en la zona horaria local del navegador, como 'YYYY-MM-DD'.
+// OJO: nunca usar new Date().toISOString() para esto — toISOString() siempre da la fecha
+// en UTC, y República Dominicana está en UTC-4: después de las ~8pm hora local, UTC ya
+// pasó al día siguiente y el sistema cree que es un día más adelante.
+const fechaLocalISO = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const DEFAULT_TIENDA_ID = 'casa-brumi';
 const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABDgAAADICAYAAAANzVGFAAA2BElEQVR4nO3dC3hU1bnw8XcmCUkgAeQmCggqKDdFRQRBFEEoAiJUqKDgrd5JwSuIBVT0KPWOXEQQ5Cag4AWUVkUREQrHalutp+er9Bzt0bbSeqFatUKS/T1rWO90zWYymZlMktnh/3ue9Uwy2bP22puZzV7vvGstEQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIqFBtNwAAgGzkeV5tNwF1WCjELRgAAAAAAAAAAPDh6wMAAHzI3kB1I4MDAIDMC1dDnQAABBKBDdT0e433HAAAmUOAAwAAAAAABB4BDgAAAAAAEHgEOAAAAAAAQOAR4AAAAAAAAIFHgAMAAAAAAAQeAQ4AAAAAABB4BDgAAAAAAEDgEeAAAAAAAACBR4ADAAAAAAAEHgEOAAAAAAAQeAQ4AAAAAABA4BHgAAAAAAAAgUeAAwAAAAAABB4BDgAAAAAAEHgEOAAAAAAAQOAR4AAAAAAAAIFHgAMAAAAAAAQeAQ4AAAAAABB4BDgAAAAAAEDgEeAAAAAAAACBR4ADAAAAAAAEHgEOAAAAAAAQeAQ4AAAAAABA4BHgAAAAAAAAgUeAAwAAAAAABB4BDgAAAAAAEHgEOAAAAAAAQOAR4AAAAAAAAIFHgAMAAAAAAAQeAQ4AAAAAABB4ubXdAAAAUHsee+wx75M/fyLlZeXSqlUrOfbYY2XAgAGh2m4XAABAqghwAABwENm8ebO3du1a2bJli+zatUvKysoO2OaII9p4/fsPkHHjxhHsAAAAAAAgaDzPiz7WxTJ8+HBzgF4oFIo+5uXlefn5+ZFSr149LxwOx2wz9oILvNpud10t7nsOAAAAAICMcTuddak88sgjXnFxcSRgYQIYJqiRk5MT+T1eMX8z22iw45hjjiHIUQ3Ffc8BAICqI+0UAADLdDZDoVCd6nRedtll3hNPPBE5rpycHCkvL4+UkITk6PZHS+cuXaR5s2aRbf/2t93y/vv/JR9++GHk93A4HCmlpaXStm07+eijD7lvyCB9r5lHAAAAAAAyxv1WPejltc2bvY4dO0YzMkzRYSennXaat379+gqzMlatWnXAa83PnTt3JpMjg8V9zwEAAAAAkDFupzPI5aKLLvIKCwttgCLXy83NjfzctGlTb+HChUkHKc4777zosBYNclw47kKCHBkq7nsOAAAAAICMcTudQSsrVqzwRo8e7RUUFsTMtaHzaPTs2SutwMSgQYOimRxa1+o1awhyZKC47zkAAFB1DPoEAMDKxjk45s+f7z322GNSv359admypRQUFETb99lnn8nHH38sn376qXz11VeR50z78/LyIsu/mmJ+njJlitx5551p/59/5JFHeh999JHk5uZG5uPo3r27vP322zV2D/Hqq6965jjN3CHNmjWTc889t07cvzAHBwAAAACgWrjfqmdLMUu3usu2VlTMMBSzrbvdgAEDvC1bXq9ytsXjjz8ezQrRLA7zXHUf+4SSEq9t27YHHGvDhg29swYO9OY88kigM0nc9xwAAAAAAHU2wGEmAnWHh5hHE8gwQ09MMT/7Ax/5+fle7969vaefejqjnf9evXpFAynmsXv37tUWXHh88WKvqKgoGtjR4TZ6zG7Ap1WrVt7cuXMDGehw33MAAAAAANTZAMebb74Z6dQnyuAwzxcXF3v9+vXz7r33Xm/Hjh3V0tl/4oknolkc2pZnn3024/u66sqrosdlghk6uam/5OXaYEdo/+9du3b11q1dF6hAh/ueAwAAVcegTwAArGycg6NJkybel19+KeFwODIHRUlJicmmkG+//VYaNmokhx92mPTt27dG/j8/4YQTvHfffTcyr8e+fftk2LBh8sILL2Rs35dccom3bNkyycnJifxujtf8W3Tq1El69OghRUVF8vnnn8tbb70lH374YWQbMy+IYeYGCYdzZMiQs+Waa66RIUOGZP09DnNwAAAAAAAOigwOU3r06LE/Y8FmckyZMqXWshSWLFkSHTKjmRRbt27NSHuuuPzy6BAYrd8MU3nggQfi1j933jyvQ/v20WwPd8UY83u3bt2822+/3Xvqqadi2rjp1U3eU2vWeLNmzfLOP/98r2/fviaoUivn1H3PAQAAAABQpwMcM2bMiAlwNG58SK0OwzjqqKNi2jNmzJgqt+e22247YCnaww8/3DNDdCp77V133RUZohNdGtdMtGrr0KJzeOj8He7wHvN4yCG1c07d9xwAAAAAAHU6wGGKWTXEneBz6NCh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";
 
@@ -574,6 +579,47 @@ function KpiVal({ value }) {
 }
 
 // ── TABLE ROW REVEAL ──
+function FormGastoProd({ onAdd }) {
+    const [monto, setMonto] = useState('');
+    const [nota,  setNota]  = useState('');
+    const submit = () => {
+        if (!parseFloat(monto)) return;
+        onAdd(monto, nota);
+        setMonto(''); setNota('');
+    };
+    return (
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:'1 1 90px'}}
+                type="number" value={monto} onChange={e=>setMonto(e.target.value)} placeholder="Monto" onKeyDown={e=>e.key==='Enter'&&submit()} />
+            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:'2 1 120px'}}
+                value={nota} onChange={e=>setNota(e.target.value)} placeholder="Nota (opcional)" onKeyDown={e=>e.key==='Enter'&&submit()} />
+            <button className="btn btn-gold btn-sm" onClick={submit}>+</button>
+        </div>
+    );
+}
+
+function FormPedidoProd({ onAdd }) {
+    const [fecha,       setFecha]       = useState(() => fechaLocalISO());
+    const [despachados, setDespachados] = useState('');
+    const [entregados,  setEntregados]  = useState('');
+    const submit = () => {
+        if (!despachados && !entregados) return;
+        onAdd(fecha, despachados, entregados);
+        setDespachados(''); setEntregados('');
+    };
+    return (
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:'1 1 130px'}}
+                type="date" value={fecha} onChange={e=>setFecha(e.target.value)} />
+            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:'1 1 100px'}}
+                type="number" value={despachados} onChange={e=>setDespachados(e.target.value)} placeholder="Despachados" onKeyDown={e=>e.key==='Enter'&&submit()} />
+            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:'1 1 100px'}}
+                type="number" value={entregados} onChange={e=>setEntregados(e.target.value)} placeholder="Entregados" onKeyDown={e=>e.key==='Enter'&&submit()} />
+            <button className="btn btn-gold btn-sm" onClick={submit}>+</button>
+        </div>
+    );
+}
+
 function RevealTable({ children, className, style }) {
     const ref = useRef(null);
     useEffect(() => {
@@ -602,8 +648,8 @@ function CierreDiario({ productos, user, tiendaId }) {
     const skipFillRef      = useRef(false);
     const prevOffsetRef    = useRef(0);
 
-    const getTodayStr = () => new Date().toISOString().slice(0, 10);
-    const getDateStr  = off => { const d = new Date(); d.setDate(d.getDate() + off); return d.toISOString().slice(0,10); };
+    const getTodayStr = () => fechaLocalISO();
+    const getDateStr  = off => { const d = new Date(); d.setDate(d.getDate() + off); return fechaLocalISO(d); };
     const selectedFechaStr = getDateStr(navOffset);
     const selectedDate     = new Date(selectedFechaStr + 'T12:00:00');
     const labelFecha       = selectedDate.toLocaleDateString('es-DO', { weekday:'long', day:'numeric', month:'long' });
@@ -832,7 +878,8 @@ function App() {
                 if (data.email && data.email !== emailNorm) updates.email = emailNorm;
                 if (Object.keys(updates).length > 0) match.ref.update(updates).catch(console.error);
                 setVendedorAutorizado(data.activo !== false);
-                setUser(prev => ({ ...prev, permisos: data.permisos || {} }));
+                // Cuentas de antes del sistema de permisos (sin campo 'permisos') conservan Cierre Diario.
+                setUser(prev => ({ ...prev, permisos: data.permisos !== undefined ? data.permisos : { cierre: true }, tiendaId: data.tiendaId || DEFAULT_TIENDA_ID }));
             }).catch(console.error);
         }).catch(console.error);
     };
@@ -997,9 +1044,8 @@ function App() {
         );
     }
 
-    return user.role === 'master'
-        ? <AdminPanel user={user} onLogout={handleLogout} onPhotoChange={handlePhotoChange} />
-        : <VendedorPanel user={user} onLogout={handleLogout} onPhotoChange={handlePhotoChange} />;
+    // Master o vendedor ya autorizado (permisos filtran lo que ve dentro del mismo panel).
+    return <AdminPanel user={user} onLogout={handleLogout} onPhotoChange={handlePhotoChange} />;
 }
 
 // ── HEADER ──
@@ -1018,7 +1064,7 @@ function Header({ user, onLogout, activeTab, navSections, onPhotoChange, onCmdK,
                 <span>{today}</span>
             </div>
             <div className="app-header-right">
-                {tiendas && tiendas.length > 0 && (
+                {user.role === 'master' && tiendas && tiendas.length > 0 && (
                     <select value={activeTiendaId} onChange={e => setActiveTiendaId(e.target.value)}
                         className="form-input no-icon" style={{width:'auto',padding:'8px 30px 8px 12px',fontSize:'12.5px',fontWeight:600,border:'1.5px solid var(--glass-border)'}}
                         title="Cambiar de tienda">
@@ -1139,7 +1185,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [savingProd,         setSavingProd]         = useState(false);
     const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'' });
     const [editSeccion,        setEditSeccion]        = useState(null); // 'inventario'
-    const [invForm,            setInvForm]            = useState({ unidadesPedidas:'', precioCompra:'', precioVenta:'', moneda:'USD' });
+    const [invForm,            setInvForm]            = useState({ precioCompra:'', precioVenta:'', moneda:'USD' });
     // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
     const ANALISIS_CHECKS = [
         ['noVenden','¿No lo están vendiendo en mi mercado?','Poca o ninguna competencia pautándolo activamente en RD. Si nadie más lo vende, tienes ventaja; si muchos lo venden, evalúa si puedes diferenciarte.'],
@@ -1435,7 +1481,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const cuentasCtbScope   = contabScope==='todas' ? cuentas  : cuentas.filter(c=>c.tiendaId===activeTiendaId);
     const asientosCtbScope  = contabScope==='todas' ? asientos : asientos.filter(a=>a.tiendaId===activeTiendaId);
-    const hoyISO = new Date().toISOString().slice(0,10);
+    const hoyISO = fechaLocalISO();
 
     // ── Sincronización automática: Gastos y Cierre Diario → Libro Diario ──
     // Ledger de solo-agregar: nunca borra ni reescribe asientos ya posteados; una edición
@@ -1469,7 +1515,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const sincronizarGasto = async (g) => {
         if (ctbSyncingRef.current.has('gasto_'+g.id)) return;
         const moneda = g.moneda || 'USD';
-        const fecha = g.fecha?.toDate ? g.fecha.toDate().toISOString().slice(0,10) : hoyISO;
+        const fecha = g.fecha?.toDate ? fechaLocalISO(g.fecha.toDate()) : hoyISO;
         const abonado = g.esCredito ? (g.montoAbonado||0) : 0;
         const yaAbonoSync = g.ctbAbonoSincronizado || 0;
         const necesitaInicial = !g.ctbAsientoInicialId;
@@ -1566,7 +1612,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         try {
             const emailNorm = form.email.toLowerCase().trim();
             const uid = await crearUsuarioConAuth(emailNorm, form.password);
-            await db.collection('users').doc(uid).set({ email: emailNorm, role: 'vendedor', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            // Los permisos se guardan también en users/{uid} (además de vendedores) porque las
+            // reglas de seguridad de Firestore solo pueden hacer lookups directos por uid, no por email.
+            await db.collection('users').doc(uid).set({ email: emailNorm, role: 'vendedor', permisos: form.permisos || {}, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
             await db.collection('vendedores').add({
                 nombre: form.nombre.trim(),
                 email:  emailNorm,
@@ -1605,6 +1653,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 activo: editUsuarioForm.activo,
                 permisos: editUsuarioForm.permisos,
             });
+            // Mismo espejo que en crearUsuario: users/{uid} necesita los permisos para que las reglas los lean.
+            if (editingUsuario.uid) {
+                await db.collection('users').doc(editingUsuario.uid).set({ permisos: editUsuarioForm.permisos }, { merge: true }).catch(console.error);
+            }
             setShowEditUsuarioModal(false);
             setEditingUsuario(null);
         } catch(err) { console.error('Error guardando permisos:', err); }
@@ -1637,6 +1689,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 docs.sort((a, b) => (b.fechaAlta?.toDate?.()?.getTime()||0) - (a.fechaAlta?.toDate?.()?.getTime()||0));
                 setVendedores(docs);
+                // Migración de una sola vez: cuentas de vendedor de antes del sistema de permisos
+                // (sin campo 'permisos') conservan su acceso de siempre — solo Cierre Diario —
+                // en vez de quedar sin ningún permiso por defecto. Solo el master puede escribir
+                // fichas ajenas, así que esto corre únicamente en su sesión.
+                if (user.role === 'master') {
+                    docs.forEach(v => {
+                        if (v.permisos !== undefined) return;
+                        db.collection('vendedores').doc(v.id).update({ permisos: { cierre: true } }).catch(console.error);
+                        if (v.uid) db.collection('users').doc(v.uid).set({ permisos: { cierre: true } }, { merge: true }).catch(console.error);
+                    });
+                }
             },
             err => console.error('Firestore vendedores:', err)
         );
@@ -1740,7 +1803,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const days = Array.from({length:7}, (_,i) => { const d=new Date(); d.setDate(d.getDate()-(6-i)); return d; });
         const cierresTienda = cierres.filter(perteneceATienda);
         const data = days.map(d => {
-            const iso = d.toISOString().slice(0,10);
+            const iso = fechaLocalISO(d);
             return cierresTienda.find(c => c.fechaStr === iso)?.totalMonto || 0;
         });
         const labels = days.map(d => d.toLocaleDateString('es-CO',{weekday:'short',day:'numeric'}));
@@ -1845,12 +1908,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const cierresScoped    = cierres.filter(perteneceATienda);
 
     const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
-    const _mesStr        = new Date().toISOString().slice(0, 7);
+    const _mesStr        = fechaLocalISO().slice(0, 7);
     const _cierresMes    = cierresScoped.filter(c => c.fechaStr?.startsWith(_mesStr));
     const totalVentasMes = _cierresMes.reduce((s, c) => s + (c.totalMonto    || 0), 0);
     const totalUndsMes   = _cierresMes.reduce((s, c) => s + (c.totalCantidad || 0), 0);
     const _ayerDate      = new Date(); _ayerDate.setDate(_ayerDate.getDate() - 1);
-    const _ayerStr       = _ayerDate.toISOString().slice(0, 10);
+    const _ayerStr       = fechaLocalISO(_ayerDate);
     const cierreHoyDash  = cierresScoped.find(c => c.fechaStr === _ayerStr);
 
     const I_link = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
@@ -1861,7 +1924,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
     const I_balanza = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M12 6 5 6l3.5 8a3.5 3.5 0 0 0 7 0L19 6l-7 0"/><line x1="7" y1="20" x2="17" y2="20"/></svg>;
 
-    const navSections = [
+    // Usuarios (gestión de cuentas) es siempre exclusivo del master, sin importar los checkboxes
+    // de permisos guardados — evita que un vendedor con ese permiso cree/edite otras cuentas.
+    // Dashboard es visible para cualquier cuenta autorizada, tampoco depende de un permiso propio.
+    const tienePermiso = key => {
+        if (user.role === 'master') return true;
+        if (key === 'vendedores') return false;
+        if (key === 'dashboard') return true;
+        return !!(user.permisos||{})[key];
+    };
+
+    const navSectionsBase = [
         { label: 'Principal', items: [{ key: 'dashboard',   label: 'Dashboard',   icon: I.chart }] },
         { label: 'Gestion',   items: [
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
@@ -1879,6 +1952,25 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'tiendas', label: 'Tiendas', icon: I.box },
         ]},
     ];
+    const navSections = navSectionsBase
+        .map(s => ({ ...s, items: s.items.filter(i => tienePermiso(i.key)) }))
+        .filter(s => s.items.length > 0);
+
+    // Si la pestaña activa deja de estar permitida (permisos revocados, o al cargar sin acceso
+    // a 'dashboard' — imposible hoy, pero por si acaso) cae a la primera pestaña disponible.
+    useEffect(() => {
+        if (tienePermiso(activeTab)) return;
+        const primera = navSections[0]?.items[0]?.key;
+        if (primera) setActiveTab(primera);
+    }, [activeTab, user.permisos, user.role]);
+
+    // Vendedores quedan fijos en la tienda donde el master los creó — no pueden ver otras tiendas
+    // aunque tengan permiso de Productos/Contabilidad/etc.
+    useEffect(() => {
+        if (user.role !== 'master' && user.tiendaId && activeTiendaId !== user.tiendaId) {
+            setActiveTiendaId(user.tiendaId);
+        }
+    }, [user.role, user.tiendaId]);
 
     // Métricas ejecutivas para el dashboard
     const nGanadores = productosScoped.filter(p => p.estado === 'Ganador').length;
@@ -1891,10 +1983,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
             {showCmdK && (() => {
                 const acciones = [
-                    { label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''}); setShowProdModal(true); } },
-                    { label: 'Nuevo usuario',          icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
-                    { label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
-                ];
+                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:''}); setShowProdModal(true); } },
+                    { key:'vendedores', label: 'Nuevo usuario',          icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
+                    { key:'accesos', label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
+                ].filter(a => tienePermiso(a.key));
                 const navCmds = navSections.flatMap(s => s.items).map(i => ({ label: i.label, icon: i.icon, kind: 'Ir a', run: () => { setActiveTab(i.key); if (i.key === 'ganadores') setActiveProducto(null); } }));
                 const q = cmdQuery.trim().toLowerCase();
                 const filtered = [...acciones, ...navCmds].filter(c => !q || c.label.toLowerCase().includes(q));
@@ -2219,7 +2311,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     {productos.map(p => {
                                         const inv = p.inventario||{};
                                         const vendido = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
-                                        const pedido  = parseFloat(inv.unidadesPedidas||0);
+                                        const pedidosProd = p.pedidos||[];
+                                        const despachadosCard = pedidosProd.reduce((s,e)=>s+(e.despachados||0),0);
+                                        const entregadosCard  = pedidosProd.reduce((s,e)=>s+(e.entregados||0),0);
                                         return (
                                             <div key={p.id} className="card glass" style={{cursor:'pointer',transition:'transform var(--t-fast),box-shadow var(--t-fast)'}}
                                                 onClick={()=>{setActiveProducto(p);setProductoTab('general');setEditSeccion(null);}}
@@ -2237,7 +2331,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
                                                     {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={p.proveedor}>{p.proveedor}</div>}
                                                     <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-                                                        {pedido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span>/{pedido} vendidos</div>}
+                                                        {vendido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span> vendidos</div>}
+                                                        {despachadosCard>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{entregadosCard}</span>/{despachadosCard} entregados</div>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2303,8 +2398,44 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const inv = p.inventario||{};
                     // Unidades vendidas = suma de lo registrado para este producto en Cierre Diario (por nombre exacto), no un campo manual.
                     const unidadesVendidasCalc = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
-                    const gananciaUnit = (parseFloat(inv.precioVenta||0)-parseFloat(inv.precioCompra||0));
-                    const gananciaTotal = gananciaUnit * unidadesVendidasCalc;
+                    // Ganancia total = facturado real (DOP) de este producto en Cierre Diario, no un estimado por margen.
+                    const gananciaTotal = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.monto||0),0), 0);
+                    const finanzas = p.finanzas || {};
+                    const GASTO_CATS_PROD = [
+                        ['publicidad', 'Gasto en Publicidad'],
+                        ['empacado',   'Gasto en Empacado'],
+                        ['proveedor',  'Pago a Proveedor (incl. envío China → USA)'],
+                        ['usaRd',      'Envío USA → RD'],
+                    ];
+                    const totalGastoCat = key => (finanzas[key]||[]).reduce((s,e)=>s+(e.monto||0),0);
+                    const totalGastosProd = GASTO_CATS_PROD.reduce((s,[key])=>s+totalGastoCat(key),0);
+                    const gananciaNeta = gananciaTotal - totalGastosProd;
+                    const agregarGastoProd = async (key, monto, nota) => {
+                        const entrada = { monto: parseFloat(monto)||0, nota: (nota||'').trim(), fecha: new Date().toISOString() };
+                        const actuales = finanzas[key] || [];
+                        await db.collection('productos').doc(p.id).update({ [`finanzas.${key}`]: [...actuales, entrada] }).catch(console.error);
+                    };
+                    const borrarGastoProd = async (key, idx) => {
+                        const actuales = [...(finanzas[key]||[])];
+                        actuales.splice(idx,1);
+                        await db.collection('productos').doc(p.id).update({ [`finanzas.${key}`]: actuales }).catch(console.error);
+                    };
+
+                    // ── Pedidos: despachados vs entregados exitosos sin devolución (tasa de entrega) ──
+                    const pedidos = p.pedidos || [];
+                    const totalDespachados = pedidos.reduce((s,e)=>s+(e.despachados||0),0);
+                    const totalEntregados  = pedidos.reduce((s,e)=>s+(e.entregados||0),0);
+                    const tasaEntrega = totalDespachados>0 ? (totalEntregados/totalDespachados*100) : null;
+                    const agregarPedido = async (fecha, despachados, entregados) => {
+                        const entrada = { despachados: parseInt(despachados)||0, entregados: parseInt(entregados)||0, fecha: fecha || fechaLocalISO() };
+                        await db.collection('productos').doc(p.id).update({ pedidos: [...pedidos, entrada] }).catch(console.error);
+                    };
+                    const borrarPedido = async idx => {
+                        const actuales = [...pedidos];
+                        actuales.splice(idx,1);
+                        await db.collection('productos').doc(p.id).update({ pedidos: actuales }).catch(console.error);
+                    };
+
                     const TABS = ['General','Análisis','Contenido','Inventario'];
                     const CONTENT_GROUPS = contenidoGrupos || [];
                     const analisis = p.analisis || {};
@@ -2359,7 +2490,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         </div>
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                                             {[
-                                                {label:'Unidades pedidas', val: inv.unidadesPedidas||'—'},
+                                                {label:'Entregados / Despachados', val: `${totalEntregados}/${totalDespachados}`},
                                                 {label:'Unidades vendidas', val: unidadesVendidasCalc||'—'},
                                             ].map(({label,val})=>(
                                                 <div key={label} className="kpi-card glass glass-mid" style={{padding:'16px'}}>
@@ -2551,7 +2682,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{fontWeight:'700',fontSize:'14px',marginBottom:18}}>Editar inventario y ventas</div>
                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                                             {[
-                                                {key:'unidadesPedidas', label:'Unidades pedidas', ph:'0'},
                                                 {key:'precioCompra', label:'Precio de compra', ph:'0.00'},
                                                 {key:'precioVenta', label:'Precio de venta', ph:'0.00'},
                                             ].map(({key,label,ph})=>(
@@ -2579,12 +2709,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <>
                                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:16}}>
                                             {[
-                                                {label:'Pedidos', val:inv.unidadesPedidas||'0', sub:'unidades'},
+                                                {label:'Despachados', val:String(totalDespachados), sub:'órdenes'},
+                                                {label:'Entregados', val:String(totalEntregados), sub:'exitosos sin devolución', ok:true},
+                                                {label:'Tasa de entrega', val:tasaEntrega!==null?`${tasaEntrega.toFixed(1)}%`:'—', sub:'entregados / despachados', ok:tasaEntrega!==null&&tasaEntrega>=70},
                                                 {label:'Vendidos', val:String(unidadesVendidasCalc), sub:'unidades — suma de Cierre Diario', ok:true},
-                                                {label:'Stock disponible', val:Math.max(0,(parseFloat(inv.unidadesPedidas||0)-unidadesVendidasCalc)).toString(), sub:'unidades'},
-                                                {label:'Ganancia unitaria', val:gananciaUnit>0?`${inv.moneda==='DOP'?'RD$':'$'}${gananciaUnit.toFixed(2)}`:'—', sub:'por unidad', ok:gananciaUnit>0},
-                                                {label:'Ganancia total', val:gananciaTotal>0?`${inv.moneda==='DOP'?'RD$':'$'}${gananciaTotal.toFixed(2)}`:'—', sub:'acumulada', ok:gananciaTotal>0},
-                                                {label:'Precio venta', val:inv.precioVenta?`${inv.moneda==='DOP'?'RD$':'$'}${inv.precioVenta}`:'—', sub:'por unidad'},
+                                                {label:'Ganancia total', val:`RD$${gananciaTotal.toFixed(2)}`, sub:'facturado — suma de Cierre Diario', ok:gananciaTotal>0},
+                                                {label:'Ganancia neta', val:`RD$${gananciaNeta.toFixed(2)}`, sub:'facturado − gastos del producto', ok:gananciaNeta>0},
                                             ].map(({label,val,sub,ok})=>(
                                                 <div key={label} className="kpi-card glass glass-mid">
                                                     <div className="kpi-top"><div className="kpi-label">{label}</div><div className={`kpi-icon ${ok?'gold':'white'}`}>{I.dollar}</div></div>
@@ -2593,8 +2723,53 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 </div>
                                             ))}
                                         </div>
-                                        <div style={{textAlign:'right'}}>
-                                            <button className="btn btn-glass" onClick={()=>{setInvForm({unidadesPedidas:inv.unidadesPedidas||'',precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||'',moneda:inv.moneda||'USD'});setEditSeccion('inventario');}}>✎ Editar Inventario</button>
+                                        <div style={{textAlign:'right',marginBottom:24}}>
+                                            <button className="btn btn-glass" onClick={()=>{setInvForm({precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||'',moneda:inv.moneda||'USD'});setEditSeccion('inventario');}}>✎ Editar Precios</button>
+                                        </div>
+
+                                        <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:12}}>Pedidos — despachados vs. entregados exitosos</div>
+                                        <div className="card glass" style={{padding:'16px 18px',marginBottom:28}}>
+                                            {pedidos.length>0 && (
+                                                <div style={{marginBottom:10,maxHeight:160,overflowY:'auto'}}>
+                                                    {pedidos.map((e,idx)=>({e,idx})).sort((a,b)=>(b.e.fecha||'').localeCompare(a.e.fecha||'')).map(({e,idx},i)=>(
+                                                        <div key={idx} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:12,color:'var(--text-dim)',padding:'6px 0',borderTop:i>0?'1px solid var(--glass-border)':undefined}}>
+                                                            <span style={{flex:1}}>{e.fecha ? new Date(e.fecha+'T12:00:00').toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span>
+                                                            <span style={{fontFamily:'Fira Code',margin:'0 10px'}}>{e.despachados} despachados</span>
+                                                            <span style={{fontFamily:'Fira Code',margin:'0 10px',color:'#3D6646'}}>{e.entregados} entregados</span>
+                                                            <button onClick={()=>borrarPedido(idx)} style={{background:'none',border:'none',color:'#A03B3B',cursor:'pointer',fontSize:14,flexShrink:0}}>×</button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <FormPedidoProd onAdd={agregarPedido} />
+                                        </div>
+
+                                        <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:12}}>Gastos del producto (RD$)</div>
+                                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
+                                            {GASTO_CATS_PROD.map(([key,label]) => {
+                                                const entradas = finanzas[key] || [];
+                                                const total = totalGastoCat(key);
+                                                return (
+                                                    <div key={key} className="card glass" style={{padding:'16px 18px'}}>
+                                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                                                            <span style={{fontSize:12.5,fontWeight:700,color:'var(--text)'}}>{label}</span>
+                                                            <span style={{fontFamily:'Fira Code',fontWeight:700,fontSize:14,color:'var(--orange)'}}>RD${total.toFixed(2)}</span>
+                                                        </div>
+                                                        {entradas.length>0 && (
+                                                            <div style={{marginBottom:10,maxHeight:120,overflowY:'auto'}}>
+                                                                {entradas.map((e,idx)=>(
+                                                                    <div key={idx} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11.5,color:'var(--text-dim)',padding:'4px 0',borderTop:idx>0?'1px solid var(--glass-border)':undefined}}>
+                                                                        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{e.nota||'—'}</span>
+                                                                        <span style={{fontFamily:'Fira Code',flexShrink:0,margin:'0 8px'}}>RD${(e.monto||0).toFixed(2)}</span>
+                                                                        <button onClick={()=>borrarGastoProd(key,idx)} style={{background:'none',border:'none',color:'#A03B3B',cursor:'pointer',fontSize:13,flexShrink:0}}>×</button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        <FormGastoProd onAdd={(monto,nota)=>agregarGastoProd(key,monto,nota)} />
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </>
                                 )
@@ -3834,39 +4009,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     </div>
                 )}
 
-            </main>
-        </div>
-    );
-}
-
-// ── VENDEDOR PANEL ──
-function VendedorPanel({ user, onLogout, onPhotoChange }) {
-    const [activeTab, setActiveTab] = useState('cierre');
-    const [productos, setProductos] = useState([]);
-
-    useEffect(() => {
-        const unsub = db.collection('productos').onSnapshot(
-            snap => setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-            err  => console.error('Productos vendedor:', err)
-        );
-        return unsub;
-    }, []);
-
-    const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
-
-    const navSections = [
-        { label: 'Mi Trabajo', items: [
-            { key: 'cierre', label: 'Cierre Diario', icon: I_cierre },
-        ]},
-    ];
-
-    return (
-        <div className="app-root">
-            <img src={LOGO} aria-hidden="true" style={{position:'fixed',top:'50%',left:'50%',transform:'translate(calc(-50% + 110px), -50%)',width:'520px',maxWidth:'55vw',opacity:0.055,filter:'brightness(0)',pointerEvents:'none',userSelect:'none',zIndex:0}} />
-            <Header user={user} onLogout={onLogout} activeTab={activeTab} navSections={navSections} onPhotoChange={onPhotoChange} />
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
-            <main className="main">
-                {activeTab === 'cierre' && <CierreDiario productos={productos} user={user} tiendaId={DEFAULT_TIENDA_ID} />}
             </main>
         </div>
     );

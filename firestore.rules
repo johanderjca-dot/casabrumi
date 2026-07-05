@@ -14,6 +14,18 @@ service cloud.firestore {
       );
     }
 
+    // Permiso por módulo: el master siempre tiene todos; un usuario normal necesita
+    // permisos.<modulo> == true en su propio doc de users/{uid} (espejo del que se ve/edita
+    // en Usuarios del panel, ahí vive en vendedores/{id} por email/uid, no por uid como doc id).
+    // .get(key, default) evita fallar si el campo permisos no existe en la cuenta.
+    function tienePermiso(modulo) {
+      return isMaster() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('permisos', {}).get(modulo, false) == true
+      );
+    }
+
     // ── users ── perfil de cada cuenta (uid, email, role, photoURL)
     // el master crea la cuenta de otros usuarios (Usuarios en el panel) además de la propia
     match /users/{uid} {
@@ -61,28 +73,25 @@ service cloud.firestore {
       allow write: if isMaster();
     }
 
-    // ── otras colecciones que ya existen en esta base (cierres, links, productos)
-    // y que no pertenecen a este panel: mantengo el comportamiento actual
-    // (cualquier usuario logueado puede leer/escribir) para no romper la otra app
-    // que las usa. Avisame si querés que las restrinja tambien.
-    match /cierres/{id}    { allow read, write: if isSignedIn(); }
-    match /links/{id}      { allow read, write: if isSignedIn(); }
-    match /productos/{id}  { allow read, write: if isSignedIn(); }
+    // ── cierres, links, productos ── gateadas por el permiso de su módulo, no solo "logueado"
+    match /cierres/{id}    { allow read, write: if tienePermiso('cierre'); }
+    match /links/{id}      { allow read, write: if tienePermiso('accesos'); }
+    match /productos/{id}  { allow read, write: if tienePermiso('ganadores'); }
 
-    // ── proveedores ── ficha de cada proveedor, cualquier usuario logueado gestiona
-    match /proveedores/{id} { allow read, write: if isSignedIn(); }
+    // ── proveedores ── ficha de cada proveedor, gateada por su permiso
+    match /proveedores/{id} { allow read, write: if tienePermiso('proveedores'); }
 
     // ── campanas ── Planeacion de Campanas, solo master
     match /campanas/{id}   { allow read, write: if isMaster(); }
 
-    // ── contabilidad (partida doble, manual) ── solo el master la ve y gestiona
-    match /cuentas_contables/{id}  { allow read, write: if isMaster(); }
-    match /asientos_contables/{id} { allow read, write: if isMaster(); }
+    // ── contabilidad (partida doble, manual) ── gateada por el permiso de Contabilidad
+    match /cuentas_contables/{id}  { allow read, write: if tienePermiso('contabilidad'); }
+    match /asientos_contables/{id} { allow read, write: if tienePermiso('contabilidad'); }
 
-    // ── configuracion ── plantilla compartida del checklist de Contenido; cualquier
-    // usuario logueado la lee (la necesita para ver el checklist), solo el master la edita
+    // ── configuracion ── plantilla compartida del checklist de Contenido; la lee quien
+    // tenga acceso a Productos, solo el master la edita
     match /configuracion/{id} {
-      allow read:  if isSignedIn();
+      allow read:  if tienePermiso('ganadores');
       allow write: if isMaster();
     }
 
