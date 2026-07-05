@@ -324,6 +324,10 @@
         .badge-green .badge-dot { background: #4A9050; animation: pulse-dot 2.4s ease-in-out infinite; }
         .badge-gray  { background: rgba(92,61,30,0.07); border: 1px solid var(--glass-border); color: var(--text-dim); }
         .badge-gray .badge-dot  { background: var(--text-dimmer); }
+        .badge-red   { background: rgba(160,56,56,0.10); border: 1px solid rgba(160,56,56,0.26); color: #A03B3B; }
+        .badge-red .badge-dot   { background: #A03B3B; }
+        .badge-orange { background: rgba(200,92,26,0.12); border: 1px solid rgba(200,92,26,0.28); color: #B5531A; }
+        .badge-orange .badge-dot { background: #C85C1A; }
         @keyframes pulse-dot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.7); opacity: 0.45; } }
 
         /* ========= EMPTY & COMING SOON ========= */
@@ -436,6 +440,7 @@ const I = {
     mail:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
     lock:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
     key:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
+    cart:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>,
 };
 
 // ── MOTOR DE DIAGNÓSTICO (rangos saludables RD — del Diccionario COD + FB Ads) ──
@@ -1172,6 +1177,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [activeProducto,     setActiveProducto]     = useState(null);
     const [productoTab,        setProductoTab]        = useState('general');
     const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
+    const [loteActivo,         setLoteActivo]         = useState(null);
+    useEffect(() => { setLoteActivo(null); }, [activeProducto?.id]);
     const [contenidoGrupos,    setContenidoGrupos]    = useState(null); // null = cargando; array cuando ya llegó de Firestore
     const [nuevoGrupoNombre,   setNuevoGrupoNombre]   = useState('');
     const [showNuevoGrupo,     setShowNuevoGrupo]     = useState(false);
@@ -1248,6 +1255,20 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     };
     const openEditProveedor = pr => { setEditingProveedor(pr); setProveedorForm({ nombre:pr.nombre||'', pais:pr.pais||'China', contacto:pr.contacto||'', link:pr.link||'', notas:pr.notas||'' }); setShowProveedorModal(true); };
     const deleteProveedor = id => { if (confirm('¿Eliminar este proveedor?')) db.collection('proveedores').doc(id).delete().catch(console.error); };
+
+    // ── Pedidos (Shopify) ── los escribe el Cloud Function shopifyWebhook vía Admin SDK;
+    // el panel solo lee. No están scoped por tienda porque hay una sola tienda Shopify conectada.
+    const [pedidosShopify, setPedidosShopify] = useState([]);
+    const [pedidosBusqueda, setPedidosBusqueda] = useState('');
+    useEffect(() => {
+        const unsub = db.collection('pedidos_shopify').orderBy('fechaShopify','desc').limit(300).onSnapshot(
+            snap => setPedidosShopify(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Pedidos Shopify:', err)
+        );
+        return unsub;
+    }, []);
+    const PEDIDO_PAGO_COLOR = { paid:'badge-green', pending:'badge-gold', refunded:'badge-red', partially_refunded:'badge-orange', voided:'badge-gray', authorized:'badge-gold' };
+    const PEDIDO_PREP_COLOR = { fulfilled:'badge-green', partial:'badge-orange', unfulfilled:'badge-gray', restocked:'badge-red' };
 
     // ── Tiendas (multi-negocio) ──
     const [tiendas,         setTiendas]         = useState([]);
@@ -1518,6 +1539,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ['vendedores','Usuarios'], ['proveedores','Proveedores'], ['ganadores','Productos'],
         ['cierre','Cierre Diario'], ['contabilidad','Contabilidad'], ['costeo','Calculadora Costeo'],
         ['diccionario','Diccionario'], ['accesos','Accesos Rápidos'], ['tiendas','Tiendas'],
+        ['pedidos','Pedidos (Shopify)'],
     ];
 
     const crearUsuario = async () => {
@@ -1854,6 +1876,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'ganadores',   label: 'Productos', icon: I_star },
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
+            { key: 'pedidos',     label: 'Pedidos', icon: I.cart },
             { key: 'contabilidad', label: 'Contabilidad', icon: I_balanza },
         ]},
         { label: 'Herramientas', items: [
@@ -2177,6 +2200,55 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     </>;
                 })()}
 
+                {activeTab === 'pedidos' && (() => {
+                    const q = pedidosBusqueda.trim().toLowerCase();
+                    const lista = !q ? pedidosShopify : pedidosShopify.filter(p =>
+                        (p.numero||'').toLowerCase().includes(q) || (p.cliente||'').toLowerCase().includes(q));
+                    const fmtFecha = iso => { if (!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('es', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); };
+                    const fmtMoneda = (total, moneda) => `${(moneda||'USD')} ${Number(total||0).toLocaleString('es', {minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                    return <>
+                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+                        <div><h1>Pedidos</h1><p>Sincronizado en tiempo real desde Shopify</p></div>
+                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',maxWidth:260}}
+                            placeholder="Buscar por # o cliente..." value={pedidosBusqueda} onChange={e=>setPedidosBusqueda(e.target.value)} />
+                    </div>
+                    <div className="card glass" style={{overflowX:'auto'}}>
+                        {lista.length > 0 ? (
+                            <table>
+                                <thead><tr>
+                                    <th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Canal</th>
+                                    <th className="td-num">Total</th><th>Pago</th><th>Preparación</th><th>Entrega</th><th>Etiquetas</th>
+                                </tr></thead>
+                                <tbody>
+                                    {lista.map(p => (
+                                        <tr key={p.id}>
+                                            <td>
+                                                <strong>{p.numero}</strong>
+                                                {p.cancelado && <span className="badge badge-red" style={{marginLeft:8,fontSize:'9.5px'}}><span className="badge-dot"/>Cancelado</span>}
+                                            </td>
+                                            <td style={{color:'var(--text-dimmer)',fontSize:'12px',whiteSpace:'nowrap'}}>{fmtFecha(p.fechaShopify)}</td>
+                                            <td style={{color:'var(--text-dim)'}}>{p.cliente || '—'}</td>
+                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{p.canal || '—'}</td>
+                                            <td className="td-num" style={{fontFamily:'Fira Code',fontWeight:'600'}}>{fmtMoneda(p.total, p.moneda)}</td>
+                                            <td><span className={`badge ${PEDIDO_PAGO_COLOR[p.estadoPago]||'badge-gray'}`}><span className="badge-dot"/>{p.estadoPago||'—'}</span></td>
+                                            <td><span className={`badge ${PEDIDO_PREP_COLOR[p.estadoPreparacion]||'badge-gray'}`}><span className="badge-dot"/>{p.estadoPreparacion||'—'}</span></td>
+                                            <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{p.formaEntrega || '—'}</td>
+                                            <td style={{color:'var(--text-dimmer)',fontSize:'11px'}}>{p.etiquetas || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="empty">
+                                <div className="empty-icon">{I.cart}</div>
+                                <h3>Sin pedidos aún</h3>
+                                <p>Los pedidos de Shopify aparecerán aquí automáticamente en cuanto lleguen.</p>
+                            </div>
+                        )}
+                    </div>
+                    </>;
+                })()}
+
                 {activeTab === 'tiendas' && <>
                     <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                         <div><h1>Tiendas</h1><p>Cada tienda tiene sus propios vendedores, gastos, productos, campañas y cierres</p></div>
@@ -2225,7 +2297,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     {productos.map(p => {
                                         const inv = p.inventario||{};
                                         const vendido = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
-                                        const pedidosProd = p.pedidos||[];
+                                        const lotesProd = (p.lotes&&p.lotes.length) ? p.lotes : (p.pedidos?.length ? [{pedidos:p.pedidos}] : []);
+                                        const pedidosProd = lotesProd.flatMap(l=>l.pedidos||[]);
                                         const despachadosCard = pedidosProd.reduce((s,e)=>s+(e.despachados||0),0);
                                         const entregadosCard  = pedidosProd.reduce((s,e)=>s+(e.entregados||0),0);
                                         return (
@@ -2314,41 +2387,63 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const unidadesVendidasCalc = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
                     // Ganancia total = facturado real (DOP) de este producto en Cierre Diario, no un estimado por margen.
                     const gananciaTotal = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.monto||0),0), 0);
-                    const finanzas = p.finanzas || {};
                     const GASTO_CATS_PROD = [
                         ['publicidad', 'Gasto en Publicidad'],
                         ['empacado',   'Gasto en Empacado'],
                         ['proveedor',  'Pago a Proveedor (incl. envío China → USA)'],
                         ['usaRd',      'Envío USA → RD'],
                     ];
-                    const totalGastoCat = key => (finanzas[key]||[]).reduce((s,e)=>s+(e.monto||0),0);
-                    const totalGastosProd = GASTO_CATS_PROD.reduce((s,[key])=>s+totalGastoCat(key),0);
-                    const gananciaNeta = gananciaTotal - totalGastosProd;
-                    const agregarGastoProd = async (key, monto, nota) => {
-                        const entrada = { monto: parseFloat(monto)||0, nota: (nota||'').trim(), fecha: new Date().toISOString() };
-                        const actuales = finanzas[key] || [];
-                        await db.collection('productos').doc(p.id).update({ [`finanzas.${key}`]: [...actuales, entrada] }).catch(console.error);
-                    };
-                    const borrarGastoProd = async (key, idx) => {
-                        const actuales = [...(finanzas[key]||[])];
-                        actuales.splice(idx,1);
-                        await db.collection('productos').doc(p.id).update({ [`finanzas.${key}`]: actuales }).catch(console.error);
-                    };
 
-                    // ── Pedidos: despachados vs entregados exitosos sin devolución (tasa de entrega) ──
-                    const pedidos = p.pedidos || [];
-                    const totalDespachados = pedidos.reduce((s,e)=>s+(e.despachados||0),0);
-                    const totalEntregados  = pedidos.reduce((s,e)=>s+(e.entregados||0),0);
+                    // ── Lotes: Pedidos y Gastos del producto viven POR LOTE; lo de arriba
+                    // (Despachados/Entregados/Ganancia Neta) es la suma de todos los lotes juntos.
+                    // Migra en caliente los datos viejos (sin lotes) a un "Lote 1" la primera vez
+                    // que se guarda algo, sin perder lo ya registrado.
+                    const lotesActuales = (p.lotes && p.lotes.length) ? p.lotes
+                        : ((p.pedidos?.length || Object.keys(p.finanzas||{}).length) ? [{ id:'lote_legacy', nombre:'Lote 1', pedidos:p.pedidos||[], finanzas:p.finanzas||{} }] : []);
+
+                    const totalGastoCatLote = (lote, key) => ((lote.finanzas||{})[key]||[]).reduce((s,e)=>s+(e.monto||0),0);
+                    const totalGastosProd = lotesActuales.reduce((s,l)=>s+GASTO_CATS_PROD.reduce((s2,[key])=>s2+totalGastoCatLote(l,key),0),0);
+                    const gananciaNeta = gananciaTotal - totalGastosProd;
+
+                    const todosPedidos = lotesActuales.flatMap(l=>l.pedidos||[]);
+                    const totalDespachados = todosPedidos.reduce((s,e)=>s+(e.despachados||0),0);
+                    const totalEntregados  = todosPedidos.reduce((s,e)=>s+(e.entregados||0),0);
                     const tasaEntrega = totalDespachados>0 ? (totalEntregados/totalDespachados*100) : null;
-                    const agregarPedido = async (fecha, despachados, entregados) => {
+
+                    const guardarLotes = nuevoLotes => db.collection('productos').doc(p.id).update({
+                        lotes: nuevoLotes, pedidos: firebase.firestore.FieldValue.delete(), finanzas: firebase.firestore.FieldValue.delete(),
+                    }).catch(console.error);
+
+                    const crearLote = () => {
+                        const nuevo = { id:'lote_'+Date.now(), nombre:`Lote ${lotesActuales.length+1}`, pedidos:[], finanzas:{} };
+                        guardarLotes([...lotesActuales, nuevo]);
+                        setLoteActivo(nuevo.id);
+                    };
+                    const renombrarLote = (loteId, nombre) => guardarLotes(lotesActuales.map(l=>l.id===loteId?{...l,nombre}:l));
+                    const agregarPedidoLote = (loteId, fecha, despachados, entregados) => {
                         const entrada = { despachados: parseInt(despachados)||0, entregados: parseInt(entregados)||0, fecha: fecha || fechaLocalISO() };
-                        await db.collection('productos').doc(p.id).update({ pedidos: [...pedidos, entrada] }).catch(console.error);
+                        guardarLotes(lotesActuales.map(l=>l.id===loteId?{...l,pedidos:[...(l.pedidos||[]),entrada]}:l));
                     };
-                    const borrarPedido = async idx => {
-                        const actuales = [...pedidos];
-                        actuales.splice(idx,1);
-                        await db.collection('productos').doc(p.id).update({ pedidos: actuales }).catch(console.error);
+                    const borrarPedidoLote = (loteId, idx) => {
+                        guardarLotes(lotesActuales.map(l=>{
+                            if (l.id!==loteId) return l;
+                            const arr=[...(l.pedidos||[])]; arr.splice(idx,1); return {...l,pedidos:arr};
+                        }));
                     };
+                    const agregarGastoLote = (loteId, key, monto, nota) => {
+                        const entrada = { monto: parseFloat(monto)||0, nota:(nota||'').trim(), fecha: new Date().toISOString() };
+                        guardarLotes(lotesActuales.map(l=>{
+                            if (l.id!==loteId) return l;
+                            const fin={...(l.finanzas||{})}; fin[key]=[...(fin[key]||[]),entrada]; return {...l,finanzas:fin};
+                        }));
+                    };
+                    const borrarGastoLote = (loteId, key, idx) => {
+                        guardarLotes(lotesActuales.map(l=>{
+                            if (l.id!==loteId) return l;
+                            const fin={...(l.finanzas||{})}; const arr=[...(fin[key]||[])]; arr.splice(idx,1); fin[key]=arr; return {...l,finanzas:fin};
+                        }));
+                    };
+                    const loteSel = lotesActuales.find(l=>l.id===loteActivo) || lotesActuales[0] || null;
 
                     const TABS = ['General','Análisis','Contenido','Inventario'];
                     const CONTENT_GROUPS = contenidoGrupos || [];
@@ -2641,28 +2736,47 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <button className="btn btn-glass" onClick={()=>{setInvForm({precioCompra:inv.precioCompra||'',precioVenta:inv.precioVenta||'',moneda:inv.moneda||'USD'});setEditSeccion('inventario');}}>✎ Editar Precios</button>
                                         </div>
 
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
+                                            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                {lotesActuales.map(l=>(
+                                                    <button key={l.id} className={`btn btn-sm ${loteSel?.id===l.id?'btn-gold':'btn-glass'}`} onClick={()=>setLoteActivo(l.id)}>{l.nombre}</button>
+                                                ))}
+                                            </div>
+                                            <button className="btn btn-glass btn-sm" onClick={crearLote}>{I.plus} Nuevo lote</button>
+                                        </div>
+
+                                        {!loteSel ? (
+                                            <div className="card glass"><div className="empty"><h3>Sin lotes aún</h3><p>Crea tu primer lote para registrar pedidos y gastos.</p></div></div>
+                                        ) : <>
+                                        <div className="form-group" style={{maxWidth:260,marginBottom:20}}>
+                                            <label style={{color:'var(--text-dim)'}}>Nombre del lote</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                defaultValue={loteSel.nombre} key={loteSel.id}
+                                                onBlur={e=>{ if(e.target.value.trim() && e.target.value.trim()!==loteSel.nombre) renombrarLote(loteSel.id, e.target.value.trim()); }} />
+                                        </div>
+
                                         <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:12}}>Pedidos — despachados vs. entregados exitosos</div>
                                         <div className="card glass" style={{padding:'16px 18px',marginBottom:28}}>
-                                            {pedidos.length>0 && (
+                                            {(loteSel.pedidos||[]).length>0 && (
                                                 <div style={{marginBottom:10,maxHeight:160,overflowY:'auto'}}>
-                                                    {pedidos.map((e,idx)=>({e,idx})).sort((a,b)=>(b.e.fecha||'').localeCompare(a.e.fecha||'')).map(({e,idx},i)=>(
+                                                    {(loteSel.pedidos||[]).map((e,idx)=>({e,idx})).sort((a,b)=>(b.e.fecha||'').localeCompare(a.e.fecha||'')).map(({e,idx},i)=>(
                                                         <div key={idx} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:12,color:'var(--text-dim)',padding:'6px 0',borderTop:i>0?'1px solid var(--glass-border)':undefined}}>
                                                             <span style={{flex:1}}>{e.fecha ? new Date(e.fecha+'T12:00:00').toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span>
                                                             <span style={{fontFamily:'Fira Code',margin:'0 10px'}}>{e.despachados} despachados</span>
                                                             <span style={{fontFamily:'Fira Code',margin:'0 10px',color:'#3D6646'}}>{e.entregados} entregados</span>
-                                                            <button onClick={()=>borrarPedido(idx)} style={{background:'none',border:'none',color:'#A03B3B',cursor:'pointer',fontSize:14,flexShrink:0}}>×</button>
+                                                            <button onClick={()=>borrarPedidoLote(loteSel.id,idx)} style={{background:'none',border:'none',color:'#A03B3B',cursor:'pointer',fontSize:14,flexShrink:0}}>×</button>
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
-                                            <FormPedidoProd onAdd={agregarPedido} />
+                                            <FormPedidoProd onAdd={(fecha,d,en)=>agregarPedidoLote(loteSel.id,fecha,d,en)} />
                                         </div>
 
-                                        <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:12}}>Gastos del producto (RD$)</div>
+                                        <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:12}}>Gastos del lote (RD$)</div>
                                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
                                             {GASTO_CATS_PROD.map(([key,label]) => {
-                                                const entradas = finanzas[key] || [];
-                                                const total = totalGastoCat(key);
+                                                const entradas = (loteSel.finanzas||{})[key] || [];
+                                                const total = totalGastoCatLote(loteSel, key);
                                                 return (
                                                     <div key={key} className="card glass" style={{padding:'16px 18px'}}>
                                                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
@@ -2675,16 +2789,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                     <div key={idx} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11.5,color:'var(--text-dim)',padding:'4px 0',borderTop:idx>0?'1px solid var(--glass-border)':undefined}}>
                                                                         <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{e.nota||'—'}</span>
                                                                         <span style={{fontFamily:'Fira Code',flexShrink:0,margin:'0 8px'}}>RD${(e.monto||0).toFixed(2)}</span>
-                                                                        <button onClick={()=>borrarGastoProd(key,idx)} style={{background:'none',border:'none',color:'#A03B3B',cursor:'pointer',fontSize:13,flexShrink:0}}>×</button>
+                                                                        <button onClick={()=>borrarGastoLote(loteSel.id,key,idx)} style={{background:'none',border:'none',color:'#A03B3B',cursor:'pointer',fontSize:13,flexShrink:0}}>×</button>
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         )}
-                                                        <FormGastoProd onAdd={(monto,nota)=>agregarGastoProd(key,monto,nota)} />
+                                                        <FormGastoProd onAdd={(monto,nota)=>agregarGastoLote(loteSel.id,key,monto,nota)} />
                                                     </div>
                                                 );
                                             })}
                                         </div>
+                                        </>}
                                     </>
                                 )
                             )}
