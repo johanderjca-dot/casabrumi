@@ -64,6 +64,11 @@ exports.shopifyWebhook = onRequest({ secrets: [SHOPIFY_WEBHOOK_SECRET], region: 
             formaEntrega: (order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].title) || '—',
             etiquetas: order.tags || '',
             articulos: (order.line_items || []).length,
+            productos: (order.line_items || []).map(li => ({
+                nombre: li.title || li.name || '—',
+                cantidad: li.quantity || 1,
+                sku: li.sku || '',
+            })),
             cancelado: !!order.cancelled_at,
             ultimoTopic: topic,
             actualizadoEn: admin.firestore.FieldValue.serverTimestamp(),

@@ -1269,6 +1269,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     }, []);
     const PEDIDO_PAGO_COLOR = { paid:'badge-green', pending:'badge-gold', refunded:'badge-red', partially_refunded:'badge-orange', voided:'badge-gray', authorized:'badge-gold' };
     const PEDIDO_PREP_COLOR = { fulfilled:'badge-green', partial:'badge-orange', unfulfilled:'badge-gray', restocked:'badge-red' };
+    // Código interno: control propio de Casa Brumi, no viene de Shopify — el webhook usa merge:true
+    // así que nunca lo pisa cuando sincroniza cambios de estado del pedido.
+    const guardarCodigoInterno = (id, valor) => db.collection('pedidos_shopify').doc(id).update({ codigoInterno: valor.trim() }).catch(console.error);
     const [importandoPedidos, setImportandoPedidos] = useState(false);
     const [resultadoImportPedidos, setResultadoImportPedidos] = useState(null);
 
@@ -1318,7 +1321,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             const iId = idx('Id'), iName = idx('Name'), iEmail = idx('Email'), iTotal = idx('Total'),
                   iMoneda = idx('Currency'), iPago = idx('Financial Status'), iPrep = idx('Fulfillment Status'),
                   iCreado = idx('Created at'), iCancelado = idx('Cancelled at'), iTags = idx('Tags'),
-                  iEnvio = idx('Shipping Method'), iCanal = idx('Source'), iBillingName = idx('Billing Name');
+                  iEnvio = idx('Shipping Method'), iCanal = idx('Source'), iBillingName = idx('Billing Name'),
+                  iLineNombre = idx('Lineitem name'), iLineCant = idx('Lineitem quantity'), iLineSku = idx('Lineitem sku');
 
             const grupos = {};
             for (let r = 1; r < filas.length; r++) {
@@ -1331,6 +1335,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
             const pedidos = Object.values(grupos).map(filasPedido => {
                 const base = filasPedido.find(f => f[iId]) || filasPedido[0];
+                const productos = filasPedido.filter(f => f[iLineNombre]).map(f => ({
+                    nombre: f[iLineNombre],
+                    cantidad: parseInt(f[iLineCant] || 1) || 1,
+                    sku: f[iLineSku] || '',
+                }));
                 return {
                     shopifyId: base[iId],
                     numero: base[iName],
@@ -1343,6 +1352,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     formaEntrega: base[iEnvio] || '—',
                     etiquetas: base[iTags] || '',
                     articulos: filasPedido.length,
+                    productos,
                     cancelado: !!base[iCancelado],
                     fechaShopify: parseFechaShopifyCsv(base[iCreado]),
                     ultimoTopic: 'import_csv',
@@ -2298,8 +2308,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                 {activeTab === 'pedidos' && (() => {
                     const q = pedidosBusqueda.trim().toLowerCase();
+                    const fmtProductos = p => (p.productos||[]).map(li => `${li.nombre}${li.cantidad>1?` x${li.cantidad}`:''}`).join(', ') || '—';
                     const lista = !q ? pedidosShopify : pedidosShopify.filter(p =>
-                        (p.numero||'').toLowerCase().includes(q) || (p.cliente||'').toLowerCase().includes(q));
+                        (p.numero||'').toLowerCase().includes(q) || (p.cliente||'').toLowerCase().includes(q) ||
+                        fmtProductos(p).toLowerCase().includes(q) || (p.codigoInterno||'').toLowerCase().includes(q));
                     const fmtFecha = iso => { if (!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('es', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); };
                     const fmtMoneda = (total, moneda) => `${(moneda||'USD')} ${Number(total||0).toLocaleString('es', {minimumFractionDigits:2,maximumFractionDigits:2})}`;
                     return <>
@@ -2307,7 +2319,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <div><h1>Pedidos</h1><p>Sincronizado en tiempo real desde Shopify</p></div>
                         <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
                             <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',maxWidth:260}}
-                                placeholder="Buscar por # o cliente..." value={pedidosBusqueda} onChange={e=>setPedidosBusqueda(e.target.value)} />
+                                placeholder="Buscar por #, cliente o producto..." value={pedidosBusqueda} onChange={e=>setPedidosBusqueda(e.target.value)} />
                             {user.role === 'master' && <>
                                 <input id="pedidos-csv-input" type="file" accept=".csv" style={{display:'none'}}
                                     onChange={e => { if (e.target.files[0]) importarPedidosCSV(e.target.files[0]); e.target.value = ''; }} />
@@ -2336,8 +2348,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         {lista.length > 0 ? (
                             <table>
                                 <thead><tr>
-                                    <th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Canal</th>
-                                    <th className="td-num">Total</th><th>Pago</th><th>Preparación</th><th>Entrega</th><th>Etiquetas</th>
+                                    <th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Canal</th>
+                                    <th className="td-num">Total</th><th>Pago</th><th>Preparación</th><th>Entrega</th><th>Etiquetas</th><th>Código interno</th>
                                 </tr></thead>
                                 <tbody>
                                     {lista.map(p => (
@@ -2348,12 +2360,18 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             </td>
                                             <td style={{color:'var(--text-dimmer)',fontSize:'12px',whiteSpace:'nowrap'}}>{fmtFecha(p.fechaShopify)}</td>
                                             <td style={{color:'var(--text-dim)'}}>{p.cliente || '—'}</td>
+                                            <td style={{color:'var(--text-dim)',fontSize:'12px',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={fmtProductos(p)}>{fmtProductos(p)}</td>
                                             <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{p.canal || '—'}</td>
                                             <td className="td-num" style={{fontFamily:'Fira Code',fontWeight:'600'}}>{fmtMoneda(p.total, p.moneda)}</td>
                                             <td><span className={`badge ${PEDIDO_PAGO_COLOR[p.estadoPago]||'badge-gray'}`}><span className="badge-dot"/>{p.estadoPago||'—'}</span></td>
                                             <td><span className={`badge ${PEDIDO_PREP_COLOR[p.estadoPreparacion]||'badge-gray'}`}><span className="badge-dot"/>{p.estadoPreparacion||'—'}</span></td>
                                             <td style={{color:'var(--text-dim)',fontSize:'12px'}}>{p.formaEntrega || '—'}</td>
                                             <td style={{color:'var(--text-dimmer)',fontSize:'11px'}}>{p.etiquetas || '—'}</td>
+                                            <td>
+                                                <input key={p.id+'-cod'} className="form-input glass no-icon" defaultValue={p.codigoInterno||''}
+                                                    placeholder="Ej. CB-014" style={{border:'1px solid var(--glass-border)',fontSize:'12px',padding:'5px 8px',minWidth:100}}
+                                                    onBlur={e=>{ if(e.target.value.trim()!==(p.codigoInterno||'')) guardarCodigoInterno(p.id, e.target.value); }} />
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
