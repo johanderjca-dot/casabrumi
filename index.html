@@ -1350,7 +1350,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [contabMoneda,     setContabMoneda]     = useState('USD');
     const [showCuentaModal,  setShowCuentaModal]  = useState(false);
     const [editingCuenta,    setEditingCuenta]    = useState(null);
-    const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD' });
+    const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD', operativo:true });
     const [savingCuenta,     setSavingCuenta]     = useState(false);
     const ASIENTO_LINEA_VACIA = { cuentaId:'', tercero:'', debe:'', haber:'' };
     const [showAsientoModal, setShowAsientoModal] = useState(false);
@@ -1362,6 +1362,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [resultHasta,      setResultHasta]      = useState('');
     const [auxCuentaId,      setAuxCuentaId]      = useState('');
     const [auxFecha,         setAuxFecha]         = useState('');
+    const [salariosMes,      setSalariosMes]      = useState(() => fechaLocalISO().slice(0,7));
+    const [comisionPct,      setComisionPct]      = useState(15);
 
     useEffect(() => {
         const unsub = db.collection('cuentas_contables').orderBy('codigo','asc').onSnapshot(
@@ -1383,18 +1385,18 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (!cuentaForm.nombre.trim() || !cuentaForm.codigo.trim() || savingCuenta) return;
         setSavingCuenta(true);
         try {
-            const data = { codigo: cuentaForm.codigo.trim(), nombre: cuentaForm.nombre.trim(), tipo: cuentaForm.tipo, moneda: cuentaForm.moneda };
+            const data = { codigo: cuentaForm.codigo.trim(), nombre: cuentaForm.nombre.trim(), tipo: cuentaForm.tipo, moneda: cuentaForm.moneda, operativo: cuentaForm.tipo==='Gasto' ? cuentaForm.operativo : null };
             if (editingCuenta) {
                 await db.collection('cuentas_contables').doc(editingCuenta.id).update(data);
             } else {
                 await db.collection('cuentas_contables').add({ ...data, tiendaId: activeTiendaId, activa: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
             }
-            setCuentaForm({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD' });
+            setCuentaForm({ codigo:'', nombre:'', tipo:'Activo', moneda:'USD', operativo:true });
             setEditingCuenta(null); setShowCuentaModal(false);
         } catch(err) { console.error('Error guardando cuenta:', err); }
         finally { setSavingCuenta(false); }
     };
-    const openEditCuenta = c => { setEditingCuenta(c); setCuentaForm({ codigo:c.codigo, nombre:c.nombre, tipo:c.tipo, moneda:c.moneda }); setShowCuentaModal(true); };
+    const openEditCuenta = c => { setEditingCuenta(c); setCuentaForm({ codigo:c.codigo, nombre:c.nombre, tipo:c.tipo, moneda:c.moneda, operativo:c.operativo!==false }); setShowCuentaModal(true); };
     const toggleCuentaActiva = c => db.collection('cuentas_contables').doc(c.id).update({ activa: !c.activa }).catch(console.error);
     const deleteCuenta = c => {
         const tieneMovimientos = asientos.some(a => (a.lineas||[]).some(l => l.cuentaId === c.id));
@@ -1464,6 +1466,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         finally { setLimpiandoAsientosGastos(false); }
     };
 
+    const [limpiandoAsientosCierre, setLimpiandoAsientosCierre] = useState(false);
+    const limpiarAsientosCierre = async () => {
+        if (!confirm('¿Eliminar todos los asientos generados automáticamente desde Cierre Diario en esta tienda? Esta acción no se puede deshacer.')) return;
+        setLimpiandoAsientosCierre(true);
+        try {
+            const snap = await db.collection('asientos_contables').where('tiendaId','==',activeTiendaId).where('origen.tipo','==','cierre').get();
+            for (let i = 0; i < snap.docs.length; i += 400) {
+                const batch = db.batch();
+                snap.docs.slice(i, i+400).forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+            alert(`${snap.docs.length} asiento(s) de Cierre Diario eliminado(s).`);
+        } catch(err) { console.error('Error limpiando asientos de cierre:', err); alert('Error al eliminar. Revisa la consola.'); }
+        finally { setLimpiandoAsientosCierre(false); }
+    };
+
     // Suma débitos/créditos de un conjunto de asientos por cuenta y calcula el saldo según naturaleza de cada cuenta.
     const sumarSaldosCtb = (cuentasScope, asientosScope) => {
         const saldos = {};
@@ -1482,110 +1500,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const cuentasCtbScope   = contabScope==='todas' ? cuentas  : cuentas.filter(c=>c.tiendaId===activeTiendaId);
     const asientosCtbScope  = contabScope==='todas' ? asientos : asientos.filter(a=>a.tiendaId===activeTiendaId);
     const hoyISO = fechaLocalISO();
-
-    // ── Sincronización automática: Gastos y Cierre Diario → Libro Diario ──
-    // Ledger de solo-agregar: nunca borra ni reescribe asientos ya posteados; una edición
-    // posterior a un gasto/cierre ya sincronizado genera un asiento de AJUSTE por la diferencia,
-    // no una corrección silenciosa del historial (así se audita como en contabilidad real).
-    const CUENTA_MEDIO_PAGO = { Efectivo:'Caja Efectivo', Tarjeta:'Banco/Tarjeta', Transferencia:'Transferencias' };
-    const CTB_CODIGO_BASE = { Activo:1000, Pasivo:2000, Patrimonio:3000, Ingreso:4000, Gasto:5000 };
-    const ctbSyncingRef = useRef(new Set());
-
-    const ensureCuentaCtb = async (nombre, tipo, moneda) => {
-        const existente = cuentas.find(c => c.tiendaId===activeTiendaId && c.nombre===nombre && c.moneda===moneda);
-        if (existente) return { id: existente.id, nombre, codigo: existente.codigo };
-        const snap = await db.collection('cuentas_contables')
-            .where('tiendaId','==',activeTiendaId).where('nombre','==',nombre).where('moneda','==',moneda).limit(1).get();
-        if (!snap.empty) return { id: snap.docs[0].id, nombre, codigo: snap.docs[0].data().codigo };
-        const codigo = String(CTB_CODIGO_BASE[tipo] + cuentas.filter(c=>c.tiendaId===activeTiendaId && c.tipo===tipo).length + 1);
-        const ref = await db.collection('cuentas_contables').add({ codigo, nombre, tipo, moneda, tiendaId: activeTiendaId, activa: true, auto: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        return { id: ref.id, nombre, codigo };
-    };
-
-    const postAsientoAuto = async (fecha, descripcion, lineas, origen) => {
-        const totalDebe  = lineas.reduce((s,l)=>s+(l.debe ||0),0);
-        const totalHaber = lineas.reduce((s,l)=>s+(l.haber||0),0);
-        const ref = await db.collection('asientos_contables').add({
-            fecha, descripcion, tiendaId: activeTiendaId, lineas, totalDebe, totalHaber, moneda: lineas[0]?.moneda||'USD',
-            origen, auto: true, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-        return ref.id;
-    };
-
-    const sincronizarGasto = async (g) => {
-        if (ctbSyncingRef.current.has('gasto_'+g.id)) return;
-        const moneda = g.moneda || 'USD';
-        const fecha = g.fecha?.toDate ? fechaLocalISO(g.fecha.toDate()) : hoyISO;
-        const abonado = g.esCredito ? (g.montoAbonado||0) : 0;
-        const yaAbonoSync = g.ctbAbonoSincronizado || 0;
-        const necesitaInicial = !g.ctbAsientoInicialId;
-        const deltaAbono = g.esCredito ? (abonado - yaAbonoSync) : 0;
-        if (!necesitaInicial && Math.abs(deltaAbono) < 0.005) return;
-        ctbSyncingRef.current.add('gasto_'+g.id);
-        try {
-            const cGasto = await ensureCuentaCtb(`Gasto: ${g.categoria||'Operacional'}`, 'Gasto', moneda);
-            const nombreMedio = (g.medioPago==='Tarjeta' && g.terminal) ? `Banco/Tarjeta — ${g.terminal}` : (CUENTA_MEDIO_PAGO[g.medioPago]||'Caja Efectivo');
-            const cMedio = await ensureCuentaCtb(nombreMedio, 'Activo', moneda);
-            const updates = {};
-            const tercero = (g.proveedor||'').trim();
-            if (necesitaInicial) {
-                const lineas = [{ cuentaId:cGasto.id, cuentaNombre:cGasto.nombre, cuentaCodigo:cGasto.codigo, moneda, debe:g.monto||0, haber:0, tercero }];
-                if (g.esCredito) {
-                    const cPP = await ensureCuentaCtb('Cuentas por Pagar', 'Pasivo', moneda);
-                    lineas.push({ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:g.monto||0, tercero });
-                } else {
-                    lineas.push({ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:g.monto||0, tercero });
-                }
-                updates.ctbAsientoInicialId = await postAsientoAuto(fecha, `Gasto: ${g.descripcion||g.categoria||''}`, lineas, { tipo:'gasto', id:g.id, parte:'inicial' });
-                updates.ctbAbonoSincronizado = 0;
-            }
-            if (g.esCredito && Math.abs(deltaAbono) >= 0.005) {
-                const cPP = await ensureCuentaCtb('Cuentas por Pagar', 'Pasivo', moneda);
-                const lineas = deltaAbono > 0
-                    ? [{ cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:deltaAbono, haber:0, tercero },
-                       { cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:0, haber:deltaAbono, tercero }]
-                    : [{ cuentaId:cMedio.id, cuentaNombre:cMedio.nombre, cuentaCodigo:cMedio.codigo, moneda, debe:-deltaAbono, haber:0, tercero },
-                       { cuentaId:cPP.id, cuentaNombre:cPP.nombre, cuentaCodigo:cPP.codigo, moneda, debe:0, haber:-deltaAbono, tercero }];
-                await postAsientoAuto(fecha, `Abono: ${g.descripcion||g.categoria||''}`, lineas, { tipo:'gasto-abono', id:g.id });
-                updates.ctbAbonoSincronizado = abonado;
-            }
-            if (Object.keys(updates).length) await db.collection('gastos').doc(g.id).update(updates);
-        } catch(err) { console.error('Sync contable (gasto):', g.id, err); }
-        finally { ctbSyncingRef.current.delete('gasto_'+g.id); }
-    };
-
-    const sincronizarCierre = async (c) => {
-        if (ctbSyncingRef.current.has('cierre_'+c.id)) return;
-        const moneda = 'DOP'; // Cierre Diario no distingue moneda; ventas contra entrega en RD
-        const yaSync = c.ctbMontoSincronizado || 0;
-        const delta = (c.totalMonto||0) - yaSync;
-        if (Math.abs(delta) < 0.5) return; // umbral mayor: montos en DOP, evita ruido de redondeo
-        ctbSyncingRef.current.add('cierre_'+c.id);
-        try {
-            const cVentas = await ensureCuentaCtb('Ventas', 'Ingreso', moneda);
-            const cCaja   = await ensureCuentaCtb('Caja Efectivo', 'Activo', moneda);
-            const lineas = delta > 0
-                ? [{ cuentaId:cCaja.id, cuentaNombre:cCaja.nombre, cuentaCodigo:cCaja.codigo, moneda, debe:delta, haber:0 },
-                   { cuentaId:cVentas.id, cuentaNombre:cVentas.nombre, cuentaCodigo:cVentas.codigo, moneda, debe:0, haber:delta }]
-                : [{ cuentaId:cVentas.id, cuentaNombre:cVentas.nombre, cuentaCodigo:cVentas.codigo, moneda, debe:-delta, haber:0 },
-                   { cuentaId:cCaja.id, cuentaNombre:cCaja.nombre, cuentaCodigo:cCaja.codigo, moneda, debe:0, haber:-delta }];
-            await postAsientoAuto(c.fechaStr, `Ventas del ${c.fechaStr}`, lineas, { tipo:'cierre', id:c.id });
-            await db.collection('cierres').doc(c.id).update({ ctbMontoSincronizado: c.totalMonto||0 });
-        } catch(err) { console.error('Sync contable (cierre):', c.id, err); }
-        finally { ctbSyncingRef.current.delete('cierre_'+c.id); }
-    };
-
-    // Se ejecuta solo mientras el master tiene abierta la pestaña Contabilidad (evita que
-    // vendedores, que no tienen permiso de escritura sobre estas colecciones, la disparen).
-    useEffect(() => {
-        if (activeTab !== 'contabilidad') return;
-        gastos.filter(perteneceATienda).forEach(sincronizarGasto);
-        // Trae el historial completo de cierres (el listener de arriba solo guarda los últimos 90)
-        // para poder sincronizar también los antiguos; incluye docs sin tiendaId (pre-multitienda).
-        db.collection('cierres').get()
-            .then(snap => snap.docs.map(d=>({id:d.id,...d.data()})).filter(perteneceATienda).forEach(sincronizarCierre))
-            .catch(err => console.error('Sync contable (carga cierres):', err));
-    }, [activeTab, activeTiendaId, gastos, cuentas]);
 
     useEffect(() => {
         const unsub = db.collection('users').onSnapshot(
@@ -3485,7 +3399,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                 {activeTab === 'contabilidad' && (() => {
                     const fmtCtb = (v, m) => `${m==='DOP'?'RD$':'$'}${(v||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-                    const CONTAB_SUBTABS = [['plan','Plan de Cuentas'],['diario','Libro Diario'],['auxiliar','Libro Auxiliar'],['balance','Balance General'],['resultados','Estado de Resultados']];
+                    const CONTAB_SUBTABS = [['plan','Plan de Cuentas'],['diario','Libro Diario'],['auxiliar','Libro Auxiliar'],['balance','Balance General'],['resultados','Estado de Resultados'],['salarios','Salarios']];
                     return <>
                     <div className="page-header"><h1>Contabilidad</h1><p>Plan de cuentas, libro diario y reportes por partida doble — módulo manual, independiente de Gastos y Cierre Diario.</p></div>
                     <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
@@ -3498,34 +3412,47 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const misCuentas = cuentas.filter(c=>c.tiendaId===activeTiendaId);
                         return <>
                         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
-                            <button className="btn btn-gold" onClick={()=>{setEditingCuenta(null);setCuentaForm({codigo:'',nombre:'',tipo:'Activo',moneda:'USD'});setShowCuentaModal(true);}}>{I.plus} Nueva cuenta</button>
+                            <button className="btn btn-gold" onClick={()=>{setEditingCuenta(null);setCuentaForm({codigo:'',nombre:'',tipo:'Activo',moneda:'USD',operativo:true});setShowCuentaModal(true);}}>{I.plus} Nueva cuenta</button>
                         </div>
                         {misCuentas.length===0 ? (
                             <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin cuentas aún</h3><p>Crea tu plan de cuentas para empezar a registrar asientos.</p></div></div>
                         ) : CUENTA_TIPOS.map(tipo => {
                             const delTipo = misCuentas.filter(c=>c.tipo===tipo);
                             if (!delTipo.length) return null;
+                            const groupKey = 'plan_'+tipo;
+                            const open = !!cGroupsOpen[groupKey];
                             return (
-                                <div key={tipo} className="card glass" style={{marginBottom:14,overflowX:'auto'}}>
-                                    <div style={{padding:'14px 18px',borderBottom:'1px solid var(--glass-border)',fontWeight:'700',fontSize:'13px'}}>{tipo}</div>
-                                    <table style={{minWidth:520}}>
-                                        <thead><tr><th>Código</th><th>Nombre</th><th>Moneda</th><th>Estado</th><th></th></tr></thead>
-                                        <tbody>
-                                            {delTipo.map(c=>(
-                                                <tr key={c.id} style={{opacity:c.activa===false?0.5:1}}>
-                                                    <td style={{fontFamily:'Fira Code',fontSize:'12px'}}>{c.codigo}</td>
-                                                    <td><strong>{c.nombre}</strong></td>
-                                                    <td>{c.moneda}</td>
-                                                    <td><span className={`badge ${c.activa===false?'badge-gray':'badge-green'}`}><span className="badge-dot"/>{c.activa===false?'Inactiva':'Activa'}</span></td>
-                                                    <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
-                                                        <button className="btn btn-glass btn-sm" onClick={()=>openEditCuenta(c)}>{I.edit}</button>
-                                                        <button className="btn btn-glass btn-sm" style={{marginLeft:6}} onClick={()=>toggleCuentaActiva(c)}>{c.activa===false?'Activar':'Desactivar'}</button>
-                                                        <button className="btn btn-glass btn-sm" style={{marginLeft:6,color:'#A03B3B'}} onClick={()=>deleteCuenta(c)}>×</button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div key={tipo} className="card glass" style={{marginBottom:14,overflow:'hidden'}}>
+                                    <div onClick={()=>setCGroupsOpen(o=>({...o,[groupKey]:!o[groupKey]}))}
+                                        style={{padding:'14px 18px',borderBottom:open?'1px solid var(--glass-border)':'none',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',userSelect:'none'}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                            <span style={{fontWeight:'700',fontSize:'13px'}}>{tipo}</span>
+                                            <span className="badge badge-gold" style={{fontSize:10}}><span className="badge-dot"/>{delTipo.length}</span>
+                                        </div>
+                                        <span style={{fontSize:18,color:'var(--text-dim)',lineHeight:1,transition:'transform 200ms ease',display:'inline-block',transform:open?'rotate(180deg)':'rotate(0deg)'}}>⌄</span>
+                                    </div>
+                                    {open && (
+                                        <div style={{overflowX:'auto'}}>
+                                            <table style={{minWidth:520}}>
+                                                <thead><tr><th>Código</th><th>Nombre</th><th>Moneda</th><th>Estado</th><th></th></tr></thead>
+                                                <tbody>
+                                                    {delTipo.map(c=>(
+                                                        <tr key={c.id} style={{opacity:c.activa===false?0.5:1}}>
+                                                            <td style={{fontFamily:'Fira Code',fontSize:'12px'}}>{c.codigo}</td>
+                                                            <td><strong>{c.nombre}</strong>{c.tipo==='Gasto'&&c.operativo===false&&<span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>No operativo</span>}</td>
+                                                            <td>{c.moneda}</td>
+                                                            <td><span className={`badge ${c.activa===false?'badge-gray':'badge-green'}`}><span className="badge-dot"/>{c.activa===false?'Inactiva':'Activa'}</span></td>
+                                                            <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>openEditCuenta(c)}>{I.edit}</button>
+                                                                <button className="btn btn-glass btn-sm" style={{marginLeft:6}} onClick={()=>toggleCuentaActiva(c)}>{c.activa===false?'Activar':'Desactivar'}</button>
+                                                                <button className="btn btn-glass btn-sm" style={{marginLeft:6,color:'#A03B3B'}} onClick={()=>deleteCuenta(c)}>×</button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -3538,6 +3465,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginBottom:14}}>
                             <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} disabled={limpiandoAsientosGastos} onClick={limpiarAsientosGastos}>
                                 {limpiandoAsientosGastos ? 'Eliminando...' : 'Eliminar asientos automáticos de Gastos'}
+                            </button>
+                            <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} disabled={limpiandoAsientosCierre} onClick={limpiarAsientosCierre}>
+                                {limpiandoAsientosCierre ? 'Eliminando...' : 'Eliminar asientos automáticos de Cierre Diario'}
                             </button>
                             <button className="btn btn-gold"
                                 onClick={()=>{setAsientoForm({fecha:hoyISO,descripcion:'',lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}]});setShowAsientoModal(true);}}>{I.plus} Nuevo asiento</button>
@@ -3747,6 +3677,78 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         </div>
                         </>;
                     })()}
+
+                    {contabTab==='salarios' && (() => {
+                        const productosActivos = productos.filter(p => p.estado === 'Activo');
+                        const nombresActivos = new Set(productosActivos.map(p => p.nombre));
+                        const cierresParaSalarios = contabScope==='todas' ? cierres : cierres.filter(perteneceATienda);
+                        const cierresDelMes = cierresParaSalarios.filter(c => c.fechaStr?.startsWith(salariosMes));
+                        const gananciaTotalMes = cierresDelMes.reduce((s,c) => s + (c.productos||[]).filter(f=>nombresActivos.has(f.nombre)).reduce((s2,f)=>s2+(f.monto||0),0), 0);
+
+                        const asientosDelMes = asientosCtbScope.filter(a => a.fecha?.startsWith(salariosMes));
+                        const cuentasGastoOpDOP = cuentasCtbScope.filter(c=>c.tipo==='Gasto' && c.operativo!==false && c.moneda==='DOP');
+                        const cuentasGastoOpUSD = cuentasCtbScope.filter(c=>c.tipo==='Gasto' && c.operativo!==false && c.moneda==='USD');
+                        const saldosOpDOP = sumarSaldosCtb(cuentasGastoOpDOP, asientosDelMes).filter(c=>c.saldo!==0);
+                        const saldosOpUSD = sumarSaldosCtb(cuentasGastoOpUSD, asientosDelMes).filter(c=>c.saldo!==0);
+                        const totalGastosOpDOP = saldosOpDOP.reduce((s,c)=>s+c.saldo,0);
+                        const totalGastosOpUSD = saldosOpUSD.reduce((s,c)=>s+c.saldo,0);
+                        const gananciaNetaComision = gananciaTotalMes - totalGastosOpDOP;
+                        const montoComision = gananciaNetaComision * (parseFloat(comisionPct)||0) / 100;
+
+                        return <>
+                        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:20}}>
+                            <select className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={contabScope} onChange={e=>setContabScope(e.target.value)}>
+                                <option value="activa">Esta tienda</option>
+                                <option value="todas">Todas las tiendas (consolidado)</option>
+                            </select>
+                            <label style={{fontSize:12,color:'var(--text-dim)'}}>Mes</label>
+                            <input type="month" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={salariosMes} onChange={e=>setSalariosMes(e.target.value)} />
+                            <label style={{fontSize:12,color:'var(--text-dim)'}}>% Comisión</label>
+                            <input type="number" className="form-input glass no-icon" style={{width:80,border:'1px solid var(--glass-border)'}} value={comisionPct} onChange={e=>setComisionPct(e.target.value)} />
+                        </div>
+
+                        <div className="card glass" style={{padding:'20px 22px',marginBottom:16}}>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0'}}>
+                                <span style={{color:'var(--text-dim)'}}>Ganancia Total (productos Activos, Cierre Diario)</span>
+                                <span style={{fontFamily:'Fira Code',fontWeight:700}}>{fmtCtb(gananciaTotalMes,'DOP')}</span>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0',color:'#A03B3B'}}>
+                                <span>− Gastos operativos (DOP)</span>
+                                <span style={{fontFamily:'Fira Code',fontWeight:700}}>{fmtCtb(totalGastosOpDOP,'DOP')}</span>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:14,fontWeight:800,padding:'10px 0',marginTop:6,borderTop:'1px solid var(--glass-border)'}}>
+                                <span>Ganancia neta para comisión</span>
+                                <span style={{fontFamily:'Fira Code',color:gananciaNetaComision>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(gananciaNetaComision,'DOP')}</span>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:16,fontWeight:800,padding:'12px 0',marginTop:8,borderTop:'2px solid var(--orange)',color:'var(--orange)'}}>
+                                <span>{comisionPct}% a pagar</span>
+                                <span style={{fontFamily:'Fira Code'}}>{fmtCtb(montoComision,'DOP')}</span>
+                            </div>
+                        </div>
+
+                        {saldosOpDOP.length>0 && (
+                            <div className="card glass" style={{padding:'16px 20px',marginBottom:16}}>
+                                <div style={{fontSize:12,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Gastos operativos descontados (DOP)</div>
+                                {saldosOpDOP.map(c=>(
+                                    <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'4px 0',color:'var(--text-dim)'}}>
+                                        <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,'DOP')}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {saldosOpUSD.length>0 && (
+                            <div className="card glass" style={{padding:'16px 20px',fontSize:12.5,color:'var(--text-dim)'}}>
+                                <strong style={{color:'var(--text)'}}>Nota:</strong> también hay {fmtCtb(totalGastosOpUSD,'USD')} en gastos operativos en USD este mes — no se restaron automáticamente (moneda distinta a la venta), pero considéralos aparte:
+                                {saldosOpUSD.map(c=>(
+                                    <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'4px 0',marginTop:6}}>
+                                        <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,'USD')}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        </>;
+                    })()}
                     </>;
                 })()}
 
@@ -3936,6 +3938,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     ))}
                                 </div>
                             </div>
+                            {cuentaForm.tipo==='Gasto' && (
+                                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:'12.5px',color:'var(--text-dim)',cursor:'pointer',marginBottom:14}}>
+                                    <input type="checkbox" checked={cuentaForm.operativo} onChange={e=>setCuentaForm(f=>({...f,operativo:e.target.checked}))} />
+                                    Es gasto operativo (se descuenta en Salarios antes de calcular la comisión)
+                                </label>
+                            )}
                             <div className="modal-actions">
                                 <button className="btn btn-glass" onClick={() => { setShowCuentaModal(false); setEditingCuenta(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={saveCuenta} disabled={!cuentaForm.nombre.trim()||!cuentaForm.codigo.trim()||savingCuenta}>
