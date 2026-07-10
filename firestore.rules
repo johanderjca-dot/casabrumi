@@ -95,6 +95,12 @@ service cloud.firestore {
       allow write: if isMaster();
     }
 
+    // ── configuracion/accesosCategorias ── categorías de Accesos Rápidos; mismo permiso
+    // que la colección links (quien gestiona links también gestiona sus categorías)
+    match /configuracion/accesosCategorias {
+      allow read, write: if tienePermiso('accesos');
+    }
+
     // cualquier otra coleccion no listada: denegada por defecto
     match /{document=**} {
       allow read, write: if false;

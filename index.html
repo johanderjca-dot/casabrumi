@@ -1153,8 +1153,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [usuarios,            setUsuarios]            = useState([]);
     const [links,               setLinks]               = useState([]);
     const [showLinkModal,       setShowLinkModal]       = useState(false);
-    const [linkForm,            setLinkForm]            = useState({ nombre:'', url:'', icono:'🔗' });
+    const [linkForm,            setLinkForm]            = useState({ nombre:'', url:'', icono:'🔗', categoria:'' });
     const [editingLink,         setEditingLink]         = useState(null);
+    const [accesosCategorias,   setAccesosCategorias]   = useState([]); // [{key,label}], ordenadas
+    const [catAccesosOpen,      setCatAccesosOpen]      = useState({}); // todas cerradas por defecto
+    const [showGestionCategorias, setShowGestionCategorias] = useState(false);
+    const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState('');
+    const [editingCategoriaKey, setEditingCategoriaKey]  = useState(null);
+    const [editCategoriaNombre, setEditCategoriaNombre]  = useState('');
+    const dragLinkRef = useRef(null); // { id, categoria } del link que se está arrastrando
+    const dragCatRef  = useRef(null); // key de la categoría que se está arrastrando
     const LINK_ICONOS = ['🔗','🛒','🏪','📦','🚚','💼','💰','📊','🌐','📱','💻','🎯','📋','📌','🏬','🛍️','🌍','📣','🔍','📸','🎨','📝','📞','📧','💬','🤝','🏆','⚡','🔔','📅','🗂️','📂','🖥️','🛠️','⚙️','🔐','👥','🏷️','💳','🏦','📈','📉','🎪','🧾','🔖'];
     const PROD_ESTADOS = ['Ganador','Activo','Pausado','Descartado'];
     const PROD_ESTADO_COLOR = { Ganador:'badge-green', Activo:'badge-gold', Pausado:'badge-gray', Descartado:'badge-gray' };
@@ -1744,6 +1752,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     }, []);
 
     useEffect(() => {
+        const ref = db.collection('configuracion').doc('accesosCategorias');
+        const unsub = ref.onSnapshot(doc => {
+            setAccesosCategorias(doc.exists && doc.data().categorias ? doc.data().categorias : []);
+        }, err => console.error('Accesos categorías:', err));
+        return unsub;
+    }, []);
+
+    useEffect(() => {
         const unsub = db.collection('cierres').orderBy('registradoEn', 'desc').limit(90).onSnapshot(
             snap => setCierres(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             err => console.error('Cierres:', err)
@@ -1847,14 +1863,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const saveLink = () => {
         if (!linkForm.nombre || !linkForm.url) return;
         const url = linkForm.url.startsWith('http') ? linkForm.url : 'https://' + linkForm.url;
-        const data = { nombre: linkForm.nombre, url, icono: linkForm.icono || '🔗' };
+        const data = { nombre: linkForm.nombre, url, icono: linkForm.icono || '🔗', categoria: linkForm.categoria || '' };
         if (editingLink) {
             db.collection('links').doc(editingLink.id).update(data).catch(console.error);
             setEditingLink(null);
         } else {
-            db.collection('links').add({ ...data, creadoEn: firebase.firestore.FieldValue.serverTimestamp() }).catch(console.error);
+            const enCategoria = links.filter(l => (l.categoria||'') === (linkForm.categoria||''));
+            const maxOrden = enCategoria.reduce((m,l) => Math.max(m, l.orden||0), -1);
+            db.collection('links').add({ ...data, orden: maxOrden+1, creadoEn: firebase.firestore.FieldValue.serverTimestamp() }).catch(console.error);
         }
-        setLinkForm({ nombre:'', url:'', icono:'🔗' });
+        setLinkForm({ nombre:'', url:'', icono:'🔗', categoria:'' });
         setShowLinkModal(false);
     };
 
@@ -1862,8 +1880,67 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openEditLink = (link) => {
         setEditingLink(link);
-        setLinkForm({ nombre: link.nombre, url: link.url, icono: link.icono || '🔗' });
+        setLinkForm({ nombre: link.nombre, url: link.url, icono: link.icono || '🔗', categoria: link.categoria || '' });
         setShowLinkModal(true);
+    };
+
+    // ── Categorías de Accesos Rápidos ──
+    const ACCESOS_CATS_REF = () => db.collection('configuracion').doc('accesosCategorias');
+
+    const crearCategoriaAccesos = async () => {
+        const nombre = nuevaCategoriaNombre.trim();
+        if (!nombre) return;
+        const nuevas = [...accesosCategorias, { key: 'cat_' + Date.now(), label: nombre }];
+        setNuevaCategoriaNombre('');
+        await ACCESOS_CATS_REF().set({ categorias: nuevas }).catch(console.error);
+    };
+
+    const renombrarCategoriaAccesos = async (key) => {
+        const label = editCategoriaNombre.trim();
+        setEditingCategoriaKey(null);
+        if (!label) return;
+        const nuevas = accesosCategorias.map(c => c.key === key ? { ...c, label } : c);
+        await ACCESOS_CATS_REF().set({ categorias: nuevas }).catch(console.error);
+    };
+
+    const eliminarCategoriaAccesos = async (key) => {
+        const nuevas = accesosCategorias.filter(c => c.key !== key);
+        await ACCESOS_CATS_REF().set({ categorias: nuevas }).catch(console.error);
+        const afectados = links.filter(l => l.categoria === key);
+        await Promise.all(afectados.map(l =>
+            db.collection('links').doc(l.id).update({ categoria: firebase.firestore.FieldValue.delete() }).catch(console.error)
+        ));
+    };
+
+    const moverCategoriaAccesos = async (fromKey, toKey) => {
+        if (fromKey === toKey) return;
+        const arr = [...accesosCategorias];
+        const fromIdx = arr.findIndex(c => c.key === fromKey);
+        const toIdx = arr.findIndex(c => c.key === toKey);
+        if (fromIdx === -1 || toIdx === -1) return;
+        const [moved] = arr.splice(fromIdx, 1);
+        arr.splice(toIdx, 0, moved);
+        setAccesosCategorias(arr);
+        await ACCESOS_CATS_REF().set({ categorias: arr }).catch(console.error);
+    };
+
+    // Reordena/mueve un link dentro de su categoría o a otra categoría (drag & drop)
+    const moverLinkAccesos = async (draggedId, targetCategoria, targetId) => {
+        if (draggedId === targetId) return;
+        const draggedLinkObj = links.find(l => l.id === draggedId);
+        if (!draggedLinkObj) return;
+        const destino = links
+            .filter(l => (l.categoria||'') === (targetCategoria||'') && l.id !== draggedId)
+            .sort((a,b) => (a.orden||0)-(b.orden||0));
+        const targetIdx = targetId ? destino.findIndex(l => l.id === targetId) : -1;
+        destino.splice(targetIdx === -1 ? destino.length : targetIdx, 0, draggedLinkObj);
+        const batch = db.batch();
+        destino.forEach((l, idx) => {
+            const ref = db.collection('links').doc(l.id);
+            if (l.id === draggedId) batch.update(ref, { orden: idx, categoria: targetCategoria || firebase.firestore.FieldValue.delete() });
+            else if ((l.orden||0) !== idx) batch.update(ref, { orden: idx });
+        });
+        await batch.commit().catch(console.error);
     };
 
     // Listas filtradas por la tienda activa (fallback a DEFAULT_TIENDA_ID para docs sin tiendaId)
@@ -3375,7 +3452,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     <div className="page-header"><h1>Accesos Rápidos</h1><p>Tus links favoritos a un clic</p></div>
                     <div className="sec-header">
                         <h2>{links.length} acceso{links.length!==1?'s':''}</h2>
-                        <button className="btn btn-gold" onClick={()=>{setLinkForm({nombre:'',url:'',icono:'🔗'});setEditingLink(null);setShowLinkModal(true);}}>{I.plus} Agregar Link</button>
+                        <div style={{display:'flex',gap:8}}>
+                            <button className="btn btn-glass" onClick={()=>setShowGestionCategorias(true)}>{I.edit} Categorías</button>
+                            <button className="btn btn-gold" onClick={()=>{setLinkForm({nombre:'',url:'',icono:'🔗',categoria:''});setEditingLink(null);setShowLinkModal(true);}}>{I.plus} Agregar Link</button>
+                        </div>
                     </div>
                     {links.length === 0 ? (
                         <div className="card glass"><div className="empty">
@@ -3384,25 +3464,67 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             <p>Agrega tu primer link para acceder rápidamente.</p>
                         </div></div>
                     ) : (
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:14}}>
-                            {links.map(link => (
-                                <div key={link.id} className="card glass" style={{position:'relative',overflow:'visible'}}>
-                                    <a href={link.url} target="_blank" rel="noopener noreferrer"
-                                        style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'24px 16px 20px',textDecoration:'none',gap:10}}>
-                                        <span style={{fontSize:'36px',lineHeight:1}}>{link.icono||'🔗'}</span>
-                                        <span style={{fontSize:'13px',fontWeight:'600',color:'var(--text)',textAlign:'center',wordBreak:'break-word'}}>{link.nombre}</span>
-                                        <span style={{fontSize:'10px',color:'var(--text-dimmer)',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'120px'}}>{link.url.replace(/^https?:\/\//,'')}</span>
-                                    </a>
-                                    <div style={{position:'absolute',top:8,right:8,display:'flex',gap:4}}>
-                                        <button onClick={()=>openEditLink(link)}
-                                            style={{background:'var(--glass-bg-mid)',border:'1px solid var(--glass-border)',borderRadius:'6px',cursor:'pointer',padding:'4px 6px',fontSize:'11px',color:'var(--text-dim)',lineHeight:1}}
-                                            title="Editar">✎</button>
-                                        <button onClick={()=>deleteLink(link.id)}
-                                            style={{background:'var(--glass-bg-mid)',border:'1px solid var(--glass-border)',borderRadius:'6px',cursor:'pointer',padding:'4px 6px',fontSize:'11px',color:'#8B3535',lineHeight:1}}
-                                            title="Eliminar">×</button>
+                        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                            {[...accesosCategorias, { key:'', label:'Sin categoría' }].map(cat => {
+                                const itemsCat = links.filter(l => (l.categoria||'') === cat.key).sort((a,b)=>(a.orden||0)-(b.orden||0));
+                                if (!cat.key && itemsCat.length === 0) return null;
+                                const catId = cat.key || '_sin_';
+                                const open = !!catAccesosOpen[catId];
+                                return (
+                                    <div key={catId} className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}
+                                        onDragOver={e=>{ if (cat.key && dragCatRef.current) e.preventDefault(); }}
+                                        onDrop={e=>{ e.preventDefault(); if (cat.key && dragCatRef.current) { moverCategoriaAccesos(dragCatRef.current, cat.key); dragCatRef.current=null; } }}>
+                                        <div onClick={()=>setCatAccesosOpen(o=>({...o,[catId]:!open}))}
+                                            style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',cursor:'pointer',userSelect:'none',borderBottom: open ? '1px solid var(--glass-border)' : 'none'}}>
+                                            <div style={{display:'flex',alignItems:'center',gap:10}}>
+                                                {cat.key && (
+                                                    <span draggable onClick={e=>e.stopPropagation()}
+                                                        onDragStart={e=>{ dragCatRef.current = cat.key; e.dataTransfer.effectAllowed='move'; }}
+                                                        onDragEnd={()=>{ dragCatRef.current=null; }}
+                                                        style={{cursor:'grab',color:'var(--text-dimmer)',fontSize:14,lineHeight:1}} title="Arrastrar para reordenar categoría">⠿</span>
+                                                )}
+                                                <span style={{fontSize:'11px',fontWeight:800,letterSpacing:'1.5px',color:'var(--text)',textTransform:'uppercase'}}>{cat.label}</span>
+                                                <span className="badge badge-gold" style={{fontSize:10}}><span className="badge-dot"/>{itemsCat.length}</span>
+                                            </div>
+                                            <span style={{fontSize:18,color:'var(--text-dim)',lineHeight:1,transition:'transform 200ms ease',display:'inline-block',transform:open?'rotate(180deg)':'rotate(0deg)'}}>⌄</span>
+                                        </div>
+                                        {open && (
+                                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:14,padding:14}}>
+                                                {itemsCat.map(link => (
+                                                    <div key={link.id} className="card glass" style={{position:'relative',overflow:'visible'}}
+                                                        onDragOver={e=>{ if (dragLinkRef.current) e.preventDefault(); }}
+                                                        onDrop={e=>{ e.preventDefault(); if (dragLinkRef.current && dragLinkRef.current.id!==link.id) { moverLinkAccesos(dragLinkRef.current.id, cat.key, link.id); } dragLinkRef.current=null; }}>
+                                                        <a href={link.url} target="_blank" rel="noopener noreferrer"
+                                                            style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'24px 16px 20px',textDecoration:'none',gap:10}}>
+                                                            <span style={{fontSize:'36px',lineHeight:1}}>{link.icono||'🔗'}</span>
+                                                            <span style={{fontSize:'13px',fontWeight:'600',color:'var(--text)',textAlign:'center',wordBreak:'break-word'}}>{link.nombre}</span>
+                                                            <span style={{fontSize:'10px',color:'var(--text-dimmer)',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'120px'}}>{link.url.replace(/^https?:\/\//,'')}</span>
+                                                        </a>
+                                                        <div style={{position:'absolute',top:8,left:8}}>
+                                                            <span draggable
+                                                                onDragStart={e=>{ dragLinkRef.current = { id: link.id, categoria: cat.key }; e.dataTransfer.effectAllowed='move'; }}
+                                                                onDragEnd={()=>{ dragLinkRef.current=null; }}
+                                                                style={{cursor:'grab',background:'var(--glass-bg-mid)',border:'1px solid var(--glass-border)',borderRadius:'6px',padding:'4px 6px',fontSize:'11px',color:'var(--text-dim)',lineHeight:1,display:'inline-block'}}
+                                                                title="Arrastrar para reordenar">⠿</span>
+                                                        </div>
+                                                        <div style={{position:'absolute',top:8,right:8,display:'flex',gap:4}}>
+                                                            <button onClick={()=>openEditLink(link)}
+                                                                style={{background:'var(--glass-bg-mid)',border:'1px solid var(--glass-border)',borderRadius:'6px',cursor:'pointer',padding:'4px 6px',fontSize:'11px',color:'var(--text-dim)',lineHeight:1}}
+                                                                title="Editar">✎</button>
+                                                            <button onClick={()=>deleteLink(link.id)}
+                                                                style={{background:'var(--glass-bg-mid)',border:'1px solid var(--glass-border)',borderRadius:'6px',cursor:'pointer',padding:'4px 6px',fontSize:'11px',color:'#8B3535',lineHeight:1}}
+                                                                title="Eliminar">×</button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <div style={{gridColumn:'1/-1',minHeight: itemsCat.length ? 0 : 40}}
+                                                    onDragOver={e=>{ if (dragLinkRef.current) e.preventDefault(); }}
+                                                    onDrop={e=>{ e.preventDefault(); if (dragLinkRef.current) { moverLinkAccesos(dragLinkRef.current.id, cat.key, null); dragLinkRef.current=null; } }} />
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 
@@ -3462,6 +3584,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <input className="form-input glass no-icon" style={{backdropFilter:'blur(10px)',border:'1px solid var(--glass-border)'}}
                                         value={linkForm.url} onChange={e=>setLinkForm(f=>({...f,url:e.target.value}))} placeholder="https://facebook.com/marketplace" />
                                 </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Categoría</label>
+                                    <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={linkForm.categoria||''} onChange={e=>setLinkForm(f=>({...f,categoria:e.target.value}))}>
+                                        <option value="">Sin categoría</option>
+                                        {accesosCategorias.map(cat => <option key={cat.key} value={cat.key}>{cat.label}</option>)}
+                                    </select>
+                                </div>
                                 <div style={{background:'var(--glass-bg-mid)',borderRadius:'var(--r-sm)',padding:'12px 14px',marginBottom:4,display:'flex',alignItems:'center',gap:12}}>
                                     <span style={{fontSize:'28px'}}>{linkForm.icono||'🔗'}</span>
                                     <div>
@@ -3475,6 +3605,43 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         {editingLink?<>{I.edit} Guardar</>:<>{I.plus} Agregar</>}
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showGestionCategorias && (
+                        <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget){setShowGestionCategorias(false);setEditingCategoriaKey(null);}}}>
+                            <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:420}}>
+                                <div className="modal-hd">
+                                    <h2>Categorías de Accesos</h2>
+                                    <button className="modal-close" onClick={()=>{setShowGestionCategorias(false);setEditingCategoriaKey(null);}}>×</button>
+                                </div>
+                                <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16,maxHeight:280,overflowY:'auto'}}>
+                                    {accesosCategorias.length===0 && (
+                                        <p style={{fontSize:12,color:'var(--text-dim)'}}>Aún no tienes categorías. Crea la primera abajo.</p>
+                                    )}
+                                    {accesosCategorias.map(cat => (
+                                        <div key={cat.key} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:'var(--glass-bg-mid)',borderRadius:'var(--r-sm)',border:'1px solid var(--glass-border)'}}>
+                                            {editingCategoriaKey===cat.key ? (
+                                                <input className="form-input glass no-icon" style={{flex:1,border:'1px solid var(--glass-border)'}}
+                                                    autoFocus value={editCategoriaNombre} onChange={e=>setEditCategoriaNombre(e.target.value)}
+                                                    onKeyDown={e=>e.key==='Enter'&&renombrarCategoriaAccesos(cat.key)}
+                                                    onBlur={()=>renombrarCategoriaAccesos(cat.key)} />
+                                            ) : (
+                                                <span style={{flex:1,fontSize:13,fontWeight:600,color:'var(--text)'}}>{cat.label}</span>
+                                            )}
+                                            <button className="btn btn-glass btn-sm" onClick={()=>{setEditingCategoriaKey(cat.key);setEditCategoriaNombre(cat.label);}} title="Renombrar">✎</button>
+                                            <button className="btn btn-glass btn-sm" style={{color:'#8B3535'}} onClick={()=>eliminarCategoriaAccesos(cat.key)} title="Eliminar">×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{display:'flex',gap:8}}>
+                                    <input className="form-input glass no-icon" style={{flex:1,border:'1px solid var(--glass-border)'}}
+                                        value={nuevaCategoriaNombre} onChange={e=>setNuevaCategoriaNombre(e.target.value)}
+                                        placeholder="Nueva categoría (ej. Proveedores)" onKeyDown={e=>e.key==='Enter'&&crearCategoriaAccesos()} />
+                                    <button className="btn btn-gold" onClick={crearCategoriaAccesos}>{I.plus} Crear</button>
+                                </div>
+                                <p style={{fontSize:11,color:'var(--text-dimmer)',marginTop:12}}>Arrastra el ícono ⠿ del encabezado de cada categoría en Accesos Rápidos para reordenarlas.</p>
                             </div>
                         </div>
                     )}
