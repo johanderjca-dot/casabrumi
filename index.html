@@ -398,7 +398,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
-db.settings({ experimentalForceLongPolling: true, merge: true });
+db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false });
 
 // App secundaria de Firebase: crea cuentas de usuarios nuevos sin cerrar la sesión del master
 // (el SDK de cliente cambia la sesión activa a la cuenta recién creada si se usa la app principal).
