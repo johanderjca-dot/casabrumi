@@ -827,10 +827,11 @@ function CierreDiario({ productos, user, tiendaId }) {
 
 // ── CALCULADORA BÁSICA (suma, resta, multiplica, divide) ──
 function BasicCalculator({ title, onRemove, removable }) {
-    const [display,   setDisplay]   = useState('0');
+    const [entry,     setEntry]     = useState('0');   // número que se está tecleando ahora
+    const [expr,      setExpr]      = useState('');    // prefijo ya confirmado, ej. "200+"
     const [stored,    setStored]    = useState(null);
     const [operator,  setOperator]  = useState(null);
-    const [overwrite, setOverwrite] = useState(false);
+    const [overwrite, setOverwrite] = useState(false);  // true = el próximo dígito empieza número nuevo
 
     const calc = (a, b, op) => {
         if (op === '+') return a + b;
@@ -846,42 +847,61 @@ function BasicCalculator({ title, onRemove, removable }) {
     };
 
     const inputDigit = d => {
-        if (overwrite) { setDisplay(d); setOverwrite(false); return; }
-        setDisplay(display === '0' ? d : (display + d).slice(0, 14));
+        if (overwrite) { setEntry(d); setOverwrite(false); return; }
+        setEntry(entry === '0' ? d : (entry + d).slice(0, 14));
     };
     const inputDot = () => {
-        if (overwrite) { setDisplay('0.'); setOverwrite(false); return; }
-        if (!display.includes('.')) setDisplay(display + '.');
+        if (overwrite) { setEntry('0.'); setOverwrite(false); return; }
+        if (!entry.includes('.')) setEntry(entry + '.');
     };
     const backspace = () => {
-        if (overwrite) return;
-        const next = display.slice(0, -1);
-        setDisplay(next === '' || next === '-' ? '0' : next);
+        if (overwrite) {
+            // recién se presionó un operador (o "="): cancelarlo y volver a editar el número anterior
+            if (operator) {
+                setEntry(String(stored));
+                setStored(null);
+                setOperator(null);
+                setExpr('');
+                setOverwrite(false);
+            }
+            return;
+        }
+        const next = entry.slice(0, -1);
+        setEntry(next === '' || next === '-' ? '0' : next);
     };
-    const clear = () => { setDisplay('0'); setStored(null); setOperator(null); setOverwrite(false); };
-    const toggleSign = () => setDisplay(d => (d.charAt(0) === '-' ? d.slice(1) : (d === '0' ? d : '-' + d)));
-    const percent = () => setDisplay(d => String(parseFloat(d) / 100));
+    const clear = () => { setEntry('0'); setExpr(''); setStored(null); setOperator(null); setOverwrite(false); };
+    const toggleSign = () => setEntry(d => (d.charAt(0) === '-' ? d.slice(1) : (d === '0' ? d : '-' + d)));
+    const percent = () => setEntry(d => String(parseFloat(d) / 100));
 
     const chooseOperator = op => {
-        const current = parseFloat(display);
         if (operator && !overwrite) {
-            const result = calc(stored, current, operator);
-            setDisplay(fmt(result));
+            const result = calc(stored, parseFloat(entry), operator);
             setStored(result);
+            setExpr(fmt(result) + op);
+        } else if (operator && overwrite) {
+            // cambiar el operador pendiente antes de teclear el segundo número
+            setExpr(fmt(stored) + op);
         } else {
-            setStored(current);
+            const a = parseFloat(entry);
+            setStored(a);
+            setExpr(fmt(a) + op);
         }
         setOperator(op);
         setOverwrite(true);
     };
     const equals = () => {
         if (operator === null) return;
-        const result = calc(stored, parseFloat(display), operator);
-        setDisplay(fmt(result));
+        const result = calc(stored, parseFloat(entry), operator);
+        setEntry(isFinite(result) ? String(result) : 'Error');
         setStored(null);
         setOperator(null);
+        setExpr('');
         setOverwrite(true);
     };
+
+    const display = operator
+        ? (overwrite ? fmt(stored) : expr + entry)
+        : (overwrite && entry !== 'Error' ? fmt(parseFloat(entry)) : entry);
 
     const handleKeyDown = e => {
         const k = e.key;
