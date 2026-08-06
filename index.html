@@ -1135,6 +1135,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         logistica: [{ nombre:'Transportadora A', costoEnvio:'180', devolucionActiva:true }],
         logisticaActiva: 0,
         costosExtra: [{ nombre:'Empaque / Caja', monto:'50' }, { nombre:'Papelería', monto:'10' }],
+        suscripciones: [],
     };
     const [costeo, setCosteo] = useState(() => {
         try { return { ...COSTEO_DEFAULTS, ...JSON.parse(localStorage.getItem('costeoCalcV2') || '{}') }; }
@@ -1144,6 +1145,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [costeoMoneda, setCosteoMoneda] = useState('DOP');
     const [costeoTab,    setCosteoTab]    = useState('calculadora');
     const [proyeccionCantidad, setProyeccionCantidad] = useState(50);
+    const MULTI_CALC_DEFAULTS = [
+        { id:'a', nombre:'Escenario A', precioVenta:'1500', costoProducto:'400', cpaAds:'300', pctConfirmacion:'80', pctEntrega:'60', flete:'180', extra:'60' },
+        { id:'b', nombre:'Escenario B', precioVenta:'1800', costoProducto:'450', cpaAds:'320', pctConfirmacion:'75', pctEntrega:'55', flete:'180', extra:'60' },
+        { id:'c', nombre:'Escenario C', precioVenta:'1200', costoProducto:'350', cpaAds:'280', pctConfirmacion:'80', pctEntrega:'65', flete:'150', extra:'50' },
+    ];
+    const [multiCalcs, setMultiCalcs] = useState(() => {
+        try { const saved = JSON.parse(localStorage.getItem('multiCalcsV1')); return Array.isArray(saved) && saved.length>0 ? saved : MULTI_CALC_DEFAULTS; }
+        catch { return MULTI_CALC_DEFAULTS; }
+    });
+    useEffect(() => { try { localStorage.setItem('multiCalcsV1', JSON.stringify(multiCalcs)); } catch {} }, [multiCalcs]);
     const [diccQuery,    setDiccQuery]    = useState('');
     const [diccCat,      setDiccCat]      = useState('Todas');
     const firstInputRef  = useRef(null);
@@ -3136,8 +3147,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const fleteAjustado = carrier.devolucionActiva ? n(carrier.costoEnvio)/entr : n(carrier.costoEnvio);
                     const cpaReal = n(costeo.cpaAds)/(conf*entr);
                     const extras = (costeo.costosExtra||[]).reduce((s,e)=>s+n(e.monto),0);
+                    const suscripciones = (costeo.suscripciones||[]).reduce((s,e)=>s+n(e.monto),0);
                     const precio = n(costeo.precioVenta);
-                    const costosOp = n(costeo.costoProducto) + fleteAjustado + extras;
+                    const costosOp = n(costeo.costoProducto) + fleteAjustado + extras + suscripciones;
                     const costosTotales = costosOp + cpaReal;
                     const profit = precio - costosTotales;
                     const roi = costosTotales>0 ? profit/costosTotales : 0;
@@ -3157,6 +3169,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         { label:'Publicidad (CPA Real)', val:cpaReal, color:'var(--orange)' },
                         { label:'Flete '+(carrier.devolucionActiva?'(Ajustado)':'(Base)'), val:fleteAjustado, color:'#7A5230' },
                         { label:'Extras (Empaque)', val:extras, color:'#C2A878' },
+                        { label:'Suscripciones', val:suscripciones, color:'#6B5FA8' },
                     ];
                     const upd = (k,v) => setCosteo(c=>({...c,[k]:v}));
                     const updCarrier = (i,k,v) => setCosteo(c=>({...c, logistica:c.logistica.map((l,idx)=>idx===i?{...l,[k]:v}:l)}));
@@ -3165,7 +3178,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const updExtra = (i,k,v) => setCosteo(c=>({...c, costosExtra:c.costosExtra.map((e,idx)=>idx===i?{...e,[k]:v}:e)}));
                     const addExtra = () => setCosteo(c=>({...c, costosExtra:[...(c.costosExtra||[]),{nombre:'Nuevo costo',monto:'0'}]}));
                     const delExtra = (i) => setCosteo(c=>({...c, costosExtra:c.costosExtra.filter((_,idx)=>idx!==i)}));
-                    const tabs = [['calculadora','Calculadora Precio'],['proyeccion','Proyección']];
+                    const updSuscripcion = (i,k,v) => setCosteo(c=>({...c, suscripciones:(c.suscripciones||[]).map((e,idx)=>idx===i?{...e,[k]:v}:e)}));
+                    const addSuscripcion = () => setCosteo(c=>({...c, suscripciones:[...(c.suscripciones||[]),{nombre:'Nueva suscripción',monto:'0'}]}));
+                    const delSuscripcion = (i) => setCosteo(c=>({...c, suscripciones:(c.suscripciones||[]).filter((_,idx)=>idx!==i)}));
+                    const mUpd = (i,k,v) => setMultiCalcs(arr=>arr.map((x,idx)=>idx===i?{...x,[k]:v}:x));
+                    const addMulti = () => setMultiCalcs(arr=>[...arr, {...MULTI_CALC_DEFAULTS[0], id:Date.now()+'', nombre:'Escenario '+String.fromCharCode(65+arr.length)}]);
+                    const delMulti = (i) => setMultiCalcs(arr=> arr.length<=1 ? arr : arr.filter((_,idx)=>idx!==i));
+                    const tabs = [['calculadora','Calculadora Precio'],['multi','Calculadoras'],['proyeccion','Proyección']];
 
                     return <>
                     <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
@@ -3204,6 +3223,84 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <div style={{fontSize:34,fontWeight:800,fontFamily:'Fira Code',color:profit>=0?'var(--orange)':'#A03B3B'}}>{money(profit*proyeccionCantidad)}</div>
                             </div>
                         </div>
+                    ) : costeoTab==='multi' ? (
+                    <div>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18,flexWrap:'wrap',gap:10}}>
+                            <p style={{fontSize:12,color:'var(--text-dimmer)',maxWidth:540}}>Compara varios escenarios de precio a la vez — cambia cualquier campo y los resultados se recalculan al instante. Mínimo 3, agrega los que necesites.</p>
+                            <button className="cst-add-btn" onClick={addMulti}>+ Agregar calculadora</button>
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16}}>
+                            {multiCalcs.map((m,i)=>{
+                                const mn = v => { const x=parseFloat(v); return isFinite(x)?x:0; };
+                                const mConf = Math.min(Math.max(mn(m.pctConfirmacion),1),100)/100;
+                                const mEntr = Math.min(Math.max(mn(m.pctEntrega),1),100)/100;
+                                const mCpaReal = mn(m.cpaAds)/(mConf*mEntr);
+                                const mCostosOp = mn(m.costoProducto) + mn(m.flete) + mn(m.extra);
+                                const mCostosTot = mCostosOp + mCpaReal;
+                                const mPrecio = mn(m.precioVenta);
+                                const mProfit = mPrecio - mCostosTot;
+                                const mRoi = mCostosTot>0 ? mProfit/mCostosTot : 0;
+                                const mMargen = mPrecio>0 ? mProfit/mPrecio*100 : 0;
+                                return (
+                                <div key={m.id||i} className="card glass cst-card" style={{display:'flex',flexDirection:'column',gap:12}}>
+                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                                        <input value={m.nombre} onChange={e=>mUpd(i,'nombre',e.target.value)}
+                                            style={{fontSize:'13.5px',fontWeight:'800',color:'var(--text)',background:'transparent',border:'none',outline:'none',flex:1}} />
+                                        {multiCalcs.length>1 && <span onClick={()=>delMulti(i)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1}}>×</span>}
+                                    </div>
+
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                                        <div>
+                                            <label className="cst-field-label">Precio Venta</label>
+                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
+                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.precioVenta} onChange={e=>mUpd(i,'precioVenta',e.target.value)} /></div>
+                                        </div>
+                                        <div>
+                                            <label className="cst-field-label">Costo Producto</label>
+                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
+                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.costoProducto} onChange={e=>mUpd(i,'costoProducto',e.target.value)} /></div>
+                                        </div>
+                                        <div>
+                                            <label className="cst-field-label">CPA (Ads)</label>
+                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
+                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.cpaAds} onChange={e=>mUpd(i,'cpaAds',e.target.value)} /></div>
+                                        </div>
+                                        <div>
+                                            <label className="cst-field-label">Flete + Extra</label>
+                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
+                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.flete} onChange={e=>mUpd(i,'flete',e.target.value)} /></div>
+                                        </div>
+                                        <div>
+                                            <label className="cst-field-label">% Confirmación</label>
+                                            <input type="number" className="cst-input" style={{fontSize:'13px',padding:'9px'}} value={m.pctConfirmacion} onChange={e=>mUpd(i,'pctConfirmacion',e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="cst-field-label">% Entrega</label>
+                                            <input type="number" className="cst-input" style={{fontSize:'13px',padding:'9px'}} value={m.pctEntrega} onChange={e=>mUpd(i,'pctEntrega',e.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginTop:4,padding:'14px 16px',borderRadius:12,background:mProfit>=0?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${mProfit>=0?'var(--orange-border)':'rgba(160,56,56,0.24)'}`}}>
+                                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                                            <span style={{fontSize:'10.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Profit/pedido</span>
+                                            <span style={{fontSize:'20px',fontWeight:'800',fontFamily:'Fira Code',color:mProfit>=0?'#3D7C47':'#A03B3B'}}>{money(mProfit)}</span>
+                                        </div>
+                                        <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:'11px',color:'var(--text-dim)',flexWrap:'wrap',gap:6}}>
+                                            <span>Margen: <strong>{mMargen.toFixed(1)}%</strong></span>
+                                            <span>ROI: <strong>{mRoi.toFixed(2)}x</strong></span>
+                                            <span>CPA real: <strong>{money(mCpaReal)}</strong></span>
+                                        </div>
+                                    </div>
+
+                                    <button className="cst-add-btn" style={{alignSelf:'flex-start'}} onClick={()=>{
+                                        setCosteo(c=>({...c, precioVenta:m.precioVenta, costoProducto:m.costoProducto, cpaAds:m.cpaAds, pctConfirmacion:m.pctConfirmacion, pctEntrega:m.pctEntrega}));
+                                        setCosteoTab('calculadora');
+                                    }}>→ Abrir en Calculadora Precio</button>
+                                </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                     ) : (
                     <div className="cst-grid">
                         {/* ── PANEL DE PARÁMETROS ── */}
@@ -3325,6 +3422,23 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </div>
                                 ))}
                                 {(costeo.costosExtra||[]).length===0 && <div style={{fontSize:'11px',color:'var(--text-dimmer)',padding:'8px 2px'}}>Sin costos extra. Agrega empaque, papelería, etc.</div>}
+                            </div>
+
+                            <div className="cst-sec-label" style={{justifyContent:'space-between'}}>
+                                <span>🔄 Suscripciones</span>
+                                <button className="cst-add-btn" onClick={addSuscripcion}>+ Item</button>
+                            </div>
+                            <div>
+                                {(costeo.suscripciones||[]).map((e,i)=>(
+                                    <div key={i} className="cst-extra-row">
+                                        <input value={e.nombre} onChange={ev=>updSuscripcion(i,'nombre',ev.target.value)}
+                                            style={{flex:1,fontSize:'12.5px',fontWeight:'600',color:'var(--text)',background:'transparent',border:'none',outline:'none'}} />
+                                        <div className="cst-input-wrap" style={{width:90}}><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
+                                            <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'8px 8px 8px 24px'}} value={e.monto} onChange={ev=>updSuscripcion(i,'monto',ev.target.value)} /></div>
+                                        <span onClick={()=>delSuscripcion(i)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1,padding:'0 2px'}}>×</span>
+                                    </div>
+                                ))}
+                                {(costeo.suscripciones||[]).length===0 && <div style={{fontSize:'11px',color:'var(--text-dimmer)',padding:'8px 2px'}}>Sin suscripciones. Define cuánto le agregas por unidad (ej. Shopify, apps, herramientas).</div>}
                             </div>
                         </div>
 
