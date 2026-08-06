@@ -259,6 +259,16 @@
         .cst-range::-webkit-slider-thumb:hover { transform: scale(1.18); }
         .cst-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(200,92,26,0.45); cursor: pointer; }
         .cst-card { padding: 18px 20px; border-radius: 14px; }
+        .calc-card { max-width: 320px; }
+        .calc-display { font-family: 'Fira Code', monospace; font-size: 28px; font-weight: 700; color: var(--text); background: var(--cream-dark); border: 1px solid var(--glass-border); border-radius: 10px; padding: 14px 16px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 12px; }
+        .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .calc-btn { padding: 14px 0; border-radius: 10px; border: 1px solid var(--glass-border); background: var(--surface-3); color: var(--text); font-family: 'Fira Code', monospace; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 120ms ease; }
+        .calc-btn:hover { background: var(--orange-dim); border-color: var(--orange-border); color: var(--orange); }
+        .calc-btn:active { transform: scale(0.94); }
+        .calc-btn-fn { color: var(--earth-2); background: var(--cream-dark); }
+        .calc-btn-op { color: var(--orange); font-weight: 800; }
+        .calc-btn-eq { background: var(--orange); border-color: var(--orange); color: #FFFFFF; }
+        .calc-btn-eq:hover { background: var(--orange-light); color: #FFFFFF; }
         .cst-bar-track { height: 9px; border-radius: 99px; background: var(--stone); overflow: hidden; }
         .cst-bar-fill { height: 100%; border-radius: 99px; transition: width 450ms cubic-bezier(0.22,0.68,0.32,1); }
         .cst-hero { border-radius: 18px; padding: 30px 32px; background: linear-gradient(125deg, #C85C1A 0%, #A8400E 55%, #7A2E08 100%); position: relative; overflow: hidden; box-shadow: 0 24px 50px -16px rgba(200,92,26,0.45); }
@@ -815,6 +825,110 @@ function CierreDiario({ productos, user, tiendaId }) {
     </>);
 }
 
+// ── CALCULADORA BÁSICA (suma, resta, multiplica, divide) ──
+function BasicCalculator({ title, onRemove, removable }) {
+    const [display,   setDisplay]   = useState('0');
+    const [stored,    setStored]    = useState(null);
+    const [operator,  setOperator]  = useState(null);
+    const [overwrite, setOverwrite] = useState(false);
+
+    const calc = (a, b, op) => {
+        if (op === '+') return a + b;
+        if (op === '-') return a - b;
+        if (op === '×') return a * b;
+        if (op === '÷') return b === 0 ? NaN : a / b;
+        return b;
+    };
+    const fmt = v => {
+        if (!isFinite(v)) return 'Error';
+        const r = Math.round(v * 1e10) / 1e10;
+        return r.toLocaleString('es-DO', { maximumFractionDigits: 10 });
+    };
+
+    const inputDigit = d => {
+        if (overwrite) { setDisplay(d); setOverwrite(false); return; }
+        setDisplay(display === '0' ? d : (display + d).slice(0, 14));
+    };
+    const inputDot = () => {
+        if (overwrite) { setDisplay('0.'); setOverwrite(false); return; }
+        if (!display.includes('.')) setDisplay(display + '.');
+    };
+    const backspace = () => {
+        if (overwrite) return;
+        const next = display.slice(0, -1);
+        setDisplay(next === '' || next === '-' ? '0' : next);
+    };
+    const clear = () => { setDisplay('0'); setStored(null); setOperator(null); setOverwrite(false); };
+    const toggleSign = () => setDisplay(d => (d.charAt(0) === '-' ? d.slice(1) : (d === '0' ? d : '-' + d)));
+    const percent = () => setDisplay(d => String(parseFloat(d) / 100));
+
+    const chooseOperator = op => {
+        const current = parseFloat(display);
+        if (operator && !overwrite) {
+            const result = calc(stored, current, operator);
+            setDisplay(fmt(result));
+            setStored(result);
+        } else {
+            setStored(current);
+        }
+        setOperator(op);
+        setOverwrite(true);
+    };
+    const equals = () => {
+        if (operator === null) return;
+        const result = calc(stored, parseFloat(display), operator);
+        setDisplay(fmt(result));
+        setStored(null);
+        setOperator(null);
+        setOverwrite(true);
+    };
+
+    const handleKeyDown = e => {
+        const k = e.key;
+        if (k >= '0' && k <= '9') { inputDigit(k); e.preventDefault(); return; }
+        if (k === '.' || k === ',') { inputDot(); e.preventDefault(); return; }
+        if (k === '+') { chooseOperator('+'); e.preventDefault(); return; }
+        if (k === '-') { chooseOperator('-'); e.preventDefault(); return; }
+        if (k === '*' || k.toLowerCase() === 'x') { chooseOperator('×'); e.preventDefault(); return; }
+        if (k === '/') { chooseOperator('÷'); e.preventDefault(); return; }
+        if (k === '%') { percent(); e.preventDefault(); return; }
+        if (k === 'Enter' || k === '=') { equals(); e.preventDefault(); return; }
+        if (k === 'Backspace') { backspace(); e.preventDefault(); return; }
+        if (k === 'Escape' || k.toLowerCase() === 'c') { clear(); e.preventDefault(); return; }
+    };
+
+    const digits = ['7','8','9','4','5','6','1','2','3'];
+    return (
+        <div className="card glass cst-card calc-card" tabIndex={0} onKeyDown={handleKeyDown} style={{outline:'none'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                <span style={{fontSize:'12.5px',fontWeight:800,color:'var(--text)'}}>{title}</span>
+                {removable && <span onClick={onRemove} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1}}>×</span>}
+            </div>
+            <div className="calc-display">{display}</div>
+            <div className="calc-grid">
+                <button className="calc-btn calc-btn-fn" onClick={clear}>C</button>
+                <button className="calc-btn calc-btn-fn" onClick={toggleSign}>±</button>
+                <button className="calc-btn calc-btn-fn" onClick={percent}>%</button>
+                <button className="calc-btn calc-btn-op" onClick={()=>chooseOperator('÷')}>÷</button>
+
+                {digits.slice(0,3).map(d => <button key={d} className="calc-btn" onClick={()=>inputDigit(d)}>{d}</button>)}
+                <button className="calc-btn calc-btn-op" onClick={()=>chooseOperator('×')}>×</button>
+
+                {digits.slice(3,6).map(d => <button key={d} className="calc-btn" onClick={()=>inputDigit(d)}>{d}</button>)}
+                <button className="calc-btn calc-btn-op" onClick={()=>chooseOperator('-')}>−</button>
+
+                {digits.slice(6,9).map(d => <button key={d} className="calc-btn" onClick={()=>inputDigit(d)}>{d}</button>)}
+                <button className="calc-btn calc-btn-op" onClick={()=>chooseOperator('+')}>+</button>
+
+                <button className="calc-btn" onClick={backspace}>⌫</button>
+                <button className="calc-btn" onClick={()=>inputDigit('0')}>0</button>
+                <button className="calc-btn" onClick={inputDot}>.</button>
+                <button className="calc-btn calc-btn-eq" onClick={equals}>=</button>
+            </div>
+        </div>
+    );
+}
+
 // ── APP ──
 function App() {
     const [user,       setUser]       = useState(null);
@@ -1145,16 +1259,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [costeoMoneda, setCosteoMoneda] = useState('DOP');
     const [costeoTab,    setCosteoTab]    = useState('calculadora');
     const [proyeccionCantidad, setProyeccionCantidad] = useState(50);
-    const MULTI_CALC_DEFAULTS = [
-        { id:'a', nombre:'Escenario A', precioVenta:'1500', costoProducto:'400', cpaAds:'300', pctConfirmacion:'80', pctEntrega:'60', flete:'180', extra:'60' },
-        { id:'b', nombre:'Escenario B', precioVenta:'1800', costoProducto:'450', cpaAds:'320', pctConfirmacion:'75', pctEntrega:'55', flete:'180', extra:'60' },
-        { id:'c', nombre:'Escenario C', precioVenta:'1200', costoProducto:'350', cpaAds:'280', pctConfirmacion:'80', pctEntrega:'65', flete:'150', extra:'50' },
-    ];
-    const [multiCalcs, setMultiCalcs] = useState(() => {
-        try { const saved = JSON.parse(localStorage.getItem('multiCalcsV1')); return Array.isArray(saved) && saved.length>0 ? saved : MULTI_CALC_DEFAULTS; }
-        catch { return MULTI_CALC_DEFAULTS; }
+    const [calcList, setCalcList] = useState(() => {
+        try { const saved = JSON.parse(localStorage.getItem('calcListV1')); return Array.isArray(saved) && saved.length>0 ? saved : [1,2,3]; }
+        catch { return [1,2,3]; }
     });
-    useEffect(() => { try { localStorage.setItem('multiCalcsV1', JSON.stringify(multiCalcs)); } catch {} }, [multiCalcs]);
+    useEffect(() => { try { localStorage.setItem('calcListV1', JSON.stringify(calcList)); } catch {} }, [calcList]);
     const [diccQuery,    setDiccQuery]    = useState('');
     const [diccCat,      setDiccCat]      = useState('Todas');
     const firstInputRef  = useRef(null);
@@ -3181,9 +3290,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const updSuscripcion = (i,k,v) => setCosteo(c=>({...c, suscripciones:(c.suscripciones||[]).map((e,idx)=>idx===i?{...e,[k]:v}:e)}));
                     const addSuscripcion = () => setCosteo(c=>({...c, suscripciones:[...(c.suscripciones||[]),{nombre:'Nueva suscripción',monto:'0'}]}));
                     const delSuscripcion = (i) => setCosteo(c=>({...c, suscripciones:(c.suscripciones||[]).filter((_,idx)=>idx!==i)}));
-                    const mUpd = (i,k,v) => setMultiCalcs(arr=>arr.map((x,idx)=>idx===i?{...x,[k]:v}:x));
-                    const addMulti = () => setMultiCalcs(arr=>[...arr, {...MULTI_CALC_DEFAULTS[0], id:Date.now()+'', nombre:'Escenario '+String.fromCharCode(65+arr.length)}]);
-                    const delMulti = (i) => setMultiCalcs(arr=> arr.length<=1 ? arr : arr.filter((_,idx)=>idx!==i));
+                    const addCalc = () => setCalcList(arr=>[...arr, (arr[arr.length-1]||0)+1]);
+                    const delCalc = (id) => setCalcList(arr=> arr.length<=1 ? arr : arr.filter(x=>x!==id));
                     const tabs = [['calculadora','Calculadora Precio'],['multi','Calculadoras'],['proyeccion','Proyección']];
 
                     return <>
@@ -3226,79 +3334,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     ) : costeoTab==='multi' ? (
                     <div>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18,flexWrap:'wrap',gap:10}}>
-                            <p style={{fontSize:12,color:'var(--text-dimmer)',maxWidth:540}}>Compara varios escenarios de precio a la vez — cambia cualquier campo y los resultados se recalculan al instante. Mínimo 3, agrega los que necesites.</p>
-                            <button className="cst-add-btn" onClick={addMulti}>+ Agregar calculadora</button>
+                            <p style={{fontSize:12,color:'var(--text-dimmer)',maxWidth:540}}>Calculadoras normales de suma, resta, multiplicación y división — para cuentas rápidas del día a día.</p>
+                            <button className="cst-add-btn" onClick={addCalc}>+ Agregar calculadora</button>
                         </div>
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16}}>
-                            {multiCalcs.map((m,i)=>{
-                                const mn = v => { const x=parseFloat(v); return isFinite(x)?x:0; };
-                                const mConf = Math.min(Math.max(mn(m.pctConfirmacion),1),100)/100;
-                                const mEntr = Math.min(Math.max(mn(m.pctEntrega),1),100)/100;
-                                const mCpaReal = mn(m.cpaAds)/(mConf*mEntr);
-                                const mCostosOp = mn(m.costoProducto) + mn(m.flete) + mn(m.extra);
-                                const mCostosTot = mCostosOp + mCpaReal;
-                                const mPrecio = mn(m.precioVenta);
-                                const mProfit = mPrecio - mCostosTot;
-                                const mRoi = mCostosTot>0 ? mProfit/mCostosTot : 0;
-                                const mMargen = mPrecio>0 ? mProfit/mPrecio*100 : 0;
-                                return (
-                                <div key={m.id||i} className="card glass cst-card" style={{display:'flex',flexDirection:'column',gap:12}}>
-                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-                                        <input value={m.nombre} onChange={e=>mUpd(i,'nombre',e.target.value)}
-                                            style={{fontSize:'13.5px',fontWeight:'800',color:'var(--text)',background:'transparent',border:'none',outline:'none',flex:1}} />
-                                        {multiCalcs.length>1 && <span onClick={()=>delMulti(i)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1}}>×</span>}
-                                    </div>
-
-                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                                        <div>
-                                            <label className="cst-field-label">Precio Venta</label>
-                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
-                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.precioVenta} onChange={e=>mUpd(i,'precioVenta',e.target.value)} /></div>
-                                        </div>
-                                        <div>
-                                            <label className="cst-field-label">Costo Producto</label>
-                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
-                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.costoProducto} onChange={e=>mUpd(i,'costoProducto',e.target.value)} /></div>
-                                        </div>
-                                        <div>
-                                            <label className="cst-field-label">CPA (Ads)</label>
-                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
-                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.cpaAds} onChange={e=>mUpd(i,'cpaAds',e.target.value)} /></div>
-                                        </div>
-                                        <div>
-                                            <label className="cst-field-label">Flete + Extra</label>
-                                            <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:'12px'}}>$</span>
-                                                <input type="number" className="cst-input has-prefix" style={{fontSize:'13px',padding:'9px 9px 9px 26px'}} value={m.flete} onChange={e=>mUpd(i,'flete',e.target.value)} /></div>
-                                        </div>
-                                        <div>
-                                            <label className="cst-field-label">% Confirmación</label>
-                                            <input type="number" className="cst-input" style={{fontSize:'13px',padding:'9px'}} value={m.pctConfirmacion} onChange={e=>mUpd(i,'pctConfirmacion',e.target.value)} />
-                                        </div>
-                                        <div>
-                                            <label className="cst-field-label">% Entrega</label>
-                                            <input type="number" className="cst-input" style={{fontSize:'13px',padding:'9px'}} value={m.pctEntrega} onChange={e=>mUpd(i,'pctEntrega',e.target.value)} />
-                                        </div>
-                                    </div>
-
-                                    <div style={{marginTop:4,padding:'14px 16px',borderRadius:12,background:mProfit>=0?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${mProfit>=0?'var(--orange-border)':'rgba(160,56,56,0.24)'}`}}>
-                                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
-                                            <span style={{fontSize:'10.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Profit/pedido</span>
-                                            <span style={{fontSize:'20px',fontWeight:'800',fontFamily:'Fira Code',color:mProfit>=0?'#3D7C47':'#A03B3B'}}>{money(mProfit)}</span>
-                                        </div>
-                                        <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:'11px',color:'var(--text-dim)',flexWrap:'wrap',gap:6}}>
-                                            <span>Margen: <strong>{mMargen.toFixed(1)}%</strong></span>
-                                            <span>ROI: <strong>{mRoi.toFixed(2)}x</strong></span>
-                                            <span>CPA real: <strong>{money(mCpaReal)}</strong></span>
-                                        </div>
-                                    </div>
-
-                                    <button className="cst-add-btn" style={{alignSelf:'flex-start'}} onClick={()=>{
-                                        setCosteo(c=>({...c, precioVenta:m.precioVenta, costoProducto:m.costoProducto, cpaAds:m.cpaAds, pctConfirmacion:m.pctConfirmacion, pctEntrega:m.pctEntrega}));
-                                        setCosteoTab('calculadora');
-                                    }}>→ Abrir en Calculadora Precio</button>
-                                </div>
-                                );
-                            })}
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>
+                            {calcList.map((id,i)=>(
+                                <BasicCalculator key={id} title={`Calculadora ${i+1}`} removable={calcList.length>1} onRemove={()=>delCalc(id)} />
+                            ))}
                         </div>
                     </div>
                     ) : (
