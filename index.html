@@ -827,11 +827,9 @@ function CierreDiario({ productos, user, tiendaId }) {
 
 // ── CALCULADORA BÁSICA (suma, resta, multiplica, divide) ──
 function BasicCalculator({ title, onRemove, removable }) {
-    const [entry,     setEntry]     = useState('0');   // número que se está tecleando ahora
-    const [expr,      setExpr]      = useState('');    // prefijo ya confirmado, ej. "200+"
-    const [stored,    setStored]    = useState(null);
-    const [operator,  setOperator]  = useState(null);
-    const [overwrite, setOverwrite] = useState(false);  // true = el próximo dígito empieza número nuevo
+    const [terms,       setTerms]       = useState(['0']);  // ej. ['600','650','501','2456']; '' = número aún no tecleado
+    const [operators,   setOperators]   = useState([]);     // ej. ['+','+','+'] — un operador menos que terms
+    const [freshResult, setFreshResult] = useState(false);  // true justo después de "="
 
     const calc = (a, b, op) => {
         if (op === '+') return a + b;
@@ -847,61 +845,84 @@ function BasicCalculator({ title, onRemove, removable }) {
     };
 
     const inputDigit = d => {
-        if (overwrite) { setEntry(d); setOverwrite(false); return; }
-        setEntry(entry === '0' ? d : (entry + d).slice(0, 14));
+        if (freshResult) { setTerms([d]); setOperators([]); setFreshResult(false); return; }
+        const last = terms.length - 1;
+        const cur = terms[last];
+        const next = (cur === '' || cur === '0') ? d : (cur + d).slice(0, 14);
+        setTerms([...terms.slice(0, last), next]);
     };
     const inputDot = () => {
-        if (overwrite) { setEntry('0.'); setOverwrite(false); return; }
-        if (!entry.includes('.')) setEntry(entry + '.');
+        if (freshResult) { setTerms(['0.']); setOperators([]); setFreshResult(false); return; }
+        const last = terms.length - 1;
+        const cur = terms[last];
+        if (cur.includes('.')) return;
+        setTerms([...terms.slice(0, last), cur === '' ? '0.' : cur + '.']);
     };
     const backspace = () => {
-        if (overwrite) {
-            // recién se presionó un operador (o "="): cancelarlo y volver a editar el número anterior
-            if (operator) {
-                setEntry(String(stored));
-                setStored(null);
-                setOperator(null);
-                setExpr('');
-                setOverwrite(false);
-            }
+        if (freshResult) {
+            const next = terms[0].slice(0, -1);
+            setTerms([next === '' || next === '-' ? '0' : next]);
+            setFreshResult(false);
             return;
         }
-        const next = entry.slice(0, -1);
-        setEntry(next === '' || next === '-' ? '0' : next);
+        const last = terms.length - 1;
+        if (terms[last] === '') {
+            // recién se presionó un operador: cancelarlo y volver a editar el número anterior
+            if (operators.length === 0) return;
+            setOperators(operators.slice(0, -1));
+            setTerms(terms.slice(0, -1));
+            return;
+        }
+        const next = terms[last].slice(0, -1);
+        setTerms([...terms.slice(0, last), next === '' || next === '-' ? '0' : next]);
     };
-    const clear = () => { setEntry('0'); setExpr(''); setStored(null); setOperator(null); setOverwrite(false); };
-    const toggleSign = () => setEntry(d => (d.charAt(0) === '-' ? d.slice(1) : (d === '0' ? d : '-' + d)));
-    const percent = () => setEntry(d => String(parseFloat(d) / 100));
+    const clear = () => { setTerms(['0']); setOperators([]); setFreshResult(false); };
+    const toggleSign = () => {
+        if (freshResult) {
+            const v = terms[0];
+            setTerms([v.charAt(0) === '-' ? v.slice(1) : (v === '0' ? v : '-' + v)]);
+            return;
+        }
+        const last = terms.length - 1;
+        if (terms[last] === '') return;
+        const v = terms[last];
+        setTerms([...terms.slice(0, last), v.charAt(0) === '-' ? v.slice(1) : (v === '0' ? v : '-' + v)]);
+    };
+    const percent = () => {
+        if (freshResult) { setTerms([String(parseFloat(terms[0]) / 100)]); return; }
+        const last = terms.length - 1;
+        if (terms[last] === '') return;
+        setTerms([...terms.slice(0, last), String(parseFloat(terms[last]) / 100)]);
+    };
 
     const chooseOperator = op => {
-        if (operator && !overwrite) {
-            const result = calc(stored, parseFloat(entry), operator);
-            setStored(result);
-            setExpr(fmt(result) + op);
-        } else if (operator && overwrite) {
-            // cambiar el operador pendiente antes de teclear el segundo número
-            setExpr(fmt(stored) + op);
-        } else {
-            const a = parseFloat(entry);
-            setStored(a);
-            setExpr(fmt(a) + op);
+        if (freshResult) { setTerms([terms[0], '']); setOperators([op]); setFreshResult(false); return; }
+        const last = terms.length - 1;
+        if (terms[last] === '') {
+            // ya hay un operador pendiente sin número nuevo: reemplazarlo (ej. cambió de idea)
+            if (operators.length > 0) setOperators([...operators.slice(0, -1), op]);
+            return;
         }
-        setOperator(op);
-        setOverwrite(true);
+        setOperators([...operators, op]);
+        setTerms([...terms, '']);
     };
     const equals = () => {
-        if (operator === null) return;
-        const result = calc(stored, parseFloat(entry), operator);
-        setEntry(isFinite(result) ? String(result) : 'Error');
-        setStored(null);
-        setOperator(null);
-        setExpr('');
-        setOverwrite(true);
+        if (operators.length === 0) return;
+        let t = terms, ops = operators;
+        if (t[t.length - 1] === '') { t = t.slice(0, -1); ops = ops.slice(0, -1); }
+        if (ops.length === 0) return;
+        const result = t.reduce((acc, cur, i) => i === 0 ? parseFloat(cur) : calc(acc, parseFloat(cur), ops[i - 1]), 0);
+        setTerms([isFinite(result) ? String(result) : 'Error']);
+        setOperators([]);
+        setFreshResult(true);
     };
 
-    const display = operator
-        ? (overwrite ? fmt(stored) : expr + entry)
-        : (overwrite && entry !== 'Error' ? fmt(parseFloat(entry)) : entry);
+    const display = terms.map((t, i) => {
+        const isLast = i === terms.length - 1;
+        if (t === '') return '';
+        if (isLast && !freshResult) return t;
+        return fmt(parseFloat(t));
+    }).reduce((acc, part, i) => i === 0 ? part : acc + operators[i - 1] + part, '');
 
     const handleKeyDown = e => {
         const k = e.key;
