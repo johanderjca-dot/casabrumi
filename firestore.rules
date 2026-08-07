@@ -84,6 +84,10 @@ service cloud.firestore {
     // ── campanas ── Planeacion de Campanas, solo master
     match /campanas/{id}   { allow read, write: if isMaster(); }
 
+    // ── configuracion/planEstrategico ── checklist del Plan Estratégico (venture studio),
+    // contenido sensible del negocio, exclusivo del master
+    match /configuracion/planEstrategico { allow read, write: if isMaster(); }
+
     // ── contabilidad (partida doble, manual) ── gateada por el permiso de Contabilidad
     match /cuentas_contables/{id}  { allow read, write: if tienePermiso('contabilidad'); }
     match /asientos_contables/{id} { allow read, write: if tienePermiso('contabilidad'); }
