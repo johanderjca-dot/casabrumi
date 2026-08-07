@@ -23,70 +23,70 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
         :root {
-            /* === TIERRA PALETTE === */
-            --cream:       #F7F2EA;
-            --cream-dark:  #EDE5D8;
-            --stone:       #D9CEBC;
-            --stone-mid:   #C4B89E;
-            --stone-dark:  #A8977E;
-            --parchment:   #FAF7F2;
+            /* === TEAL/CORAL PALETTE === */
+            --cream:       #F5FAF9;
+            --cream-dark:  #E7F3F1;
+            --stone:       #D3E6E3;
+            --stone-mid:   #B3CDC9;
+            --stone-dark:  #7FA19C;
+            --parchment:   #FBFEFD;
 
-            --earth:       #5C3D1E;
-            --earth-2:     #7A5230;
-            --earth-dim:   rgba(92,61,30,0.50);
-            --earth-dimmer:rgba(92,61,30,0.28);
+            --earth:       #103630;
+            --earth-2:     #17493F;
+            --earth-dim:   rgba(11,38,34,0.50);
+            --earth-dimmer:rgba(11,38,34,0.28);
 
-            --orange:      #C85C1A;
-            --orange-light:#D97340;
-            --orange-dim:  rgba(200,92,26,0.12);
-            --orange-border:rgba(200,92,26,0.28);
+            --orange:      #129A8F;
+            --orange-light:#3DBBB0;
+            --orange-dim:  rgba(18,154,143,0.12);
+            --orange-border:rgba(18,154,143,0.28);
 
-            /* Sand brand — kept for compatibility */
-            --sand:        #C2A878;
-            --sand-light:  #D9C9A0;
-            --sand-dark:   #9A8A6A;
-            --sand-dim:    rgba(194,168,120,0.18);
-            --sand-border: rgba(194,168,120,0.32);
-            --bronze:      #A07440;
-            --gold:        #C2A878;
+            /* Coral brand — secondary accent */
+            --sand:        #FF7A63;
+            --sand-light:  #FFA391;
+            --sand-dark:   #E85A42;
+            --sand-dim:    rgba(255,122,99,0.16);
+            --sand-border: rgba(255,122,99,0.32);
+            --bronze:      #E85A42;
+            --gold:        #FF7A63;
 
-            --ink:         #2C1F0E;
-            --ink-2:       #4A3020;
-            --on-ink:      #F7F2EA;
-            --on-ink-dim:  rgba(247,242,234,0.65);
-            --on-ink-dimmer:rgba(247,242,234,0.36);
+            --ink:         #0B2622;
+            --ink-2:       #123A33;
+            --on-ink:      #EFFBF9;
+            --on-ink-dim:  rgba(239,251,249,0.65);
+            --on-ink-dimmer:rgba(239,251,249,0.36);
 
-            --bg:          #F0EAE0;
-            --surface-1:   #F7F3EC;
-            --surface-2:   #FAF7F2;
-            --surface-3:   #FDFBF8;
-            --sidebar-bg:  #EDE5D8;
+            --bg:          #EAF6F4;
+            --surface-1:   #F1FAF8;
+            --surface-2:   #F8FDFC;
+            --surface-3:   #FFFFFF;
+            --sidebar-bg:  #FFFFFF;
 
             --glass-bg:      var(--surface-2);
             --glass-bg-mid:  var(--surface-1);
             --glass-bg-high: var(--surface-3);
-            --glass-border:  rgba(92,61,30,0.08);
-            --glass-border-h:rgba(92,61,30,0.16);
-            --glass-shadow:  0 1px 0 rgba(255,255,255,0.7) inset, 0 2px 12px rgba(92,61,30,0.07);
-            --glass-shadow-lg: 0 1px 0 rgba(255,255,255,0.8) inset, 0 16px 48px rgba(92,61,30,0.14);
+            --glass-border:  rgba(11,38,34,0.08);
+            --glass-border-h:rgba(11,38,34,0.16);
+            --glass-shadow:  0 1px 0 rgba(255,255,255,0.7) inset, 0 2px 12px rgba(11,38,34,0.07);
+            --glass-shadow-lg: 0 1px 0 rgba(255,255,255,0.8) inset, 0 16px 48px rgba(11,38,34,0.14);
 
-            --text:        #1A1008;
-            --text-dim:    rgba(26,16,8,0.72);
-            --text-dimmer: rgba(26,16,8,0.48);
+            --text:        #0D211D;
+            --text-dim:    rgba(13,33,29,0.72);
+            --text-dimmer: rgba(13,33,29,0.48);
 
             --header-h:  56px;
             --sidebar-w: 220px;
-            --r:    12px;
-            --r-sm:  8px;
+            --r:    18px;
+            --r-sm:  12px;
             --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
             --t-fast:   150ms cubic-bezier(0.23, 1, 0.32, 1);
             --t-normal: 260ms cubic-bezier(0.22, 0.68, 0.32, 1);
-            --grad-ink:  linear-gradient(135deg, #C85C1A 0%, #A04010 100%);
-            --grad-gold: linear-gradient(135deg, #C2A878 0%, #A98851 100%);
+            --grad-ink:  linear-gradient(135deg, #129A8F 0%, #0D6C63 100%);
+            --grad-gold: linear-gradient(135deg, #FF7A63 0%, #E85A42 100%);
         }
         html, body, #root { height: 100%; }
         body { font-family: 'Fira Sans', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; color: var(--text); overflow-x: hidden; background: var(--bg); }
-        ::selection { background: rgba(200,92,26,0.18); }
+        ::selection { background: rgba(18,154,143,0.18); }
         *::-webkit-scrollbar { width: 5px; height: 5px; }
         *::-webkit-scrollbar-track { background: transparent; }
         *::-webkit-scrollbar-thumb { background: var(--stone); border-radius: 99px; }
@@ -95,7 +95,7 @@
         /* SCENE — very subtle warm grain */
         .scene { position: fixed; inset: 0; z-index: 0; background: var(--bg); overflow: hidden; }
         .scene::before { content: ''; position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"); opacity: 0.6; pointer-events: none; }
-        .scene::after  { content: ''; position: absolute; top: -20vh; right: -10vw; width: 55vw; height: 55vw; border-radius: 50%; background: radial-gradient(circle, rgba(200,92,26,0.06) 0%, transparent 65%); pointer-events: none; }
+        .scene::after  { content: ''; position: absolute; top: -20vh; right: -10vw; width: 55vw; height: 55vw; border-radius: 50%; background: radial-gradient(circle, rgba(18,154,143,0.06) 0%, transparent 65%); pointer-events: none; }
         @keyframes rise   { from { opacity: 0; transform: translateY(20px); filter: blur(6px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
         @keyframes fadeIn { from { opacity: 0; } }
         @keyframes pop    { from { opacity: 0; transform: scale(0.95) translateY(10px); filter: blur(3px); } }
@@ -111,7 +111,7 @@
         .auth-wrap { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-columns: 55fr 45fr; }
         @media (max-width: 768px) { .auth-wrap { grid-template-columns: 1fr; } .auth-left { display: none; } }
         .auth-left { display: flex; align-items: center; justify-content: flex-start; padding: 72px 64px; position: relative; background: var(--earth); overflow: hidden; }
-        .auth-left::before { content: ''; position: absolute; bottom: -30%; left: -15%; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(200,92,26,0.22) 0%, transparent 65%); pointer-events: none; }
+        .auth-left::before { content: ''; position: absolute; bottom: -30%; left: -15%; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(18,154,143,0.22) 0%, transparent 65%); pointer-events: none; }
         .auth-left::after  { content: ''; position: absolute; top: -10%; right: -20%; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 65%); pointer-events: none; }
         .auth-left-glow { display: none; }
         .auth-logo-wrap { position: relative; z-index: 1; display: flex; align-items: flex-start; }
@@ -132,9 +132,9 @@
         .error-msg { background: rgba(180,40,40,0.07); border: 1px solid rgba(180,40,40,0.20); border-radius: var(--r-sm); padding: 10px 14px; font-size: 12.5px; color: #9B3030; margin-bottom: 14px; }
         .hint-box { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--earth-2); font-family: 'Fira Code', monospace; font-weight: 500; margin-bottom: 18px; }
         .hint-box svg { width: 13px; height: 13px; flex-shrink: 0; }
-        .btn-submit { width: 100%; padding: 14px; border: none; border-radius: var(--r-sm); font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer; color: #FFFFFF; background: var(--orange); transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out); letter-spacing: 1.5px; text-transform: uppercase; box-shadow: 0 4px 18px -4px rgba(200,92,26,0.45); }
-        @media (hover: hover) and (pointer: fine) { .btn-submit:hover { box-shadow: 0 8px 24px -4px rgba(200,92,26,0.55); transform: translateY(-1px); } }
-        .btn-submit:active { transform: scale(0.97); box-shadow: 0 2px 8px -2px rgba(200,92,26,0.30); }
+        .btn-submit { width: 100%; padding: 14px; border: none; border-radius: var(--r-sm); font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer; color: #FFFFFF; background: var(--orange); transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out); letter-spacing: 1.5px; text-transform: uppercase; box-shadow: 0 4px 18px -4px rgba(18,154,143,0.45); }
+        @media (hover: hover) and (pointer: fine) { .btn-submit:hover { box-shadow: 0 8px 24px -4px rgba(18,154,143,0.55); transform: translateY(-1px); } }
+        .btn-submit:active { transform: scale(0.97); box-shadow: 0 2px 8px -2px rgba(18,154,143,0.30); }
         .btn-submit:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
         .auth-switch { text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-dimmer); }
         .auth-switch a { color: var(--orange); font-weight: 700; cursor: pointer; text-decoration: none; }
@@ -143,7 +143,7 @@
         .app-root { position: relative; z-index: 1; display: flex; min-height: 100vh; }
 
         /* ========= HEADER ========= */
-        .app-header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); z-index: 200; display: flex; align-items: center; background: rgba(240,234,224,0.92); border-bottom: 1px solid var(--glass-border); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .app-header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); z-index: 200; display: flex; align-items: center; background: rgba(255,255,255,0.90); border-bottom: 1px solid var(--glass-border); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
         .app-header-logo { width: var(--sidebar-w); flex-shrink: 0; display: flex; align-items: center; justify-content: flex-start; height: 100%; border-right: 1px solid var(--glass-border); padding: 0 22px; }
         .app-header-logo img { height: 18px; filter: brightness(0); opacity: 0.75; object-fit: contain; }
         .app-header-title { flex: 1; padding: 0 28px; display: flex; align-items: center; gap: 10px; }
@@ -165,12 +165,12 @@
         .sidebar-nav { flex: 1; padding: 24px 0; }
         .nav-label { font-size: 8px; font-weight: 800; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 3px; padding: 0 22px; margin: 28px 0 8px; }
         .nav-label:first-child { margin-top: 0; }
-        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 22px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-dim); transition: color 140ms ease, background 140ms ease; margin-bottom: 1px; position: relative; border-left: 2px solid transparent; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin: 0 10px 3px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-dim); transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease; position: relative; border-radius: 12px; }
         .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; transition: transform 150ms var(--ease-out); }
-        @media (hover: hover) and (pointer: fine) { .nav-item:hover { background: rgba(92,61,30,0.05); color: var(--text); } }
+        @media (hover: hover) and (pointer: fine) { .nav-item:hover { background: rgba(11,38,34,0.05); color: var(--text); } }
         .nav-item:active { transform: scale(0.98); }
-        .nav-item.active { border-left-color: var(--orange); color: var(--orange); font-weight: 700; background: rgba(200,92,26,0.06); }
-        .nav-item.active svg { color: var(--orange); }
+        .nav-item.active { color: #FFFFFF; font-weight: 700; background: var(--orange); box-shadow: 0 6px 16px -6px rgba(18,154,143,0.55); }
+        .nav-item.active svg { color: #FFFFFF; }
         .nav-item.active::before { display: none; }
         .sidebar-footer { padding: 14px 0; border-top: 1px solid var(--glass-border); }
         .user-tile { display: flex; align-items: center; gap: 10px; padding: 10px 22px; }
@@ -204,9 +204,9 @@
         @media (max-width: 1200px) { .kpi-grid { grid-template-columns: 1fr 1fr 1fr; } }
         .kpi-card { border-radius: var(--r); padding: 22px 24px; transition: transform var(--t-normal), box-shadow var(--t-normal); cursor: default; position: relative; animation: rise 0.52s cubic-bezier(0.22, 0.68, 0.32, 1) backwards; border: 1px solid var(--glass-border); background: var(--surface-2); }
         .kpi-grid .kpi-card:first-child { grid-row: span 2; display: flex; flex-direction: column; justify-content: space-between; background: var(--earth); border-color: transparent; }
-        .kpi-grid .kpi-card:first-child .kpi-label { color: rgba(247,242,234,0.55); }
+        .kpi-grid .kpi-card:first-child .kpi-label { color: rgba(239,251,249,0.55); }
         .kpi-grid .kpi-card:first-child .kpi-val { font-size: 48px; letter-spacing: -2px; color: var(--cream); -webkit-text-fill-color: var(--cream); }
-        .kpi-grid .kpi-card:first-child .kpi-sub { color: rgba(247,242,234,0.45); }
+        .kpi-grid .kpi-card:first-child .kpi-sub { color: rgba(239,251,249,0.45); }
         .kpi-grid .kpi-card:first-child .kpi-icon.gold { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.15); color: var(--sand-light); }
         .kpi-grid .kpi-card:nth-child(2) { animation-delay: 0.08s; }
         .kpi-grid .kpi-card:nth-child(3) { animation-delay: 0.12s; }
@@ -214,12 +214,12 @@
         .kpi-grid .kpi-card:nth-child(5) { animation-delay: 0.20s; }
         .kpi-grid .kpi-card:nth-child(6) { animation-delay: 0.24s; }
         .kpi-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: var(--r) var(--r) 0 0; background: linear-gradient(90deg, var(--orange) 0%, var(--orange-light) 100%); opacity: 0; transition: opacity var(--t-normal); }
-        @media (hover: hover) and (pointer: fine) { .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px -8px rgba(92,61,30,0.16); } .kpi-card:hover::after { opacity: 1; } }
+        @media (hover: hover) and (pointer: fine) { .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px -8px rgba(11,38,34,0.16); } .kpi-card:hover::after { opacity: 1; } }
         .kpi-grid .kpi-card:first-child::after { display: none; }
 
         /* ========= HERO ========= */
-        .hero { border-radius: var(--r); padding: 28px 32px; margin-bottom: 20px; background: linear-gradient(135deg, var(--earth) 0%, var(--earth-2) 60%, #8B5E30 100%); border: none; box-shadow: 0 16px 40px -12px rgba(92,61,30,0.40), inset 0 1px 0 rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; overflow: hidden; position: relative; }
-        .hero::before { content: ''; position: absolute; top: -50%; right: -8%; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, rgba(200,92,26,0.30), transparent 65%); pointer-events: none; }
+        .hero { border-radius: var(--r); padding: 28px 32px; margin-bottom: 20px; background: linear-gradient(135deg, var(--earth) 0%, var(--earth-2) 60%, #17493F 100%); border: none; box-shadow: 0 16px 40px -12px rgba(11,38,34,0.40), inset 0 1px 0 rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; overflow: hidden; position: relative; }
+        .hero::before { content: ''; position: absolute; top: -50%; right: -8%; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, rgba(18,154,143,0.30), transparent 65%); pointer-events: none; }
         .hero::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 36%; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.05) 50%, transparent 80%); transform: translateX(-130%) skewX(-16deg); animation: heroShine 7s ease-in-out infinite; pointer-events: none; }
         @keyframes heroShine { 0% { transform: translateX(-130%) skewX(-16deg); } 55%, 100% { transform: translateX(420%) skewX(-16deg); } }
         .hero h2 { font-size: 20px; font-weight: 800; color: var(--on-ink); letter-spacing: -0.5px; margin-bottom: 5px; }
@@ -231,8 +231,8 @@
         .hero-stat-label { font-size: 8.5px; color: var(--on-ink-dimmer); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; margin-top: 4px; }
 
         /* ========= COMMAND PALETTE ========= */
-        .cmdk-overlay { position: fixed; inset: 0; background: rgba(44,31,14,0.35); backdrop-filter: blur(10px); display: flex; align-items: flex-start; justify-content: center; z-index: 2000; padding: 12vh 20px 20px; animation: fadeIn 0.15s ease; }
-        .cmdk { width: 100%; max-width: 520px; background: var(--parchment); border-radius: 16px; box-shadow: 0 32px 80px rgba(92,61,30,0.28), 0 0 0 1px var(--glass-border) inset; overflow: hidden; border: 1px solid var(--glass-border); animation: pop 0.24s cubic-bezier(0.34, 1.4, 0.45, 1) backwards; }
+        .cmdk-overlay { position: fixed; inset: 0; background: rgba(11,38,34,0.35); backdrop-filter: blur(10px); display: flex; align-items: flex-start; justify-content: center; z-index: 2000; padding: 12vh 20px 20px; animation: fadeIn 0.15s ease; }
+        .cmdk { width: 100%; max-width: 520px; background: var(--parchment); border-radius: 16px; box-shadow: 0 32px 80px rgba(11,38,34,0.28), 0 0 0 1px var(--glass-border) inset; overflow: hidden; border: 1px solid var(--glass-border); animation: pop 0.24s cubic-bezier(0.34, 1.4, 0.45, 1) backwards; }
         .cmdk-input { width: 100%; padding: 16px 20px; font-size: 14px; font-family: inherit; border: none; outline: none; color: var(--text); background: transparent; border-bottom: 1px solid var(--glass-border); }
         .cmdk-input::placeholder { color: var(--text-dimmer); }
         .cmdk-list { max-height: 300px; overflow-y: auto; padding: 8px; }
@@ -255,9 +255,9 @@
         .cst-input-wrap .cst-prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 700; color: var(--text-dimmer); font-family: 'Fira Code', monospace; pointer-events: none; }
         .cst-input.has-prefix { padding-left: 30px; }
         .cst-range { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 99px; outline: none; cursor: pointer; }
-        .cst-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(200,92,26,0.45); cursor: pointer; transition: transform 120ms ease; }
+        .cst-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(18,154,143,0.45); cursor: pointer; transition: transform 120ms ease; }
         .cst-range::-webkit-slider-thumb:hover { transform: scale(1.18); }
-        .cst-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(200,92,26,0.45); cursor: pointer; }
+        .cst-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(18,154,143,0.45); cursor: pointer; }
         .cst-card { padding: 18px 20px; border-radius: 14px; }
         .calc-card { max-width: 320px; }
         .calc-display { font-family: 'Fira Code', monospace; font-size: 28px; font-weight: 700; color: var(--text); background: var(--cream-dark); border: 1px solid var(--glass-border); border-radius: 10px; padding: 14px 16px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 12px; }
@@ -271,7 +271,7 @@
         .calc-btn-eq:hover { background: var(--orange-light); color: #FFFFFF; }
         .cst-bar-track { height: 9px; border-radius: 99px; background: var(--stone); overflow: hidden; }
         .cst-bar-fill { height: 100%; border-radius: 99px; transition: width 450ms cubic-bezier(0.22,0.68,0.32,1); }
-        .cst-hero { border-radius: 18px; padding: 30px 32px; background: linear-gradient(125deg, #C85C1A 0%, #A8400E 55%, #7A2E08 100%); position: relative; overflow: hidden; box-shadow: 0 24px 50px -16px rgba(200,92,26,0.45); }
+        .cst-hero { border-radius: 18px; padding: 30px 32px; background: linear-gradient(125deg, #129A8F 0%, #0D6C63 55%, #093D38 100%); position: relative; overflow: hidden; box-shadow: 0 24px 50px -16px rgba(18,154,143,0.45); }
         .cst-hero::after { content: ''; position: absolute; top: -50%; right: -6%; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 68%); pointer-events: none; }
         .cst-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 13px; border-radius: 99px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.22); }
         .cst-pill-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 99px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; background: rgba(255,255,255,0.95); color: var(--orange); border: none; transition: transform 140ms ease, box-shadow 140ms ease; box-shadow: 0 4px 14px rgba(0,0,0,0.14); }
@@ -281,9 +281,9 @@
         .cst-tabbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 22px; background: var(--cream-dark); padding: 5px; border-radius: 13px; border: 1px solid var(--glass-border); width: fit-content; }
         .cst-tab { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: var(--text-dim); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: all 140ms ease; white-space: nowrap; }
         .cst-tab:hover { color: var(--text); }
-        .cst-tab.active { background: var(--surface-3); color: var(--orange); box-shadow: 0 1px 4px rgba(92,61,30,0.10); }
+        .cst-tab.active { background: var(--surface-3); color: var(--orange); box-shadow: 0 1px 4px rgba(11,38,34,0.10); }
         .cst-logi-card { padding: 14px 16px; border-radius: 13px; border: 1.5px solid var(--glass-border); background: var(--surface-3); cursor: pointer; transition: all 150ms ease; position: relative; }
-        .cst-logi-card.sel { border-color: var(--orange-border); background: var(--orange-dim); box-shadow: 0 4px 14px -6px rgba(200,92,26,0.30); }
+        .cst-logi-card.sel { border-color: var(--orange-border); background: var(--orange-dim); box-shadow: 0 4px 14px -6px rgba(18,154,143,0.30); }
         .cst-extra-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 11px; background: var(--surface-3); border: 1px solid var(--glass-border); margin-bottom: 8px; }
 
         /* ========= KPI INTERNALS ========= */
@@ -293,7 +293,7 @@
         .kpi-card:hover .kpi-icon { transform: scale(1.08) rotate(-3deg); }
         .kpi-icon svg { width: 14px; height: 14px; }
         .kpi-icon.gold  { background: var(--orange-dim); border: 1px solid var(--orange-border); color: var(--orange); }
-        .kpi-icon.white { background: rgba(92,61,30,0.06); border: 1px solid var(--glass-border); color: var(--text-dim); }
+        .kpi-icon.white { background: rgba(11,38,34,0.06); border: 1px solid var(--glass-border); color: var(--text-dim); }
         .kpi-val { font-size: 30px; font-weight: 700; letter-spacing: -1.2px; font-family: 'Fira Code', monospace; line-height: 1; margin-bottom: 6px; color: var(--text); }
         .kpi-sub { font-size: 11px; color: var(--text-dimmer); }
 
@@ -304,9 +304,9 @@
         /* ========= BUTTONS ========= */
         .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--r-sm); font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: transform 140ms var(--ease-out), box-shadow 200ms var(--ease-out), background 140ms ease, color 140ms ease, border-color 140ms ease; white-space: nowrap; letter-spacing: 0.2px; }
         .btn svg { width: 13px; height: 13px; }
-        .btn-gold { background: var(--orange); color: #FFFFFF; border: none; box-shadow: 0 4px 14px -4px rgba(200,92,26,0.40); }
-        @media (hover: hover) and (pointer: fine) { .btn-gold:hover { transform: translateY(-1.5px); box-shadow: 0 8px 20px -4px rgba(200,92,26,0.50); } }
-        .btn-gold:active { transform: scale(0.97); box-shadow: 0 2px 6px -2px rgba(200,92,26,0.25); }
+        .btn-gold { background: var(--orange); color: #FFFFFF; border: none; box-shadow: 0 4px 14px -4px rgba(18,154,143,0.40); }
+        @media (hover: hover) and (pointer: fine) { .btn-gold:hover { transform: translateY(-1.5px); box-shadow: 0 8px 20px -4px rgba(18,154,143,0.50); } }
+        .btn-gold:active { transform: scale(0.97); box-shadow: 0 2px 6px -2px rgba(18,154,143,0.25); }
         .btn-glass { background: var(--cream-dark); border-color: var(--glass-border); color: var(--text-dim); }
         @media (hover: hover) and (pointer: fine) { .btn-glass:hover { background: var(--stone); color: var(--text); border-color: var(--stone-mid); transform: translateY(-1px); } }
         .btn-glass:active { transform: scale(0.97); }
@@ -314,16 +314,16 @@
 
         /* ========= CARDS & TABLES ========= */
         .card { border-radius: var(--r); overflow: hidden; transition: box-shadow var(--t-normal), border-color var(--t-normal); border: 1px solid var(--glass-border); background: var(--surface-2); }
-        .card:hover { border-color: var(--stone-mid); box-shadow: 0 8px 28px -8px rgba(92,61,30,0.12); }
+        .card:hover { border-color: var(--stone-mid); box-shadow: 0 8px 28px -8px rgba(11,38,34,0.12); }
         .card-body { padding: 22px; }
         table { width: 100%; border-collapse: collapse; }
         thead th { padding: 10px 16px; text-align: left; font-size: 9px; font-weight: 700; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1.5px solid var(--stone); background: var(--cream-dark); white-space: nowrap; }
-        tbody td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid rgba(92,61,30,0.06); color: var(--text); transition: background 120ms ease; }
+        tbody td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid rgba(11,38,34,0.06); color: var(--text); transition: background 120ms ease; }
         tbody tr:last-child td { border-bottom: none; }
         tfoot td { padding: 14px 16px; font-size: 13px; }
         tbody td:first-child { position: relative; }
         tbody td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2.5px; background: var(--orange); opacity: 0; transition: opacity 150ms ease; }
-        @media (hover: hover) and (pointer: fine) { tbody tr:hover td { background: rgba(200,92,26,0.04); } tbody tr:hover td:first-child::before { opacity: 1; } }
+        @media (hover: hover) and (pointer: fine) { tbody tr:hover td { background: rgba(18,154,143,0.04); } tbody tr:hover td:first-child::before { opacity: 1; } }
         .td-num { font-family: 'Fira Code', monospace; font-weight: 600; color: var(--earth-2); }
 
         /* ========= BADGES ========= */
@@ -333,12 +333,12 @@
         .badge-gold .badge-dot  { background: var(--orange); }
         .badge-green { background: rgba(60,130,80,0.10); border: 1px solid rgba(60,130,80,0.22); color: #3C7840; }
         .badge-green .badge-dot { background: #4A9050; animation: pulse-dot 2.4s ease-in-out infinite; }
-        .badge-gray  { background: rgba(92,61,30,0.07); border: 1px solid var(--glass-border); color: var(--text-dim); }
+        .badge-gray  { background: rgba(11,38,34,0.07); border: 1px solid var(--glass-border); color: var(--text-dim); }
         .badge-gray .badge-dot  { background: var(--text-dimmer); }
         .badge-red   { background: rgba(160,56,56,0.10); border: 1px solid rgba(160,56,56,0.26); color: #A03B3B; }
         .badge-red .badge-dot   { background: #A03B3B; }
-        .badge-orange { background: rgba(200,92,26,0.12); border: 1px solid rgba(200,92,26,0.28); color: #B5531A; }
-        .badge-orange .badge-dot { background: #C85C1A; }
+        .badge-orange { background: rgba(18,154,143,0.12); border: 1px solid rgba(18,154,143,0.28); color: #0D6C63; }
+        .badge-orange .badge-dot { background: #129A8F; }
         @keyframes pulse-dot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.7); opacity: 0.45; } }
 
         /* ========= EMPTY & COMING SOON ========= */
@@ -355,7 +355,7 @@
         .coming-soon p  { font-size: 13px; color: var(--text-dim); max-width: 280px; margin: 8px auto 0; line-height: 1.6; }
 
         /* ========= MODALS ========= */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(44,31,14,0.38); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; animation: fadeIn 0.16s ease; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(11,38,34,0.38); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; animation: fadeIn 0.16s ease; }
         .modal { border-radius: 16px; padding: 28px; width: 100%; max-width: 430px; animation: pop 0.26s cubic-bezier(0.34, 1.4, 0.45, 1) backwards; max-height: 88vh; overflow-y: auto; background: var(--parchment); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow-lg); }
         .modal-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
         .modal-hd h2 { font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
@@ -377,7 +377,7 @@
 
         /* AUTH LEFT PANEL */
         .auth-left-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 36px; max-width: 380px; }
-        .auth-brand-name { font-size: 9px; font-weight: 800; color: rgba(247,242,234,0.45); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px; }
+        .auth-brand-name { font-size: 9px; font-weight: 800; color: rgba(239,251,249,0.45); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px; }
         .auth-headline { font-size: 34px; font-weight: 800; color: var(--on-ink); letter-spacing: -1px; line-height: 1.12; }
         .auth-headline em { font-style: normal; color: var(--orange-light); }
         .auth-divider { width: 32px; height: 1.5px; background: var(--orange); border-radius: 2px; opacity: 0.7; }
@@ -475,8 +475,8 @@ const DX = (tipo, valor) => {
 };
 const DX_COLORS = {
     green:  { bg:'rgba(74,120,89,0.12)',  bd:'rgba(74,120,89,0.30)', fg:'#3D6646', dot:'#4A7859' },
-    gold:   { bg:'rgba(194,168,120,0.18)', bd:'rgba(194,168,120,0.40)', fg:'#9A7B3E', dot:'#C2A878' },
-    orange: { bg:'rgba(200,92,26,0.12)',  bd:'rgba(200,92,26,0.28)', fg:'#B5531A', dot:'#C85C1A' },
+    gold:   { bg:'rgba(224,168,62,0.18)', bd:'rgba(224,168,62,0.40)', fg:'#9C6F1E', dot:'#E0A83E' },
+    orange: { bg:'rgba(208,124,31,0.12)',  bd:'rgba(208,124,31,0.28)', fg:'#96551A', dot:'#D07C1F' },
     red:    { bg:'rgba(160,56,56,0.10)',  bd:'rgba(160,56,56,0.26)', fg:'#A03B3B', dot:'#A03B3B' },
 };
 function DxBadge({ tipo, valor, style }) {
@@ -785,9 +785,9 @@ function CierreDiario({ productos, user, tiendaId }) {
 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:24}}>
             <div className="kpi-card" style={{background:'var(--earth)',border:'none',borderRadius:'var(--r)',padding:'22px 24px'}}>
-                <div style={{fontSize:'9px',fontWeight:800,color:'rgba(247,242,234,0.5)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:8}}>{isToday ? 'Total del día' : 'Total del cierre'}</div>
+                <div style={{fontSize:'9px',fontWeight:800,color:'rgba(239,251,249,0.5)',textTransform:'uppercase',letterSpacing:'2px',marginBottom:8}}>{isToday ? 'Total del día' : 'Total del cierre'}</div>
                 <div style={{fontSize:'32px',fontWeight:800,letterSpacing:'-1.5px',fontFamily:"'Fira Code',monospace",lineHeight:1,marginBottom:6,color:'#fff'}}>RD${totalMonto.toLocaleString()}</div>
-                <div style={{fontSize:'11px',color:'rgba(247,242,234,0.45)'}}>{totalCantidad} unidad{totalCantidad!==1?'es':''} vendida{totalCantidad!==1?'s':''}</div>
+                <div style={{fontSize:'11px',color:'rgba(239,251,249,0.45)'}}>{totalCantidad} unidad{totalCantidad!==1?'es':''} vendida{totalCantidad!==1?'s':''}</div>
             </div>
             <div className="kpi-card glass">
                 <div className="kpi-label">Productos</div>
@@ -1152,7 +1152,7 @@ function App() {
             <div className="auth-left">
                 <div className="auth-left-content">
                     <div className="auth-logo-wrap" style={{marginBottom:0}}>
-                        <img src={LOGO} alt="Casa Brumi Importaciones" style={{width:'clamp(140px,45%,200px)', filter:'brightness(0)', opacity:0.85}} />
+                        <img src={LOGO} alt="Casa Brumi Importaciones" style={{width:'clamp(140px,45%,200px)', filter:'brightness(0) invert(1)', opacity:0.95}} />
                     </div>
                     <div>
                         <p className="auth-brand-name">Sistema de Gestión</p>
@@ -2024,17 +2024,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (chartInst.current) chartInst.current.destroy();
         chartInst.current = new Chart(chartRef.current, {
             type: 'bar',
-            data: { labels, datasets: [{ data, backgroundColor: labels.map((_,i)=>i===labels.length-1?'#C85C1A':'rgba(92,61,30,0.55)'), hoverBackgroundColor:'#D97340', borderRadius:6, borderSkipped:false }] },
+            data: { labels, datasets: [{ data, backgroundColor: labels.map((_,i)=>i===labels.length-1?'#129A8F':(i%2===0?'#FF7A63':'#7FD9D0')), hoverBackgroundColor:'#3DBBB0', borderRadius:6, borderSkipped:false }] },
             options: {
                 responsive:true, maintainAspectRatio:false,
                 plugins: {
                     legend:{ display:false },
-                    tooltip:{ backgroundColor:'#1C1814', titleColor:'#fff', bodyColor:'rgba(255,255,255,0.65)', padding:10, cornerRadius:8,
+                    tooltip:{ backgroundColor:'#0B2622', titleColor:'#fff', bodyColor:'rgba(255,255,255,0.65)', padding:10, cornerRadius:8,
                         callbacks:{ label: ctx => ` RD$${ctx.raw.toFixed(2)}` } }
                 },
                 scales: {
-                    y: { grid:{ color:'rgba(92,61,30,0.07)' }, ticks:{ color:'rgba(92,61,30,0.38)', font:{family:'Fira Code',size:11} }, border:{ display:false } },
-                    x: { grid:{ display:false }, ticks:{ color:'rgba(92,61,30,0.45)', font:{size:11} }, border:{ display:false } }
+                    y: { grid:{ color:'rgba(11,38,34,0.07)' }, ticks:{ color:'rgba(11,38,34,0.38)', font:{family:'Fira Code',size:11} }, border:{ display:false } },
+                    x: { grid:{ display:false }, ticks:{ color:'rgba(11,38,34,0.45)', font:{size:11} }, border:{ display:false } }
                 }
             }
         });
@@ -2291,7 +2291,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 {activeTab === 'dashboard' && <>
                     <div style={{position:'relative',marginBottom:'24px'}}>
                         {/* Ambient orange glow */}
-                        <div style={{position:'absolute',top:'-80px',right:'-80px',width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle, rgba(200,92,26,0.12) 0%, transparent 65%)',pointerEvents:'none',zIndex:0}} />
+                        <div style={{position:'absolute',top:'-80px',right:'-80px',width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle, rgba(18,154,143,0.12) 0%, transparent 65%)',pointerEvents:'none',zIndex:0}} />
 
                         {/* Greeting */}
                         <div style={{marginBottom:'18px',position:'relative',zIndex:1,display:'flex',alignItems:'flex-end',justifyContent:'space-between'}}>
@@ -2307,10 +2307,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         </div>
 
                         {/* BENTO GRID */}
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1.4fr',gridAutoRows:'min-content',gap:'12px',position:'relative',zIndex:1}}>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1.4fr',gridAutoRows:'min-content',gap:'14px',position:'relative',zIndex:1}}>
 
-                            {/* ── FEATURE CARD — naranja, col 4, filas 1-2 ── */}
-                            <div style={{gridColumn:'4',gridRow:'1/3',borderRadius:'16px',padding:'26px',background:'var(--orange)',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',position:'relative',boxShadow:'0 16px 40px -10px rgba(200,92,26,0.45)'}}>
+                            {/* ── FEATURE CARD — turquesa, col 4, filas 1-2 ── */}
+                            <div style={{gridColumn:'4',gridRow:'1/3',borderRadius:'20px',padding:'26px',background:'var(--grad-ink)',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',position:'relative',boxShadow:'0 16px 40px -10px rgba(18,154,143,0.45)'}}>
                                 <div style={{position:'absolute',top:'-40px',left:'-40px',width:'180px',height:'180px',borderRadius:'50%',background:'rgba(255,255,255,0.08)',pointerEvents:'none'}} />
                                 <div style={{position:'absolute',bottom:'-30px',right:'-30px',width:'140px',height:'140px',borderRadius:'50%',background:'rgba(0,0,0,0.10)',pointerEvents:'none'}} />
                                 <div style={{position:'relative',zIndex:1}}>
@@ -2333,33 +2333,69 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 </div>
                             </div>
 
-                            {/* ── ROW 1 — 3 stat cards ── */}
-                            <div style={{gridColumn:'1',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
-                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Vendedores</p>
-                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:'var(--text)',lineHeight:1}}><KpiVal value={vendedoresScoped.length}/></div>
-                                <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>en el equipo</p>
-                            </div>
-                            <div style={{gridColumn:'2',borderRadius:'14px',padding:'18px 20px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
-                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'2px'}}>Productos</p>
-                                <div style={{fontSize:'28px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-1px',color:'var(--text)',lineHeight:1}}><KpiVal value={productosScoped.length}/></div>
-                                <p style={{fontSize:'10px',color:'var(--text-dimmer)'}}>{nGanadores} ganadores</p>
-                            </div>
-                            <div style={{gridColumn:'3',borderRadius:'14px',padding:'18px 20px',background:'var(--orange-dim)',border:'1px solid var(--orange-border)',display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'6px',minHeight:'110px'}}>
-                                <p style={{fontSize:'8.5px',fontWeight:'800',color:'var(--orange)',textTransform:'uppercase',letterSpacing:'2px'}}>Cierre ayer</p>
-                                <div style={{fontSize:'20px',fontWeight:'700',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.8px',color:'var(--orange)',lineHeight:1}}>
-                                    <KpiVal value={cierreHoyDash ? `RD$${(cierreHoyDash.totalMonto||0).toLocaleString()}` : '—'}/>
+                            {/* ── ROW 1 — 3 tarjetas de stat en color sólido ── */}
+                            {[
+                                { col:1, bg:'var(--sand)', shadow:'rgba(255,122,99,0.40)', icon:I.users, label:'Vendedores', value:vendedoresScoped.length, sub:'en el equipo' },
+                                { col:2, bg:'#F0A84E', shadow:'rgba(240,168,78,0.40)', icon:I_star, label:'Productos', value:productosScoped.length, sub:`${nGanadores} ganadores` },
+                                { col:3, bg:'var(--orange)', shadow:'rgba(18,154,143,0.40)', icon:I.dollar, label:'Cierre ayer',
+                                  value: cierreHoyDash ? `RD$${(cierreHoyDash.totalMonto||0).toLocaleString()}` : '—',
+                                  sub: cierreHoyDash ? `${cierreHoyDash.totalCantidad||0} unidades` : 'sin cierre aún' },
+                            ].map(c=>(
+                                <div key={c.col} style={{gridColumn:String(c.col),borderRadius:'18px',padding:'18px 20px',background:c.bg,display:'flex',flexDirection:'column',justifyContent:'space-between',gap:'10px',minHeight:'110px',boxShadow:`0 12px 28px -10px ${c.shadow}`,position:'relative',overflow:'hidden'}}>
+                                    <div style={{position:'absolute',top:'-24px',right:'-24px',width:'90px',height:'90px',borderRadius:'50%',background:'rgba(255,255,255,0.12)',pointerEvents:'none'}} />
+                                    <div style={{width:30,height:30,borderRadius:'50%',background:'rgba(255,255,255,0.22)',display:'flex',alignItems:'center',justifyContent:'center',color:'#FFFFFF',position:'relative',zIndex:1}}>
+                                        <span style={{width:14,height:14,display:'flex'}}>{c.icon}</span>
+                                    </div>
+                                    <div style={{position:'relative',zIndex:1}}>
+                                        <div style={{fontSize:'20px',fontWeight:'800',fontFamily:"'Fira Code',monospace",letterSpacing:'-0.6px',color:'#FFFFFF',lineHeight:1,marginBottom:4}}><KpiVal value={c.value}/></div>
+                                        <p style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.85)'}}>{c.label}</p>
+                                        <p style={{fontSize:'10px',color:'rgba(255,255,255,0.62)',marginTop:2}}>{c.sub}</p>
+                                    </div>
                                 </div>
-                                <p style={{fontSize:'10px',color:'var(--orange)',opacity:0.7}}>{cierreHoyDash ? `${cierreHoyDash.totalCantidad||0} unidades` : 'sin cierre aún'}</p>
-                            </div>
+                            ))}
 
-                            {/* ── ROW 2 — Chart spans cols 1-3 ── */}
-                            <div style={{gridColumn:'1/4',borderRadius:'14px',padding:'20px 22px',background:'var(--surface-2)',border:'1px solid var(--glass-border)'}}>
+                            {/* ── ROW 2 — Chart (cols 1-2) + Donut de progreso (col 3) ── */}
+                            <div style={{gridColumn:'1/3',borderRadius:'18px',padding:'20px 22px',background:'var(--surface-2)',border:'1px solid var(--glass-border)'}}>
                                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
                                     <p style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Ventas — últimos 7 días</p>
                                     <span style={{fontSize:'11px',color:'var(--text-dimmer)'}}>DOP</span>
                                 </div>
                                 <div style={{height:'140px'}}><canvas ref={chartRef}></canvas></div>
                             </div>
+
+                            {(() => {
+                                const totalProd = productosScoped.length;
+                                const pctGan = totalProd ? Math.round(nGanadores/totalProd*100) : 0;
+                                const nActivos = productosScoped.filter(p=>p.estado==='Activo').length;
+                                const nOtros = totalProd - nGanadores - nActivos;
+                                return (
+                                <div style={{gridColumn:'3',borderRadius:'18px',padding:'20px 22px',background:'var(--surface-2)',border:'1px solid var(--glass-border)',display:'flex',flexDirection:'column'}}>
+                                    <p style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:'14px'}}>Progreso</p>
+                                    <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',minHeight:90}}>
+                                        <div style={{position:'relative',width:96,height:96,borderRadius:'50%',
+                                            background:totalProd?`conic-gradient(var(--orange) 0% ${pctGan}%, var(--sand) ${pctGan}% ${pctGan+(totalProd?Math.round(nActivos/totalProd*100):0)}%, var(--stone) ${pctGan+(totalProd?Math.round(nActivos/totalProd*100):0)}% 100%)`:'var(--stone)'}}>
+                                            <div style={{position:'absolute',inset:12,borderRadius:'50%',background:'var(--surface-2)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column'}}>
+                                                <span style={{fontSize:18,fontWeight:800,fontFamily:'Fira Code',color:'var(--text)'}}>{pctGan}%</span>
+                                                <span style={{fontSize:8,color:'var(--text-dimmer)',fontWeight:700,textTransform:'uppercase',letterSpacing:1}}>Ganadores</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:10}}>
+                                        {[
+                                            {c:'var(--orange)', l:'Ganadores', v:nGanadores},
+                                            {c:'var(--sand)', l:'Activos', v:nActivos},
+                                            {c:'var(--stone-dark)', l:'Otros', v:Math.max(nOtros,0)},
+                                        ].map(r=>(
+                                            <div key={r.l} style={{display:'flex',alignItems:'center',gap:7,fontSize:11,color:'var(--text-dim)'}}>
+                                                <span style={{width:7,height:7,borderRadius:'50%',background:r.c,flexShrink:0}}/>
+                                                <span style={{flex:1}}>{r.l}</span>
+                                                <span style={{fontWeight:700,color:'var(--text)',fontFamily:'Fira Code'}}>{r.v}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -2912,7 +2948,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <div style={{padding:'18px 22px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid var(--glass-border)',flexWrap:'wrap',gap:10}}>
                                                 <div style={{display:'flex',alignItems:'center',gap:14}}>
                                                     <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px'}}>Validación ganador</div>
-                                                    <span style={{fontFamily:'Fira Code',fontWeight:'800',fontSize:'20px',color:posibleGanador?'#3D6646':analisisScore>=6?'#9A7B3E':'#A03B3B'}}>{analisisScore}/{ANALISIS_CHECKS.length}</span>
+                                                    <span style={{fontFamily:'Fira Code',fontWeight:'800',fontSize:'20px',color:posibleGanador?'#3D6646':analisisScore>=6?'#9C6F1E':'#A03B3B'}}>{analisisScore}/{ANALISIS_CHECKS.length}</span>
                                                     {(() => {
                                                         const lvl = posibleGanador?'green':(analisisScore>=6?'gold':(analisisScore>0?'orange':'red'));
                                                         const c=DX_COLORS[lvl];
@@ -3466,8 +3502,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const segs = [
                         { label:'Producto (Costo)', val:n(costeo.costoProducto), color:'#3B82C4' },
                         { label:'Publicidad (CPA Real)', val:cpaReal, color:'var(--orange)' },
-                        { label:'Flete '+(carrier.devolucionActiva?'(Ajustado)':'(Base)'), val:fleteAjustado, color:'#7A5230' },
-                        { label:'Extras (Empaque)', val:extras, color:'#C2A878' },
+                        { label:'Flete '+(carrier.devolucionActiva?'(Ajustado)':'(Base)'), val:fleteAjustado, color:'#17493F' },
+                        { label:'Extras (Empaque)', val:extras, color:'#FF7A63' },
                         { label:'Suscripciones', val:suscripciones, color:'#6B5FA8' },
                     ];
                     const upd = (k,v) => setCosteo(c=>({...c,[k]:v}));
@@ -3490,7 +3526,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <div style={{display:'flex',gap:8,alignItems:'center'}}>
                             <div style={{display:'flex',background:'var(--cream-dark)',borderRadius:10,padding:3,border:'1px solid var(--glass-border)'}}>
                                 {['DOP','USD'].map(m=>(
-                                    <button key={m} onClick={()=>setCosteoMoneda(m)} className="cst-tab" style={{padding:'7px 14px',...(costeoMoneda===m?{background:'var(--surface-3)',color:'var(--orange)',boxShadow:'0 1px 4px rgba(92,61,30,0.10)'}:{})}}>{m}</button>
+                                    <button key={m} onClick={()=>setCosteoMoneda(m)} className="cst-tab" style={{padding:'7px 14px',...(costeoMoneda===m?{background:'var(--surface-3)',color:'var(--orange)',boxShadow:'0 1px 4px rgba(11,38,34,0.10)'}:{})}}>{m}</button>
                                 ))}
                             </div>
                         </div>
