@@ -1560,9 +1560,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     }, [navDepth]);
 
     // ── Contabilidad (partida doble, manual, por tienda) ──
-    const CUENTA_TIPOS = ['Activo','Pasivo','Patrimonio','Ingreso','Gasto'];
-    const CUENTA_NATURALEZA = { Activo:'deudora', Gasto:'deudora', Pasivo:'acreedora', Patrimonio:'acreedora', Ingreso:'acreedora' };
-    const CUENTA_TIPO_COLOR = { Activo:'badge-green', Gasto:'badge-gray', Pasivo:'badge-gold', Patrimonio:'badge-gold', Ingreso:'badge-green' };
+    const CUENTA_TIPOS = ['Activo','Pasivo','Patrimonio','Ingreso','Costo','Gasto'];
+    // "naturaleza" acá es debe/haber (deudora/acreedora) — NO confundir con el campo nuevo
+    // cuenta.naturaleza ('directo'|'compartido'|'na') que indica si el gasto/costo se atribuye
+    // a un producto específico. Costo se comporta como deudora, igual que Activo/Gasto.
+    const CUENTA_NATURALEZA = { Activo:'deudora', Costo:'deudora', Gasto:'deudora', Pasivo:'acreedora', Patrimonio:'acreedora', Ingreso:'acreedora' };
+    const CUENTA_TIPO_COLOR = { Activo:'badge-green', Costo:'badge-orange', Gasto:'badge-gray', Pasivo:'badge-gold', Patrimonio:'badge-gold', Ingreso:'badge-green' };
+    // Prefijos de código de 2 dígitos que clasifican las cuentas de Gasto dentro del Estado de
+    // Resultados: 61=Venta, 62=Operación, 63=Financieros. Cualquier Gasto fuera de estos tres
+    // cae en "Otros Gastos" para que el reporte nunca se coma un saldo silenciosamente.
+    const GASTO_GRUPO = c => (c.codigo||'').startsWith('61') ? 'venta' : (c.codigo||'').startsWith('62') ? 'operacion' : (c.codigo||'').startsWith('63') ? 'financiero' : 'otros';
     const [cuentas,          setCuentas]          = useState([]);
     const [asientos,         setAsientos]         = useState([]);
     const [contabTab,        setContabTab]        = useState('plan'); // 'plan'|'diario'|'balance'|'resultados'
@@ -1570,7 +1577,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const contabMoneda = 'DOP'; // el negocio opera solo en pesos dominicanos
     const [showCuentaModal,  setShowCuentaModal]  = useState(false);
     const [editingCuenta,    setEditingCuenta]    = useState(null);
-    const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'DOP', operativo:true });
+    const [cuentaForm,       setCuentaForm]       = useState({ codigo:'', nombre:'', tipo:'Activo', moneda:'DOP', operativo:true, naturaleza:'na' });
     const [savingCuenta,     setSavingCuenta]     = useState(false);
     const ASIENTO_LINEA_VACIA = { cuentaId:'', productoId:'', tercero:'', debe:'', haber:'' };
     const [showAsientoModal, setShowAsientoModal] = useState(false);
@@ -1607,18 +1614,23 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (!cuentaForm.nombre.trim() || !cuentaForm.codigo.trim() || savingCuenta) return;
         setSavingCuenta(true);
         try {
-            const data = { codigo: cuentaForm.codigo.trim(), nombre: cuentaForm.nombre.trim(), tipo: cuentaForm.tipo, moneda: cuentaForm.moneda, operativo: cuentaForm.tipo==='Gasto' ? cuentaForm.operativo : null };
+            const esGastoOCosto = cuentaForm.tipo==='Gasto' || cuentaForm.tipo==='Costo';
+            const data = {
+                codigo: cuentaForm.codigo.trim(), nombre: cuentaForm.nombre.trim(), tipo: cuentaForm.tipo, moneda: cuentaForm.moneda,
+                operativo: cuentaForm.tipo==='Gasto' ? cuentaForm.operativo : null,
+                naturaleza: esGastoOCosto ? (cuentaForm.naturaleza==='na' ? 'compartido' : cuentaForm.naturaleza) : 'na',
+            };
             if (editingCuenta) {
                 await db.collection('cuentas_contables').doc(editingCuenta.id).update(data);
             } else {
                 await db.collection('cuentas_contables').add({ ...data, tiendaId: activeTiendaId, activa: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
             }
-            setCuentaForm({ codigo:'', nombre:'', tipo:'Activo', moneda:'DOP', operativo:true });
+            setCuentaForm({ codigo:'', nombre:'', tipo:'Activo', moneda:'DOP', operativo:true, naturaleza:'na' });
             setEditingCuenta(null); setShowCuentaModal(false);
         } catch(err) { console.error('Error guardando cuenta:', err); }
         finally { setSavingCuenta(false); }
     };
-    const openEditCuenta = c => { setEditingCuenta(c); setCuentaForm({ codigo:c.codigo, nombre:c.nombre, tipo:c.tipo, moneda:c.moneda, operativo:c.operativo!==false }); setShowCuentaModal(true); };
+    const openEditCuenta = c => { setEditingCuenta(c); setCuentaForm({ codigo:c.codigo, nombre:c.nombre, tipo:c.tipo, moneda:c.moneda, operativo:c.operativo!==false, naturaleza:c.naturaleza||'na' }); setShowCuentaModal(true); };
     const toggleCuentaActiva = c => db.collection('cuentas_contables').doc(c.id).update({ activa: !c.activa }).catch(console.error);
     const deleteCuenta = c => {
         const tieneMovimientos = asientos.some(a => (a.lineas||[]).some(l => l.cuentaId === c.id));
@@ -1635,6 +1647,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const asientoTotalDebe  = asientoLineasValidas.reduce((s,l)=>s+(parseFloat(l.debe)||0),0);
     const asientoTotalHaber = asientoLineasValidas.reduce((s,l)=>s+(parseFloat(l.haber)||0),0);
     const asientoBalanceado = asientoLineasValidas.length>=2 && asientoTotalDebe>0 && Math.abs(asientoTotalDebe-asientoTotalHaber)<0.005;
+    // Líneas de cuenta "directo" (ads de un SKU, costo de mercancía, etc.) que todavía no
+    // eligieron producto — bloquean el guardado hasta que se complete.
+    const asientoLineasSinProducto = asientoLineasValidas.filter(l => {
+        const cuenta = cuentas.find(c=>c.id===l.cuentaId);
+        return cuenta?.naturaleza==='directo' && !l.productoId;
+    });
+    const asientoProductoOk = asientoLineasSinProducto.length === 0;
 
     const addAsientoLinea = () => setAsientoForm(f => ({...f, lineas:[...f.lineas, {...ASIENTO_LINEA_VACIA}]}));
     const removeAsientoLinea = i => setAsientoForm(f => ({...f, lineas: f.lineas.filter((_,idx)=>idx!==i)}));
@@ -1642,6 +1661,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const saveAsiento = async () => {
         if (!asientoForm.fecha || !asientoBalanceado || savingAsiento) return;
+        if (!asientoProductoOk) {
+            alert('Hay líneas con una cuenta "directo" (ads, costo de mercancía, etc.) sin producto asignado. Elige un producto en cada una antes de guardar.');
+            return;
+        }
         setSavingAsiento(true);
         try {
             const lineas = asientoLineasValidas.map(l => {
@@ -1774,9 +1797,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         let gastoGeneral = 0;
         asientosScope.forEach(a => (a.lineas||[]).forEach(l => {
             const cuenta = cuentasById[l.cuentaId];
-            if (!cuenta || (cuenta.tipo!=='Ingreso' && cuenta.tipo!=='Gasto')) return;
+            // Costo se trata igual que Gasto acá (ambos son deudoras que reducen la utilidad) —
+            // si no se incluyera, la utilidad por producto quedaría inflada en cuanto se empiece
+            // a registrar costo de mercancía vendida en cuentas tipo Costo.
+            if (!cuenta || (cuenta.tipo!=='Ingreso' && cuenta.tipo!=='Gasto' && cuenta.tipo!=='Costo')) return;
             if (!l.productoId) {
-                if (cuenta.tipo==='Gasto') gastoGeneral += (l.debe||0) - (l.haber||0);
+                if (cuenta.tipo==='Gasto' || cuenta.tipo==='Costo') gastoGeneral += (l.debe||0) - (l.haber||0);
                 return;
             }
             if (!porProducto[l.productoId]) porProducto[l.productoId] = { id:l.productoId, nombre:l.productoNombre||'—', codigo:l.productoCodigo||'', ingresos:0, gastosDirectos:0, esActivo:false };
@@ -4078,7 +4104,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const misCuentas = cuentas.filter(c=>c.tiendaId===activeTiendaId);
                         return <>
                         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
-                            <button className="btn btn-gold" onClick={()=>{setEditingCuenta(null);setCuentaForm({codigo:'',nombre:'',tipo:'Activo',moneda:'DOP',operativo:true});setShowCuentaModal(true);}}>{I.plus} Nueva cuenta</button>
+                            <button className="btn btn-gold" onClick={()=>{setEditingCuenta(null);setCuentaForm({codigo:'',nombre:'',tipo:'Activo',moneda:'DOP',operativo:true,naturaleza:'na'});setShowCuentaModal(true);}}>{I.plus} Nueva cuenta</button>
                         </div>
                         {misCuentas.length===0 ? (
                             <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin cuentas aún</h3><p>Crea tu plan de cuentas para empezar a registrar asientos.</p></div></div>
@@ -4264,7 +4290,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             const pasivos    = saldos.filter(c=>c.tipo==='Pasivo');
                             const patrimonio = saldos.filter(c=>c.tipo==='Patrimonio');
                             const ingresos   = saldos.filter(c=>c.tipo==='Ingreso');
-                            const gastosCt   = saldos.filter(c=>c.tipo==='Gasto');
+                            // Costo cuenta como deudora igual que Gasto para la utilidad acumulada —
+                            // si se dejara afuera, el balance dejaría de cuadrar en cuanto se registre
+                            // costo de mercancía vendida en una cuenta tipo Costo.
+                            const gastosCt   = saldos.filter(c=>c.tipo==='Gasto' || c.tipo==='Costo');
                             const totalActivos    = activos.reduce((s,c)=>s+c.saldo,0);
                             const totalPasivos    = pasivos.reduce((s,c)=>s+c.saldo,0);
                             const totalPatrimBase = patrimonio.reduce((s,c)=>s+c.saldo,0);
@@ -4302,15 +4331,61 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         }
 
                         // ── Estado de Resultados ──
+                        // Cascada: Ingresos − Costo = MARGEN BRUTO − Gastos de Venta (61xx) = MARGEN DE
+                        // CONTRIBUCIÓN − Gastos de Operación (62xx) − Gastos Financieros (63xx) = UTILIDAD
+                        // NETA. "Otros Gastos" atrapa cualquier cuenta de Gasto que no siga la convención
+                        // de código 61/62/63 para que el reporte nunca pierda un saldo en silencio.
                         const desde = resultDesde || hoyISO.slice(0,8)+'01';
                         const hasta = resultHasta || hoyISO;
                         const asientosPeriodo = asientosCtbScope.filter(a=>a.fecha>=desde && a.fecha<=hasta);
                         const saldosP = sumarSaldosCtb(cuentasScope, asientosPeriodo);
-                        const ingresosP = saldosP.filter(c=>c.tipo==='Ingreso');
-                        const gastosP   = saldosP.filter(c=>c.tipo==='Gasto');
-                        const totalIngP = ingresosP.reduce((s,c)=>s+c.saldo,0);
-                        const totalGasP = gastosP.reduce((s,c)=>s+c.saldo,0);
-                        const utilidad  = totalIngP - totalGasP;
+                        const ingresosP    = saldosP.filter(c=>c.tipo==='Ingreso');
+                        const costoP       = saldosP.filter(c=>c.tipo==='Costo');
+                        const gastosVentaP = saldosP.filter(c=>c.tipo==='Gasto' && GASTO_GRUPO(c)==='venta');
+                        const gastosOperP  = saldosP.filter(c=>c.tipo==='Gasto' && GASTO_GRUPO(c)==='operacion');
+                        const gastosFinP   = saldosP.filter(c=>c.tipo==='Gasto' && GASTO_GRUPO(c)==='financiero');
+                        const gastosOtrosP = saldosP.filter(c=>c.tipo==='Gasto' && GASTO_GRUPO(c)==='otros');
+
+                        const totalIngP   = ingresosP.reduce((s,c)=>s+c.saldo,0);
+                        const totalCostoP = costoP.reduce((s,c)=>s+c.saldo,0);
+                        const margenBruto    = totalIngP - totalCostoP;
+                        const margenBrutoPct = totalIngP>0 ? margenBruto/totalIngP*100 : 0;
+
+                        const totalGVentaP = gastosVentaP.reduce((s,c)=>s+c.saldo,0);
+                        const margenContrib    = margenBruto - totalGVentaP;
+                        const margenContribPct = totalIngP>0 ? margenContrib/totalIngP*100 : 0;
+
+                        const totalGOperP  = gastosOperP.reduce((s,c)=>s+c.saldo,0);
+                        const totalGFinP   = gastosFinP.reduce((s,c)=>s+c.saldo,0);
+                        const totalGOtrosP = gastosOtrosP.reduce((s,c)=>s+c.saldo,0);
+                        const utilidad    = margenContrib - totalGOperP - totalGFinP - totalGOtrosP;
+                        const utilidadPct = totalIngP>0 ? utilidad/totalIngP*100 : 0;
+
+                        const Seccion = ({titulo, items, total, vacio}) => (
+                            <div style={{marginBottom:18}}>
+                                <div style={{fontWeight:'700',fontSize:'13px',marginBottom:10}}>{titulo}</div>
+                                {items.length===0 ? <p style={{fontSize:'12px',color:'var(--text-dimmer)'}}>{vacio}</p> : items.map(c=>(
+                                    <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'4px 0',color:'var(--text-dim)'}}>
+                                        <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,contabMoneda)}</span>
+                                    </div>
+                                ))}
+                                <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',fontWeight:'700',marginTop:4,paddingTop:8,borderTop:'1px solid var(--glass-border)'}}>
+                                    <span>Total {titulo.toLowerCase()}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(total,contabMoneda)}</span>
+                                </div>
+                            </div>
+                        );
+                        const Cascada = ({label, val, pct, highlight}) => (
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding: highlight?'14px 16px':'10px 0',margin: highlight?'8px 0 18px':'0 0 8px',borderRadius: highlight?12:0,
+                                background: highlight?(val>=0?'var(--orange-dim)':'rgba(160,56,56,0.08)'):undefined,
+                                border: highlight?`1px solid ${val>=0?'var(--orange-border)':'rgba(160,56,56,0.24)'}`:'none',
+                                borderTop: !highlight?'2px solid var(--glass-border)':undefined}}>
+                                <span style={{fontWeight:800,fontSize:highlight?14:13,letterSpacing:highlight?'0.3px':0}}>{label}</span>
+                                <span style={{textAlign:'right'}}>
+                                    <span style={{fontFamily:'Fira Code',fontWeight:800,fontSize:highlight?18:15,color: val>=0?(highlight?'var(--orange)':'var(--text)'):'#A03B3B'}}>{fmtCtb(val,contabMoneda)}</span>
+                                    <span style={{fontSize:11,color:'var(--text-dimmer)',marginLeft:8,fontFamily:'Fira Code'}}>{pct.toFixed(1)}%</span>
+                                </span>
+                            </div>
+                        );
                         return <>
                         {filtrosBar}
                         <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:18,flexWrap:'wrap'}}>
@@ -4320,27 +4395,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             <input type="date" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={hasta} onChange={e=>setResultHasta(e.target.value)} />
                         </div>
                         <div className="card glass" style={{padding:'20px 22px'}}>
-                            <div style={{fontWeight:'700',fontSize:'13px',marginBottom:10}}>Ingresos</div>
-                            {ingresosP.length===0 ? <p style={{fontSize:'12px',color:'var(--text-dimmer)'}}>Sin ingresos en el período</p> : ingresosP.map(c=>(
-                                <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'4px 0',color:'var(--text-dim)'}}>
-                                    <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,contabMoneda)}</span>
-                                </div>
-                            ))}
-                            <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',fontWeight:'700',margin:'8px 0',paddingTop:8,borderTop:'1px solid var(--glass-border)'}}>
-                                <span>Total ingresos</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(totalIngP,contabMoneda)}</span>
-                            </div>
-                            <div style={{fontWeight:'700',fontSize:'13px',margin:'18px 0 10px'}}>Gastos</div>
-                            {gastosP.length===0 ? <p style={{fontSize:'12px',color:'var(--text-dimmer)'}}>Sin gastos en el período</p> : gastosP.map(c=>(
-                                <div key={c.id} style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'4px 0',color:'var(--text-dim)'}}>
-                                    <span>{c.nombre}</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(c.saldo,contabMoneda)}</span>
-                                </div>
-                            ))}
-                            <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',fontWeight:'700',margin:'8px 0',paddingTop:8,borderTop:'1px solid var(--glass-border)'}}>
-                                <span>Total gastos</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(totalGasP,contabMoneda)}</span>
-                            </div>
-                            <div style={{display:'flex',justifyContent:'space-between',fontSize:'15px',fontWeight:'800',marginTop:16,paddingTop:14,borderTop:'2px solid var(--glass-border)',color:utilidad>=0?'var(--sand-dark)':'#A03B3B'}}>
-                                <span>Utilidad neta</span><span style={{fontFamily:'Fira Code'}}>{fmtCtb(utilidad,contabMoneda)}</span>
-                            </div>
+                            <Seccion titulo="Ingresos" items={ingresosP} total={totalIngP} vacio="Sin ingresos en el período" />
+                            <Seccion titulo="Costo de Ventas" items={costoP} total={totalCostoP} vacio="Sin costo de ventas en el período" />
+                            <Cascada label="MARGEN BRUTO" val={margenBruto} pct={margenBrutoPct} highlight />
+                            <Seccion titulo="Gastos de Venta" items={gastosVentaP} total={totalGVentaP} vacio="Sin gastos de venta (61xx) en el período" />
+                            <Cascada label="MARGEN DE CONTRIBUCIÓN" val={margenContrib} pct={margenContribPct} highlight />
+                            <Seccion titulo="Gastos de Operación" items={gastosOperP} total={totalGOperP} vacio="Sin gastos de operación (62xx) en el período" />
+                            <Seccion titulo="Gastos Financieros" items={gastosFinP} total={totalGFinP} vacio="Sin gastos financieros (63xx) en el período" />
+                            {gastosOtrosP.length>0 && <Seccion titulo="Otros Gastos" items={gastosOtrosP} total={totalGOtrosP} vacio="" />}
+                            <Cascada label="UTILIDAD NETA" val={utilidad} pct={utilidadPct} highlight />
                         </div>
                         </>;
                     })()}
@@ -4662,6 +4725,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     ))}
                                 </div>
                             </div>
+                            {(cuentaForm.tipo==='Gasto' || cuentaForm.tipo==='Costo') && (
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Naturaleza</label>
+                                    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:6}}>
+                                        {[['directo','Directo'],['compartido','Compartido']].map(([v,label])=>(
+                                            <button key={v} className={`btn btn-sm ${(cuentaForm.naturaleza==='na'?'compartido':cuentaForm.naturaleza)===v?'btn-gold':'btn-glass'}`}
+                                                onClick={()=>setCuentaForm(f=>({...f,naturaleza:v}))}>{label}</button>
+                                        ))}
+                                    </div>
+                                    <p style={{fontSize:'11px',color:'var(--text-dimmer)'}}>
+                                        {(cuentaForm.naturaleza==='na'?'compartido':cuentaForm.naturaleza)==='directo'
+                                            ? 'Cada línea con esta cuenta exige elegir un producto (ej. ads de un SKU, costo de mercancía).'
+                                            : 'No pide producto — se reparte entre todos (ej. comisiones bancarias, operación general).'}
+                                    </p>
+                                </div>
+                            )}
                             {cuentaForm.tipo==='Gasto' && (
                                 <label style={{display:'flex',alignItems:'center',gap:8,fontSize:'12.5px',color:'var(--text-dim)',cursor:'pointer',marginBottom:14}}>
                                     <input type="checkbox" checked={cuentaForm.operativo} onChange={e=>setCuentaForm(f=>({...f,operativo:e.target.checked}))} />
@@ -4697,11 +4776,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         value={asientoForm.descripcion} onChange={e=>setAsientoForm(f=>({...f,descripcion:e.target.value}))} placeholder="Ej. Pago de alquiler de julio" />
                                 </div>
                             </div>
-                            {asientoForm.lineas.map((l,i)=>(
-                                <div key={i} style={{border:'1px solid var(--glass-border)',borderRadius:'var(--r-sm)',padding:10,marginBottom:8}}>
+                            {asientoForm.lineas.map((l,i)=>{
+                                const cuentaLinea = cuentas.find(c=>c.id===l.cuentaId);
+                                const esDirecto = cuentaLinea?.naturaleza==='directo';
+                                const esCompartido = cuentaLinea?.naturaleza==='compartido';
+                                const faltaProducto = esDirecto && !l.productoId;
+                                return (
+                                <div key={i} style={{border:`1px solid ${faltaProducto?'rgba(160,56,56,0.35)':'var(--glass-border)'}`,borderRadius:'var(--r-sm)',padding:10,marginBottom:8}}>
                                     <div style={{display:'flex',gap:8,marginBottom:8}}>
                                         <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',flex:1}}
-                                            value={l.cuentaId} onChange={e=>setAsientoLinea(i,{cuentaId:e.target.value})}>
+                                            value={l.cuentaId} onChange={e=>setAsientoLinea(i,{cuentaId:e.target.value, productoId: cuentas.find(c=>c.id===e.target.value)?.naturaleza==='compartido' ? '' : l.productoId})}>
                                             <option value="">Selecciona una cuenta…</option>
                                             {cuentas.filter(c=>c.tiendaId===activeTiendaId && c.activa!==false).map(c=>(
                                                 <option key={c.id} value={c.id}>{c.codigo} — {c.nombre} ({c.moneda})</option>
@@ -4710,9 +4794,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <button className="btn btn-glass btn-sm" disabled={asientoForm.lineas.length<=2} onClick={()=>removeAsientoLinea(i)}>×</button>
                                     </div>
                                     <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.3fr 1fr 1fr',gap:8}}>
-                                        <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                            value={l.productoId} onChange={e=>setAsientoLinea(i,{productoId:e.target.value})}>
-                                            <option value="">Producto (opcional)</option>
+                                        <select className="form-input glass no-icon" style={{border:`1px solid ${faltaProducto?'rgba(160,56,56,0.5)':'var(--glass-border)'}`}}
+                                            disabled={esCompartido} value={l.productoId} onChange={e=>setAsientoLinea(i,{productoId:e.target.value})}>
+                                            <option value="">{esDirecto?'Producto (obligatorio)':esCompartido?'Producto (no aplica)':'Producto (opcional)'}</option>
                                             {productosScoped.map(p=>(
                                                 <option key={p.id} value={p.id}>{p.codigo} — {p.nombre}</option>
                                             ))}
@@ -4724,8 +4808,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                             value={l.haber} onChange={e=>setAsientoLinea(i,{haber:e.target.value, debe: e.target.value ? '' : l.debe})} placeholder="Haber" />
                                     </div>
+                                    {faltaProducto && <p style={{fontSize:'11px',color:'#A03B3B',marginTop:6}}>Esta cuenta es de naturaleza "directo" — elige el producto.</p>}
                                 </div>
-                            ))}
+                                );
+                            })}
                             <datalist id="terceros-sugeridos">
                                 {[...new Set(asientos.flatMap(a=>a.lineas||[]).map(l=>l.tercero).filter(Boolean))].map(t=><option key={t} value={t} />)}
                             </datalist>
@@ -4735,9 +4821,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <span>Haber: <strong style={{fontFamily:'Fira Code'}}>{asientoTotalHaber.toFixed(2)}</strong></span>
                                 <span className={`badge ${asientoBalanceado?'badge-green':'badge-gray'}`}><span className="badge-dot"/>{asientoBalanceado?'Balanceado':'Descuadrado'}</span>
                             </div>
+                            {!asientoProductoOk && (
+                                <p style={{fontSize:'12px',color:'#A03B3B',marginTop:6}}>Faltan productos en {asientoLineasSinProducto.length} línea{asientoLineasSinProducto.length!==1?'s':''} de cuenta "directo".</p>
+                            )}
                             <div className="modal-actions">
                                 <button className="btn btn-glass" onClick={() => { setShowAsientoModal(false); setEditingAsiento(null); }}>Cancelar</button>
-                                <button className="btn btn-gold" onClick={saveAsiento} disabled={!asientoForm.fecha||!asientoBalanceado||savingAsiento}>
+                                <button className="btn btn-gold" onClick={saveAsiento} disabled={!asientoForm.fecha||!asientoBalanceado||!asientoProductoOk||savingAsiento}>
                                     {savingAsiento ? 'Guardando...' : editingAsiento ? <>{I.edit} Guardar Cambios</> : <>{I.plus} Crear Asiento</>}
                                 </button>
                             </div>
