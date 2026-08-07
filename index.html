@@ -1648,11 +1648,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const asientoTotalHaber = asientoLineasValidas.reduce((s,l)=>s+(parseFloat(l.haber)||0),0);
     const asientoBalanceado = asientoLineasValidas.length>=2 && asientoTotalDebe>0 && Math.abs(asientoTotalDebe-asientoTotalHaber)<0.005;
     // Líneas de cuenta "directo" (ads de un SKU, costo de mercancía, etc.) que todavía no
-    // eligieron producto — bloquean el guardado hasta que se complete.
-    const asientoLineasSinProducto = asientoLineasValidas.filter(l => {
-        const cuenta = cuentas.find(c=>c.id===l.cuentaId);
-        return cuenta?.naturaleza==='directo' && !l.productoId;
-    });
+    // eligieron producto — bloquean el guardado hasta que se complete. Se valida por línea,
+    // guardando la cuenta para poder señalar cuál falla en el mensaje de error.
+    const asientoLineasSinProducto = asientoLineasValidas
+        .map(l => ({ l, cuenta: cuentas.find(c=>c.id===l.cuentaId) }))
+        .filter(({l,cuenta}) => cuenta?.naturaleza==='directo' && !l.productoId)
+        .map(({cuenta}) => cuenta);
     const asientoProductoOk = asientoLineasSinProducto.length === 0;
 
     const addAsientoLinea = () => setAsientoForm(f => ({...f, lineas:[...f.lineas, {...ASIENTO_LINEA_VACIA}]}));
@@ -1662,7 +1663,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const saveAsiento = async () => {
         if (!asientoForm.fecha || !asientoBalanceado || savingAsiento) return;
         if (!asientoProductoOk) {
-            alert('Hay líneas con una cuenta "directo" (ads, costo de mercancía, etc.) sin producto asignado. Elige un producto en cada una antes de guardar.');
+            alert(asientoLineasSinProducto.map(c => `La cuenta ${c.codigo} ${c.nombre} es de costo directo: debes indicar a qué producto corresponde.`).join('\n'));
             return;
         }
         setSavingAsiento(true);
@@ -4131,7 +4132,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     {delTipo.map(c=>(
                                                         <tr key={c.id} style={{opacity:c.activa===false?0.5:1}}>
                                                             <td style={{fontFamily:'Fira Code',fontSize:'12px'}}>{c.codigo}</td>
-                                                            <td><strong>{c.nombre}</strong>{c.tipo==='Gasto'&&c.operativo===false&&<span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>No operativo</span>}</td>
+                                                            <td><strong>{c.nombre}</strong>
+                                                                {(c.tipo==='Gasto'||c.tipo==='Costo')&&c.naturaleza&&c.naturaleza!=='na'&&(
+                                                                    c.naturaleza==='directo'
+                                                                        ? <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 9px',marginLeft:8,borderRadius:99,fontSize:'9px',fontWeight:700,background:DX_COLORS.orange.bg,border:`1px solid ${DX_COLORS.orange.bd}`,color:DX_COLORS.orange.fg}}><span style={{width:5,height:5,borderRadius:'50%',background:DX_COLORS.orange.dot}}/>Directo</span>
+                                                                        : <span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>Compartido</span>
+                                                                )}
+                                                                {c.tipo==='Gasto'&&c.operativo===false&&<span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>No operativo</span>}</td>
                                                             <td><span className={`badge ${c.activa===false?'badge-gray':'badge-green'}`}><span className="badge-dot"/>{c.activa===false?'Inactiva':'Activa'}</span></td>
                                                             <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
                                                                 <button className="btn btn-glass btn-sm" onClick={()=>openEditCuenta(c)}>{I.edit}</button>
@@ -4349,17 +4356,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const totalIngP   = ingresosP.reduce((s,c)=>s+c.saldo,0);
                         const totalCostoP = costoP.reduce((s,c)=>s+c.saldo,0);
                         const margenBruto    = totalIngP - totalCostoP;
-                        const margenBrutoPct = totalIngP>0 ? margenBruto/totalIngP*100 : 0;
+                        const margenBrutoPct = totalIngP>0 ? margenBruto/totalIngP*100 : null;
 
                         const totalGVentaP = gastosVentaP.reduce((s,c)=>s+c.saldo,0);
                         const margenContrib    = margenBruto - totalGVentaP;
-                        const margenContribPct = totalIngP>0 ? margenContrib/totalIngP*100 : 0;
+                        const margenContribPct = totalIngP>0 ? margenContrib/totalIngP*100 : null;
 
                         const totalGOperP  = gastosOperP.reduce((s,c)=>s+c.saldo,0);
                         const totalGFinP   = gastosFinP.reduce((s,c)=>s+c.saldo,0);
                         const totalGOtrosP = gastosOtrosP.reduce((s,c)=>s+c.saldo,0);
                         const utilidad    = margenContrib - totalGOperP - totalGFinP - totalGOtrosP;
-                        const utilidadPct = totalIngP>0 ? utilidad/totalIngP*100 : 0;
+                        const utilidadPct = totalIngP>0 ? utilidad/totalIngP*100 : null;
 
                         const Seccion = ({titulo, items, total, vacio}) => (
                             <div style={{marginBottom:18}}>
@@ -4382,7 +4389,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <span style={{fontWeight:800,fontSize:highlight?14:13,letterSpacing:highlight?'0.3px':0}}>{label}</span>
                                 <span style={{textAlign:'right'}}>
                                     <span style={{fontFamily:'Fira Code',fontWeight:800,fontSize:highlight?18:15,color: val>=0?(highlight?'var(--orange)':'var(--text)'):'#A03B3B'}}>{fmtCtb(val,contabMoneda)}</span>
-                                    <span style={{fontSize:11,color:'var(--text-dimmer)',marginLeft:8,fontFamily:'Fira Code'}}>{pct.toFixed(1)}%</span>
+                                    <span style={{fontSize:11,color:'var(--text-dimmer)',marginLeft:8,fontFamily:'Fira Code'}}>{pct===null?'—':`${pct.toFixed(1)}%`}</span>
                                 </span>
                             </div>
                         );
@@ -4736,8 +4743,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </div>
                                     <p style={{fontSize:'11px',color:'var(--text-dimmer)'}}>
                                         {(cuentaForm.naturaleza==='na'?'compartido':cuentaForm.naturaleza)==='directo'
-                                            ? 'Cada línea con esta cuenta exige elegir un producto (ej. ads de un SKU, costo de mercancía).'
-                                            : 'No pide producto — se reparte entre todos (ej. comisiones bancarias, operación general).'}
+                                            ? 'Directo: desaparecería si el producto no existiera.'
+                                            : 'Compartido: seguiría igual.'}
                                     </p>
                                 </div>
                             )}
@@ -4795,7 +4802,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </div>
                                     <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.3fr 1fr 1fr',gap:8}}>
                                         <select className="form-input glass no-icon" style={{border:`1px solid ${faltaProducto?'rgba(160,56,56,0.5)':'var(--glass-border)'}`}}
-                                            disabled={esCompartido} value={l.productoId} onChange={e=>setAsientoLinea(i,{productoId:e.target.value})}>
+                                            disabled={esCompartido} title={esCompartido?'Gasto compartido: se reparte al cierre mensual.':undefined}
+                                            value={l.productoId} onChange={e=>setAsientoLinea(i,{productoId:e.target.value})}>
                                             <option value="">{esDirecto?'Producto (obligatorio)':esCompartido?'Producto (no aplica)':'Producto (opcional)'}</option>
                                             {productosScoped.map(p=>(
                                                 <option key={p.id} value={p.id}>{p.codigo} — {p.nombre}</option>
@@ -4808,7 +4816,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                             value={l.haber} onChange={e=>setAsientoLinea(i,{haber:e.target.value, debe: e.target.value ? '' : l.debe})} placeholder="Haber" />
                                     </div>
-                                    {faltaProducto && <p style={{fontSize:'11px',color:'#A03B3B',marginTop:6}}>Esta cuenta es de naturaleza "directo" — elige el producto.</p>}
+                                    {faltaProducto && <p style={{fontSize:'11px',color:'#A03B3B',marginTop:6}}>La cuenta {cuentaLinea.codigo} {cuentaLinea.nombre} es de costo directo: debes indicar a qué producto corresponde.</p>}
                                 </div>
                                 );
                             })}
@@ -4822,7 +4830,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <span className={`badge ${asientoBalanceado?'badge-green':'badge-gray'}`}><span className="badge-dot"/>{asientoBalanceado?'Balanceado':'Descuadrado'}</span>
                             </div>
                             {!asientoProductoOk && (
-                                <p style={{fontSize:'12px',color:'#A03B3B',marginTop:6}}>Faltan productos en {asientoLineasSinProducto.length} línea{asientoLineasSinProducto.length!==1?'s':''} de cuenta "directo".</p>
+                                <p style={{fontSize:'12px',color:'#A03B3B',marginTop:6}}>Faltan productos en {asientoLineasSinProducto.length} línea{asientoLineasSinProducto.length!==1?'s':''} de costo directo.</p>
                             )}
                             <div className="modal-actions">
                                 <button className="btn btn-glass" onClick={() => { setShowAsientoModal(false); setEditingAsiento(null); }}>Cancelar</button>
