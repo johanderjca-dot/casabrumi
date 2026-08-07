@@ -755,6 +755,11 @@ function CierreDiario({ productos, user, tiendaId }) {
         setSaving(false);
     };
 
+    const deleteCierre = async (id) => {
+        try { await db.collection('cierres').doc(id).delete(); }
+        catch(e) { console.error('Error eliminando cierre:', e); }
+    };
+
     return (<>
         <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
             <div>
@@ -845,6 +850,7 @@ function CierreDiario({ productos, user, tiendaId }) {
                         <th>Productos</th>
                         <th style={{textAlign:'center'}}>Unidades</th>
                         <th style={{textAlign:'right'}}>Total</th>
+                        <th style={{width:36}}></th>
                     </tr></thead>
                     <tbody>
                         {historial.map(c => {
@@ -857,6 +863,15 @@ function CierreDiario({ productos, user, tiendaId }) {
                                     <td style={{fontSize:12,color:'var(--text-dim)'}}>{(c.productos||[]).map(p=>p.nombre).join(', ')||'—'}</td>
                                     <td style={{textAlign:'center',fontFamily:"'Fira Code',monospace",fontSize:12}}>{c.totalCantidad||0}</td>
                                     <td style={{textAlign:'right',fontWeight:700,fontFamily:"'Fira Code',monospace",color:'var(--orange)'}}>RD${(c.totalMonto||0).toLocaleString()}</td>
+                                    <td style={{textAlign:'center'}}>
+                                        <span onClick={e=>{ e.stopPropagation(); if(confirm(`¿Eliminar el cierre del ${c.fechaStr}? Esta acción no se puede deshacer.`)) deleteCierre(c.id); }}
+                                            title="Eliminar cierre"
+                                            style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:16,lineHeight:1,padding:'2px 7px',borderRadius:6,display:'inline-block',transition:'color 140ms ease, background 140ms ease'}}
+                                            onMouseEnter={e=>{e.currentTarget.style.color='#A03B3B';e.currentTarget.style.background='rgba(160,56,56,0.08)';}}
+                                            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-dimmer)';e.currentTarget.style.background='transparent';}}>
+                                            ×
+                                        </span>
+                                    </td>
                                 </tr>
                             );
                         })}
