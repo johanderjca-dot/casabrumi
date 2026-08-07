@@ -2785,7 +2785,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     };
                     const loteSel = lotesActuales.find(l=>l.id===loteActivo) || lotesActuales[0] || null;
 
-                    const TABS = ['General','Análisis','Contenido','Inventario'];
+                    const TABS = ['General','Inventario'];
                     const CONTENT_GROUPS = contenidoGrupos || [];
                     const analisis = p.analisis || {};
                     const analisisScore = ANALISIS_CHECKS.filter(([k,,,favorable='si'])=>(analisis.checks||{})[k]===favorable).length;
