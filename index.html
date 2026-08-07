@@ -1574,6 +1574,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [savingCuenta,     setSavingCuenta]     = useState(false);
     const ASIENTO_LINEA_VACIA = { cuentaId:'', productoId:'', tercero:'', debe:'', haber:'' };
     const [showAsientoModal, setShowAsientoModal] = useState(false);
+    const [editingAsiento,   setEditingAsiento]   = useState(null);
     const [asientoForm,      setAsientoForm]      = useState({ fecha:'', descripcion:'', lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}] });
     const [savingAsiento,    setSavingAsiento]    = useState(false);
     const [asientoAbierto,   setAsientoAbierto]   = useState(null); // id del asiento expandido en Libro Diario
@@ -1648,15 +1649,31 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 const producto = productos.find(p=>p.id===l.productoId);
                 return { cuentaId: l.cuentaId, cuentaNombre: cuenta?.nombre||'', cuentaCodigo: cuenta?.codigo||'', moneda: cuenta?.moneda||'DOP', debe: parseFloat(l.debe)||0, haber: parseFloat(l.haber)||0, tercero: (l.tercero||'').trim(), productoId: l.productoId||'', productoCodigo: producto?.codigo||'', productoNombre: producto?.nombre||'' };
             });
-            await db.collection('asientos_contables').add({
-                fecha: asientoForm.fecha, descripcion: asientoForm.descripcion.trim(), tiendaId: activeTiendaId,
+            const data = {
+                fecha: asientoForm.fecha, descripcion: asientoForm.descripcion.trim(),
                 lineas, totalDebe: asientoTotalDebe, totalHaber: asientoTotalHaber, moneda: lineas[0]?.moneda||'DOP',
-                creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
-            });
+            };
+            if (editingAsiento) {
+                await db.collection('asientos_contables').doc(editingAsiento.id).update(data);
+            } else {
+                await db.collection('asientos_contables').add({
+                    ...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+            }
             setAsientoForm({ fecha:'', descripcion:'', lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}] });
+            setEditingAsiento(null);
             setShowAsientoModal(false);
         } catch(err) { console.error('Error guardando asiento:', err); }
         finally { setSavingAsiento(false); }
+    };
+    const openEditAsiento = a => {
+        if (a.auto) { alert('Este asiento se generó automáticamente desde Gastos o Cierre Diario y no se puede editar aquí — corrige o elimina el registro original.'); return; }
+        setEditingAsiento(a);
+        setAsientoForm({
+            fecha: a.fecha || '', descripcion: a.descripcion || '',
+            lineas: (a.lineas||[]).map(l => ({ cuentaId: l.cuentaId||'', productoId: l.productoId||'', tercero: l.tercero||'', debe: l.debe?String(l.debe):'', haber: l.haber?String(l.haber):'' })),
+        });
+        setShowAsientoModal(true);
     };
     const deleteAsiento = a => {
         if (a.auto) { alert('Este asiento se generó automáticamente desde Gastos o Cierre Diario y no se puede borrar aquí — corrige o elimina el registro original.'); return; }
@@ -4121,7 +4138,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 {convirtiendoUsdDop ? 'Convirtiendo...' : 'Convertir cuentas/asientos en USD a DOP'}
                             </button>
                             <button className="btn btn-gold"
-                                onClick={()=>{setAsientoForm({fecha:hoyISO,descripcion:'',lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}]});setShowAsientoModal(true);}}>{I.plus} Nuevo asiento</button>
+                                onClick={()=>{setEditingAsiento(null);setAsientoForm({fecha:hoyISO,descripcion:'',lineas:[{...ASIENTO_LINEA_VACIA},{...ASIENTO_LINEA_VACIA}]});setShowAsientoModal(true);}}>{I.plus} Nuevo asiento</button>
                         </div>
                         {misAsientos.length===0 ? (
                             <div className="card glass"><div className="empty"><div className="empty-icon">{I_balanza}</div><h3>Sin asientos aún</h3><p>Registra tu primer asiento contable.</p></div></div>
@@ -4139,6 +4156,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     <td className="td-num">{fmtCtb(a.totalDebe,a.moneda)}</td>
                                                     <td className="td-num">{fmtCtb(a.totalHaber,a.moneda)}</td>
                                                     <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
+                                                        <button className="btn btn-glass btn-sm" onClick={e=>{e.stopPropagation();openEditAsiento(a);}}>{I.edit}</button>{' '}
                                                         <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={e=>{e.stopPropagation();deleteAsiento(a);}}>×</button>
                                                     </td>
                                                 </tr>
@@ -4661,11 +4679,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 )}
 
                 {showAsientoModal && (
-                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAsientoModal(false); }}>
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowAsientoModal(false); setEditingAsiento(null); } }}>
                         <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)',maxWidth:640}}>
                             <div className="modal-hd">
-                                <h2>Nuevo Asiento</h2>
-                                <button className="modal-close" onClick={() => setShowAsientoModal(false)}>×</button>
+                                <h2>{editingAsiento ? 'Editar Asiento' : 'Nuevo Asiento'}</h2>
+                                <button className="modal-close" onClick={() => { setShowAsientoModal(false); setEditingAsiento(null); }}>×</button>
                             </div>
                             <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12,marginBottom:12}}>
                                 <div className="form-group" style={{marginBottom:0}}>
@@ -4718,9 +4736,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <span className={`badge ${asientoBalanceado?'badge-green':'badge-gray'}`}><span className="badge-dot"/>{asientoBalanceado?'Balanceado':'Descuadrado'}</span>
                             </div>
                             <div className="modal-actions">
-                                <button className="btn btn-glass" onClick={() => setShowAsientoModal(false)}>Cancelar</button>
+                                <button className="btn btn-glass" onClick={() => { setShowAsientoModal(false); setEditingAsiento(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={saveAsiento} disabled={!asientoForm.fecha||!asientoBalanceado||savingAsiento}>
-                                    {savingAsiento ? 'Guardando...' : <>{I.plus} Crear Asiento</>}
+                                    {savingAsiento ? 'Guardando...' : editingAsiento ? <>{I.edit} Guardar Cambios</> : <>{I.plus} Crear Asiento</>}
                                 </button>
                             </div>
                         </div>
