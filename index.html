@@ -488,6 +488,58 @@ function DxBadge({ tipo, valor, style }) {
     </span>;
 }
 
+// ── RENTABILIDAD POR PRODUCTO (landed cost, margen de contribución, ROIC) ──
+// Todos los campos de costo/venta viven en producto.rentabilidad (USD por unidad, igual que
+// el resto del modelo). "unidadesVendidas" NUNCA se guarda manual — se pasa desde afuera,
+// calculado igual que en el resto del panel: suma de Cierre Diario por nombre exacto de producto.
+const RENTABILIDAD_DEFAULT = {
+    costoFob:0, fleteUnit:0, arancelesUnit:0, transporteUnit:0,
+    precioVenta:0, unidadesDevueltas:0,
+    gastoAds:0, comisionPct:0, empaqueUnit:0, deliveryUnit:0,
+    inventarioActual:0, capitalInvertido:0, rotacionesAno:3,
+};
+// veredicto → nivel de DX_COLORS (reutiliza los mismos verde/ámbar/rojo semánticos del resto
+// del panel, independientes del turquesa/coral de marca — así "Escalar" no se confunde con un
+// simple highlight de marca).
+const VEREDICTO_NIVEL = { Matar:'red', Escalar:'green', 'Rotación lenta':'gold', Sobrevive:'gold', Revisar:'red' };
+
+function calcularRentabilidad(rentabilidad, unidadesVendidas) {
+    const r = { ...RENTABILIDAD_DEFAULT, ...(rentabilidad||{}) };
+    const n = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+    const uVend = Math.max(n(unidadesVendidas), 0);
+    const uDev  = Math.max(n(r.unidadesDevueltas), 0);
+    const precioVenta = n(r.precioVenta);
+
+    const landedCost     = n(r.costoFob) + n(r.fleteUnit) + n(r.arancelesUnit) + n(r.transporteUnit);
+    const ventasNetas    = Math.max(uVend - uDev, 0) * precioVenta;
+    const margenBruto    = precioVenta - landedCost;
+    const adsPorUnidad   = uVend > 0 ? n(r.gastoAds) / uVend : 0;
+    const costosDirectos = adsPorUnidad + (precioVenta * n(r.comisionPct) / 100) + n(r.empaqueUnit) + n(r.deliveryUnit);
+    const mcUnit  = margenBruto - costosDirectos;
+    const mcPct   = precioVenta > 0 ? mcUnit / precioVenta : 0;
+    const roic    = mcPct * n(r.rotacionesAno);
+
+    let veredicto;
+    if (mcUnit < 0)                          veredicto = 'Matar';
+    else if (mcPct >= 0.35 && roic >= 0.60)  veredicto = 'Escalar';
+    else if (mcPct >= 0.35)                  veredicto = 'Rotación lenta';
+    else if (mcPct >= 0.25)                  veredicto = 'Sobrevive';
+    else                                      veredicto = 'Revisar';
+
+    return {
+        precioVenta, landedCost, ventasNetas, margenBruto, adsPorUnidad, costosDirectos, mcUnit, mcPct, roic,
+        veredicto, tieneDatos: precioVenta > 0,
+    };
+}
+
+function VeredictoBadge({ veredicto, style }) {
+    const c = DX_COLORS[VEREDICTO_NIVEL[veredicto] || 'gray'];
+    if (!c) return null;
+    return <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 9px',borderRadius:99,fontSize:'10px',fontWeight:'700',background:c.bg,border:`1px solid ${c.bd}`,color:c.fg,whiteSpace:'nowrap',...style}}>
+        <span style={{width:5,height:5,borderRadius:'50%',background:c.dot}}/>{veredicto}
+    </span>;
+}
+
 // ── DICCIONARIO E-COMMERCE RD (COD + Facebook Ads) ──
 const DICCIONARIO = [
     { cat:'Fundamentos', icon:'🛒', items:[
@@ -1388,7 +1440,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showProdModal,      setShowProdModal]      = useState(false);
     const [editingProducto,    setEditingProducto]    = useState(null);
     const [savingProd,         setSavingProd]         = useState(false);
-    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'', codigo:'' });
+    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Activo', proveedor:'', imagen:'', codigo:'', rentabilidad:{...RENTABILIDAD_DEFAULT} });
+    const [showRentBlock,      setShowRentBlock]      = useState(false);
+    const [filtroRentabilidad, setFiltroRentabilidad] = useState('todos'); // 'todos'|'matar'|'escalar'|'sindatos'
     const [editSeccion,        setEditSeccion]        = useState(null); // 'inventario'
     const [invForm,            setInvForm]            = useState({ precioCompra:'', precioVenta:'' });
     // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
@@ -2065,6 +2119,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             estado: prodForm.estado, proveedor: prodForm.proveedor,
             imagen: prodForm.imagen, codigo: prodForm.codigo.trim(),
             facebook: editingProducto?.facebook || {}, inventario: editingProducto?.inventario || {},
+            rentabilidad: { ...RENTABILIDAD_DEFAULT, ...(prodForm.rentabilidad||{}) },
         };
         if (editingProducto) {
             db.collection('productos').doc(editingProducto.id).update(data).catch(console.error);
@@ -2072,7 +2127,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         } else {
             db.collection('productos').add({...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
         }
-        setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''});
+        setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:'',rentabilidad:{...RENTABILIDAD_DEFAULT}});
         setEditingProducto(null); setShowProdModal(false);
     };
 
@@ -2083,7 +2138,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openEditProd = (p) => {
         setEditingProducto(p);
-        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', imagen:p.imagen||'', codigo:p.codigo||''});
+        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', imagen:p.imagen||'', codigo:p.codigo||'', rentabilidad:{...RENTABILIDAD_DEFAULT, ...(p.rentabilidad||{})}});
+        setShowRentBlock(false);
         setShowProdModal(true);
     };
 
@@ -2261,7 +2317,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
             {showCmdK && (() => {
                 const acciones = [
-                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''}); setShowProdModal(true); } },
+                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:'',rentabilidad:{...RENTABILIDAD_DEFAULT}}); setShowRentBlock(false); setShowProdModal(true); } },
                     { key:'vendedores', label: 'Nuevo usuario',          icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
                     { key:'accesos', label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
                 ].filter(a => tienePermiso(a.key));
@@ -2617,22 +2673,51 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         ).filas.map(f=>[f.id, f.utilidad])
                     );
                     // ── Lista de productos ──
+                    const rentDeProducto = p => {
+                        const v = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
+                        return calcularRentabilidad(p.rentabilidad, v);
+                    };
+                    const productosVisibles = productos.filter(p => {
+                        if (filtroRentabilidad==='todos') return true;
+                        const r = rentDeProducto(p);
+                        if (filtroRentabilidad==='matar')   return r.tieneDatos && r.veredicto==='Matar';
+                        if (filtroRentabilidad==='escalar') return r.tieneDatos && r.veredicto==='Escalar';
+                        if (filtroRentabilidad==='sindatos') return !r.tieneDatos;
+                        return true;
+                    });
                     if (!activeProducto) return (
                         <>
-                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                            <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
                                 <div><h1>Productos</h1><p>Gestiona y analiza tus mejores productos</p></div>
-                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
+                                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                                    {productos.length>0 && (
+                                        <select className="form-input no-icon" style={{width:'auto',padding:'8px 30px 8px 12px',fontSize:'12.5px',fontWeight:600,border:'1.5px solid var(--glass-border)'}}
+                                            value={filtroRentabilidad} onChange={e=>setFiltroRentabilidad(e.target.value)}>
+                                            <option value="todos">Todos los productos</option>
+                                            <option value="matar">Solo "Matar"</option>
+                                            <option value="escalar">Solo "Escalar"</option>
+                                            <option value="sindatos">Sin datos de costo</option>
+                                        </select>
+                                    )}
+                                    <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:'',rentabilidad:{...RENTABILIDAD_DEFAULT}});setShowRentBlock(false);setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
+                                </div>
                             </div>
                             {productos.length===0 ? (
                                 <div className="card glass"><div className="empty">
                                     <div style={{fontSize:'40px',marginBottom:14}}>⭐</div>
                                     <h3>Sin productos aún</h3><p>Agrega tu primer producto ganador.</p>
                                 </div></div>
+                            ) : productosVisibles.length===0 ? (
+                                <div className="card glass"><div className="empty">
+                                    <div style={{fontSize:'40px',marginBottom:14}}>🔍</div>
+                                    <h3>Sin resultados</h3><p>Ningún producto coincide con este filtro.</p>
+                                </div></div>
                             ) : (
                                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:16}}>
-                                    {productos.map(p => {
+                                    {productosVisibles.map(p => {
                                         const inv = p.inventario||{};
                                         const vendido = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
+                                        const rent = calcularRentabilidad(p.rentabilidad, vendido);
                                         const lotesProd = (p.lotes&&p.lotes.length) ? p.lotes : (p.pedidos?.length ? [{pedidos:p.pedidos}] : []);
                                         const pedidosProd = lotesProd.flatMap(l=>l.pedidos||[]);
                                         const despachadosCard = pedidosProd.reduce((s,e)=>s+(e.despachados||0),0);
@@ -2664,6 +2749,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 <div style={{padding:'14px 16px'}}>
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
                                                     {p.codigo&&<span className="badge badge-gold" style={{fontFamily:'Fira Code',fontSize:'11px',fontWeight:700,marginBottom:8,display:'inline-block'}}>{p.codigo}</span>}
+                                                    <div style={{marginBottom:8}}>
+                                                        {rent.tieneDatos ? (
+                                                            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                                                                <VeredictoBadge veredicto={rent.veredicto} />
+                                                                <span style={{fontSize:'10.5px',color:'var(--text-dim)',fontFamily:'Fira Code',fontWeight:700}}>MC {(rent.mcPct*100).toFixed(0)}%</span>
+                                                                <span style={{fontSize:'10.5px',color:'var(--text-dim)',fontFamily:'Fira Code',fontWeight:700}}>ROIC {(rent.roic*100).toFixed(0)}%</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{fontSize:'10.5px',color:'var(--text-dimmer)'}}>Sin datos de costo</span>
+                                                        )}
+                                                    </div>
                                                     {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={p.proveedor}>{p.proveedor}</div>}
                                                     <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
                                                         {vendido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span> vendidos</div>}
@@ -2721,6 +2817,56 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'80px',resize:'vertical'}}
                                                 value={prodForm.descripcion} onChange={e=>setProdForm(f=>({...f,descripcion:e.target.value}))} placeholder="Descripción del producto..." />
                                         </div>
+
+                                        {/* Costos y rentabilidad — bloque colapsable, no satura el form normal */}
+                                        <div className="form-group">
+                                            <div onClick={()=>setShowRentBlock(v=>!v)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',padding:'8px 0'}}>
+                                                <label style={{color:'var(--text-dim)',cursor:'pointer',marginBottom:0}}>💰 Costos y rentabilidad</label>
+                                                <span style={{fontSize:11,color:'var(--text-dimmer)'}}>{showRentBlock?'Ocultar ▲':'Mostrar ▼'}</span>
+                                            </div>
+                                            {showRentBlock && (
+                                                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                                                    {[
+                                                        { title:'Costo de importación (por unidad, USD)', fields:[
+                                                            {key:'costoFob', label:'Costo FOB'},
+                                                            {key:'fleteUnit', label:'Flete'},
+                                                            {key:'arancelesUnit', label:'Aranceles'},
+                                                            {key:'transporteUnit', label:'Transporte a bodega'},
+                                                        ]},
+                                                        { title:'Venta', fields:[
+                                                            {key:'precioVenta', label:'Precio de venta (USD)'},
+                                                            {key:'unidadesDevueltas', label:'Unidades devueltas'},
+                                                        ]},
+                                                        { title:'Costos directos del producto', fields:[
+                                                            {key:'gastoAds', label:'Gasto en ads (total, USD)'},
+                                                            {key:'comisionPct', label:'Comisión plataforma (%)'},
+                                                            {key:'empaqueUnit', label:'Empaque (USD/u)'},
+                                                            {key:'deliveryUnit', label:'Delivery (USD/u)'},
+                                                        ]},
+                                                        { title:'Inventario', fields:[
+                                                            {key:'inventarioActual', label:'Unidades en bodega'},
+                                                            {key:'capitalInvertido', label:'Capital invertido (USD)'},
+                                                            {key:'rotacionesAno', label:'Rotaciones/año (estimado)'},
+                                                        ]},
+                                                    ].map(grupo=>(
+                                                        <div key={grupo.title}>
+                                                            <div style={{fontSize:10,fontWeight:800,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>{grupo.title}</div>
+                                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                                                                {grupo.fields.map(({key,label})=>(
+                                                                    <div key={key} className="form-group" style={{marginBottom:0}}>
+                                                                        <label style={{color:'var(--text-dim)',fontSize:'11.5px'}}>{label}</label>
+                                                                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                                            type="number" placeholder="0" value={prodForm.rentabilidad?.[key] ?? ''}
+                                                                            onChange={e=>setProdForm(f=>({...f, rentabilidad:{...f.rentabilidad, [key]:e.target.value}}))} />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="modal-actions">
                                             <button className="btn btn-glass" onClick={()=>{setShowProdModal(false);setEditingProducto(null);}}>Cancelar</button>
                                             <button className="btn btn-gold" onClick={saveProd} disabled={!prodForm.nombre||savingProd} style={{flex:1,justifyContent:'center'}}>
@@ -2738,6 +2884,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const inv = p.inventario||{};
                     // Unidades vendidas = suma de lo registrado para este producto en Cierre Diario (por nombre exacto), no un campo manual.
                     const unidadesVendidasCalc = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
+                    const rentDetalle = calcularRentabilidad(p.rentabilidad, unidadesVendidasCalc);
                     // Ganancia total = facturado real (DOP) de este producto en Cierre Diario, no un estimado por margen.
                     const gananciaTotal = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.monto||0),0), 0);
                     const GASTO_CATS_PROD = [
@@ -2849,6 +2996,50 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             ))}
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* ── Tarjeta Rentabilidad (tab General) ── */}
+                            {productoTab==='general' && (
+                                <div className="card glass" style={{padding:'22px 24px',marginTop:16}}>
+                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+                                        <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Rentabilidad</div>
+                                        {rentDetalle.tieneDatos && <VeredictoBadge veredicto={rentDetalle.veredicto} />}
+                                    </div>
+                                    {!rentDetalle.tieneDatos ? (
+                                        <p style={{fontSize:'13px',color:'var(--text-dimmer)'}}>Sin datos de costo — edita el producto y completa el bloque "Costos y rentabilidad" para ver el análisis.</p>
+                                    ) : (
+                                        <div>
+                                            {[
+                                                { label:'Precio de venta', val:rentDetalle.precioVenta, op:null },
+                                                { label:'Landed cost', val:rentDetalle.landedCost, op:'−' },
+                                                { label:'Margen bruto', val:rentDetalle.margenBruto, op:'=', bold:true },
+                                                { label:'Costos directos', val:rentDetalle.costosDirectos, op:'−' },
+                                            ].map(row=>(
+                                                <div key={row.label} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 0',borderBottom:'1px solid var(--glass-border)'}}>
+                                                    <span style={{fontSize:'12.5px',color:'var(--text-dim)',display:'flex',alignItems:'center',gap:8}}>
+                                                        {row.op && <span style={{color:'var(--text-dimmer)',fontFamily:'Fira Code',width:12}}>{row.op}</span>}
+                                                        {row.label}
+                                                    </span>
+                                                    <span style={{fontSize:'13.5px',fontFamily:'Fira Code',fontWeight:row.bold?800:600,color:'var(--text)'}}>US${row.val.toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',marginTop:10,borderRadius:14,background:rentDetalle.mcUnit>=0?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${rentDetalle.mcUnit>=0?'var(--orange-border)':'rgba(160,56,56,0.24)'}`}}>
+                                                <div>
+                                                    <div style={{fontSize:'10.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Margen de contribución</div>
+                                                    <div style={{fontSize:'10.5px',color:'var(--text-dimmer)',marginTop:2}}>el número que decide si el producto vive</div>
+                                                </div>
+                                                <div style={{textAlign:'right'}}>
+                                                    <div style={{fontSize:'24px',fontWeight:'800',fontFamily:'Fira Code',color:rentDetalle.mcUnit>=0?'var(--orange)':'#A03B3B'}}>US${rentDetalle.mcUnit.toFixed(2)}</div>
+                                                    <div style={{fontSize:'11px',color:'var(--text-dim)',fontFamily:'Fira Code'}}>{(rentDetalle.mcPct*100).toFixed(1)}%</div>
+                                                </div>
+                                            </div>
+                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 2px 2px'}}>
+                                                <span style={{fontSize:'12.5px',color:'var(--text-dim)'}}>ROIC (MC × rotaciones/año)</span>
+                                                <span style={{fontSize:'14px',fontFamily:'Fira Code',fontWeight:700,color:'var(--text)'}}>{(rentDetalle.roic*100).toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -3385,6 +3576,56 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'80px',resize:'vertical'}}
                                                 value={prodForm.descripcion} onChange={e=>setProdForm(f=>({...f,descripcion:e.target.value}))} placeholder="Descripción del producto..." />
                                         </div>
+
+                                        {/* Costos y rentabilidad — bloque colapsable, no satura el form normal */}
+                                        <div className="form-group">
+                                            <div onClick={()=>setShowRentBlock(v=>!v)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',padding:'8px 0'}}>
+                                                <label style={{color:'var(--text-dim)',cursor:'pointer',marginBottom:0}}>💰 Costos y rentabilidad</label>
+                                                <span style={{fontSize:11,color:'var(--text-dimmer)'}}>{showRentBlock?'Ocultar ▲':'Mostrar ▼'}</span>
+                                            </div>
+                                            {showRentBlock && (
+                                                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                                                    {[
+                                                        { title:'Costo de importación (por unidad, USD)', fields:[
+                                                            {key:'costoFob', label:'Costo FOB'},
+                                                            {key:'fleteUnit', label:'Flete'},
+                                                            {key:'arancelesUnit', label:'Aranceles'},
+                                                            {key:'transporteUnit', label:'Transporte a bodega'},
+                                                        ]},
+                                                        { title:'Venta', fields:[
+                                                            {key:'precioVenta', label:'Precio de venta (USD)'},
+                                                            {key:'unidadesDevueltas', label:'Unidades devueltas'},
+                                                        ]},
+                                                        { title:'Costos directos del producto', fields:[
+                                                            {key:'gastoAds', label:'Gasto en ads (total, USD)'},
+                                                            {key:'comisionPct', label:'Comisión plataforma (%)'},
+                                                            {key:'empaqueUnit', label:'Empaque (USD/u)'},
+                                                            {key:'deliveryUnit', label:'Delivery (USD/u)'},
+                                                        ]},
+                                                        { title:'Inventario', fields:[
+                                                            {key:'inventarioActual', label:'Unidades en bodega'},
+                                                            {key:'capitalInvertido', label:'Capital invertido (USD)'},
+                                                            {key:'rotacionesAno', label:'Rotaciones/año (estimado)'},
+                                                        ]},
+                                                    ].map(grupo=>(
+                                                        <div key={grupo.title}>
+                                                            <div style={{fontSize:10,fontWeight:800,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>{grupo.title}</div>
+                                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                                                                {grupo.fields.map(({key,label})=>(
+                                                                    <div key={key} className="form-group" style={{marginBottom:0}}>
+                                                                        <label style={{color:'var(--text-dim)',fontSize:'11.5px'}}>{label}</label>
+                                                                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                                            type="number" placeholder="0" value={prodForm.rentabilidad?.[key] ?? ''}
+                                                                            onChange={e=>setProdForm(f=>({...f, rentabilidad:{...f.rentabilidad, [key]:e.target.value}}))} />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="modal-actions">
                                             <button className="btn btn-glass" onClick={()=>{setShowProdModal(false);setEditingProducto(null);}}>Cancelar</button>
                                             <button className="btn btn-gold" onClick={saveProd} disabled={!prodForm.nombre||savingProd} style={{flex:1,justifyContent:'center'}}>
