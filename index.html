@@ -4137,8 +4137,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                     c.naturaleza==='directo'
                                                                         ? <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'2px 9px',marginLeft:8,borderRadius:99,fontSize:'9px',fontWeight:700,background:DX_COLORS.orange.bg,border:`1px solid ${DX_COLORS.orange.bd}`,color:DX_COLORS.orange.fg}}><span style={{width:5,height:5,borderRadius:'50%',background:DX_COLORS.orange.dot}}/>Directo</span>
                                                                         : <span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>Compartido</span>
-                                                                )}
-                                                                {c.tipo==='Gasto'&&c.operativo===false&&<span className="badge badge-gray" style={{marginLeft:8,fontSize:'9px'}}><span className="badge-dot"/>No operativo</span>}</td>
+                                                                )}</td>
                                                             <td><span className={`badge ${c.activa===false?'badge-gray':'badge-green'}`}><span className="badge-dot"/>{c.activa===false?'Inactiva':'Activa'}</span></td>
                                                             <td style={{whiteSpace:'nowrap',textAlign:'right'}}>
                                                                 <button className="btn btn-glass btn-sm" onClick={()=>openEditCuenta(c)}>{I.edit}</button>
