@@ -4748,12 +4748,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </p>
                                 </div>
                             )}
-                            {cuentaForm.tipo==='Gasto' && (
-                                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:'12.5px',color:'var(--text-dim)',cursor:'pointer',marginBottom:14}}>
-                                    <input type="checkbox" checked={cuentaForm.operativo} onChange={e=>setCuentaForm(f=>({...f,operativo:e.target.checked}))} />
-                                    Es gasto operativo (se descuenta en Salarios antes de calcular la comisión)
-                                </label>
-                            )}
                             <div className="modal-actions">
                                 <button className="btn btn-glass" onClick={() => { setShowCuentaModal(false); setEditingCuenta(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={saveCuenta} disabled={!cuentaForm.nombre.trim()||!cuentaForm.codigo.trim()||savingCuenta}>
