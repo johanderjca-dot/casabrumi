@@ -883,10 +883,19 @@ function CierreDiario({ productos, user, tiendaId }) {
 }
 
 // ── CALCULADORA BÁSICA (suma, resta, multiplica, divide) ──
-function BasicCalculator({ title, onRemove, removable }) {
-    const [terms,       setTerms]       = useState(['0']);  // ej. ['600','650','501','2456']; '' = número aún no tecleado
-    const [operators,   setOperators]   = useState([]);     // ej. ['+','+','+'] — un operador menos que terms
-    const [freshResult, setFreshResult] = useState(false);  // true justo después de "="
+function BasicCalculator({ id, title, onRemove, removable }) {
+    // Se guarda en sessionStorage (no localStorage): sobrevive cambios de pestaña dentro de
+    // la misma sesión del navegador, pero se borra solo al cerrar la pestaña/ventana — tal
+    // como se pidió, no queremos que persista para siempre entre visitas.
+    const storageKey = 'calcStateV1_' + id;
+    const leerGuardado = () => { try { return JSON.parse(sessionStorage.getItem(storageKey)); } catch { return null; } };
+    const [terms,       setTerms]       = useState(() => leerGuardado()?.terms || ['0']);  // ej. ['600','650','501','2456']; '' = número aún no tecleado
+    const [operators,   setOperators]   = useState(() => leerGuardado()?.operators || []); // ej. ['+','+','+'] — un operador menos que terms
+    const [freshResult, setFreshResult] = useState(() => leerGuardado()?.freshResult || false); // true justo después de "="
+
+    useEffect(() => {
+        try { sessionStorage.setItem(storageKey, JSON.stringify({ terms, operators, freshResult })); } catch {}
+    }, [terms, operators, freshResult, storageKey]);
 
     const calc = (a, b, op) => {
         if (op === '+') return a + b;
@@ -3576,7 +3585,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const addSuscripcion = () => setCosteo(c=>({...c, suscripciones:[...(c.suscripciones||[]),{nombre:'Nueva suscripción',monto:'0'}]}));
                     const delSuscripcion = (i) => setCosteo(c=>({...c, suscripciones:(c.suscripciones||[]).filter((_,idx)=>idx!==i)}));
                     const addCalc = () => setCalcList(arr=>[...arr, (arr[arr.length-1]||0)+1]);
-                    const delCalc = (id) => setCalcList(arr=> arr.length<=1 ? arr : arr.filter(x=>x!==id));
+                    const delCalc = (id) => { try { sessionStorage.removeItem('calcStateV1_'+id); } catch {} setCalcList(arr=> arr.length<=1 ? arr : arr.filter(x=>x!==id)); };
                     const tabs = [['calculadora','Calculadora Precio'],['multi','Calculadoras'],['proyeccion','Proyección']];
 
                     return <>
@@ -3624,7 +3633,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>
                             {calcList.map((id,i)=>(
-                                <BasicCalculator key={id} title={`Calculadora ${i+1}`} removable={calcList.length>1} onRemove={()=>delCalc(id)} />
+                                <BasicCalculator key={id} id={id} title={`Calculadora ${i+1}`} removable={calcList.length>1} onRemove={()=>delCalc(id)} />
                             ))}
                         </div>
                     </div>
