@@ -3572,10 +3572,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const roi = costosTotales>0 ? profit/costosTotales : 0;
                     const margenActual = precio>0 ? profit/precio*100 : 0;
                     const cpaBreakeven = precio - costosOp;
-                    // Precio de comparación: el que subes en Shopify (compare_at_price) por encima del real.
+                    // Precio de comparación: el que subes en Shopify (compare_at_price). Se calcula como
+                    // precio ÷ (1 - %) para que el badge de descuento de Shopify diga exactamente ese %
+                    // (un markup directo, ej. precio×1.20, da un badge menor: 1900→2280 solo marca 17% off).
                     // Paquetes y downsells usan este número como referencia "antes", no el precio real,
                     // para que el % de descuento que ve el cliente se vea más alto.
-                    const precioComparacion = precio * (1 + n(costeo.pctComparacion) / 100);
+                    const pctComp = Math.min(Math.max(n(costeo.pctComparacion), 0), 99) / 100;
+                    const precioComparacion = precio / (1 - pctComp);
                     const mObj = n(costeo.margenObjetivo)/100;
                     const precioOptimoRaw = mObj<1 ? costosTotales/(1-mObj) : costosTotales;
                     const precioOptimo = Math.ceil(precioOptimoRaw/50)*50;
@@ -3951,7 +3954,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <div style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>Precio de comparación (Shopify)</div>
                                     <div style={{fontSize:'30px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)',letterSpacing:'-1px',lineHeight:1}}>{money(precioComparacion)}</div>
                                     <div style={{fontSize:'11px',color:'var(--text-dimmer)',marginTop:6,display:'flex',alignItems:'center',gap:4}}>
-                                        Markup: <input type="number" step="1" min="0" className="cst-margin-input" value={costeo.pctComparacion} onChange={e=>upd('pctComparacion',e.target.value)} style={{width:34,fontFamily:'Fira Code',fontWeight:700,color:'var(--text-dim)',background:'transparent',border:'none',borderBottom:'1px dashed var(--glass-border)',outline:'none',padding:0}} />% sobre el precio real (va en compare_at_price)
+                                        Badge de descuento: <input type="number" step="1" min="0" max="99" className="cst-margin-input" value={costeo.pctComparacion} onChange={e=>upd('pctComparacion',e.target.value)} style={{width:30,fontFamily:'Fira Code',fontWeight:700,color:'var(--text-dim)',background:'transparent',border:'none',borderBottom:'1px dashed var(--glass-border)',outline:'none',padding:0}} />% off exacto en Shopify (va en compare_at_price)
                                     </div>
                                 </div>
                             </div>
