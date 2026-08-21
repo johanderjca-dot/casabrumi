@@ -1379,6 +1379,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [costeoTab,    setCosteoTab]    = useState('calculadora');
     const [paqueteSeleccionado, setPaqueteSeleccionado] = useState(null);
     const [downsellSeleccionado, setDownsellSeleccionado] = useState(null);
+    const [downsellUnidades, setDownsellUnidades] = useState(1);
     const [proyeccionCantidad, setProyeccionCantidad] = useState(50);
     const [calcList, setCalcList] = useState(() => {
         try { const saved = JSON.parse(localStorage.getItem('calcListV1')); return Array.isArray(saved) && saved.length>0 ? saved : [1,2,3]; }
@@ -3617,14 +3618,18 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         return { precioSinCombo, ahorro, descuentoEfectivo, precioFinal, costosTotalPaq, gananciaBruta, margenPaq, roiPaq, unidades };
                     };
 
-                    const calcularDownsell = (descuentoPct) => {
-                        const precioDownsell = precio * (1 - descuentoPct / 100);
-                        const costosDownsell = costosOp + cpaReal;
+                    // Downsell de N unidades: parte del precio real del paquete de N (calcularPaquete)
+                    // y le aplica el % de descuento. Los costos no cambian con el descuento.
+                    const calcularDownsell = (unidades, descuentoPct) => {
+                        const basePaquete = calcularPaquete(unidades);
+                        const precioBase = basePaquete.precioFinal;
+                        const precioDownsell = precioBase * (1 - descuentoPct / 100);
+                        const costosDownsell = basePaquete.costosTotalPaq;
                         const gananciaDownsell = precioDownsell - costosDownsell;
                         const margenDownsell = precioDownsell > 0 ? (gananciaDownsell / precioDownsell) * 100 : 0;
-                        const margenMinimo = profit * 1.1; // 10% por encima de la ganancia principal
+                        const margenMinimo = profit * 1.1; // 10% por encima de la ganancia de una sola unidad
                         const esViable = gananciaDownsell >= margenMinimo;
-                        return { precioDownsell, gananciaDownsell, margenDownsell, esViable, margenMinimo };
+                        return { precioBase, precioDownsell, gananciaDownsell, margenDownsell, esViable, margenMinimo };
                     };
 
                     return <>
@@ -3705,16 +3710,21 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             {/* DOWNSELLS */}
                             <div className="card glass" style={{padding:'26px 28px'}}>
                                 <div style={{fontSize:15,fontWeight:800,color:'var(--text)',marginBottom:20}}>⬇️ Downsells (Recuperación)</div>
-                                <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:18}}>Ofertas con descuento para recuperar carritos abandonados. Mínimo: +10% rentabilidad vs oferta principal.</p>
+                                <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>Ofertas con descuento para recuperar carritos abandonados. Mínimo: +10% rentabilidad vs oferta principal.</p>
+                                <div style={{display:'flex',gap:6,marginBottom:16,background:'var(--cream-dark)',borderRadius:10,padding:3,border:'1px solid var(--glass-border)'}}>
+                                    {[1,2,3].map(u=>(
+                                        <button key={u} onClick={()=>setDownsellUnidades(u)} className="cst-tab" style={{flex:1,padding:'7px 10px',...(downsellUnidades===u?{background:'var(--surface-3)',color:'var(--orange)',boxShadow:'0 1px 4px rgba(11,38,34,0.10)'}:{})}}>{u===1?'1 producto':`Paquete ${u}`}</button>
+                                    ))}
+                                </div>
                                 <div style={{display:'flex',flexDirection:'column',gap:14}}>
                                     {[5,10,15].map((desc)=>{
-                                        const calcDown = calcularDownsell(desc);
+                                        const calcDown = calcularDownsell(downsellUnidades, desc);
                                         return (
                                             <div key={desc} style={{padding:'16px',borderRadius:12,background:calcDown.esViable?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${calcDown.esViable?'var(--orange-border)':'rgba(160,56,56,0.24)'}`,cursor:'pointer'}} onClick={()=>setDownsellSeleccionado(desc)}>
                                                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:12}}>
                                                     <div>
                                                         <div style={{fontSize:13,fontWeight:700,color:calcDown.esViable?'var(--text)':'#A03B3B',marginBottom:4}}>−{desc}% descuento</div>
-                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{money(precio)} → {money(calcDown.precioDownsell)}</div>
+                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{money(calcDown.precioBase)} → {money(calcDown.precioDownsell)}</div>
                                                     </div>
                                                     <span style={{fontSize:16,fontWeight:800,color:calcDown.esViable?'var(--orange)':'#A03B3B',fontFamily:'Fira Code'}}>{calcDown.esViable?'✓':'✗'}</span>
                                                 </div>
