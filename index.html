@@ -3678,9 +3678,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:12}}>
                                                     <div>
                                                         <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:4}}>{paq.nombre}</div>
-                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{money(precio)} + {paq.unidades-1} × ({money(n(costeo.costoProducto))} costo + {money(profit)} ganancia) · Ahorras {calcPaq.descuentoEfectivo.toFixed(1)}% vs. {paq.unidades} por separado</div>
+                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{money(precio)} + {paq.unidades-1} × ({money(n(costeo.costoProducto))} costo + {money(profit)} ganancia)</div>
                                                     </div>
-                                                    <span style={{fontSize:18,fontWeight:800,color:'var(--orange)',fontFamily:'Fira Code'}}>{money(calcPaq.precioFinal)}</span>
+                                                    <div style={{textAlign:'right'}}>
+                                                        <div style={{fontSize:11,color:'var(--text-dimmer)',textDecoration:'line-through'}}>{money(calcPaq.precioSinCombo)}</div>
+                                                        <span style={{fontSize:18,fontWeight:800,color:'var(--orange)',fontFamily:'Fira Code'}}>{money(calcPaq.precioFinal)}</span>
+                                                        <div style={{fontSize:10,fontWeight:700,color:'var(--orange)'}}>−{calcPaq.descuentoEfectivo.toFixed(1)}% de descuento real</div>
+                                                    </div>
                                                 </div>
                                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,fontSize:11}}>
                                                     <div style={{padding:'8px',background:'var(--cream-dark)',borderRadius:8}}>
