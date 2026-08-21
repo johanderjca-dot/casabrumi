@@ -21,6 +21,7 @@
 
             <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        .cst-margin-input::-webkit-inner-spin-button, .cst-margin-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
         :root {
             /* === TEAL/CORAL PALETTE === */
@@ -3894,7 +3895,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <div style={{fontSize:'9px',fontWeight:'700',color:'rgba(255,255,255,0.6)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:10}}>Estrategia de precio</div>
                                         <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end',marginBottom:10}}>
                                             <button onClick={()=>upd('margenObjetivo',String(Math.max(0.1,Math.round((n(costeo.margenObjetivo)-0.1)*10)/10)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>−</button>
-                                            <span style={{fontSize:'15px',fontWeight:'800',color:'#fff',fontFamily:'Fira Code',minWidth:46,textAlign:'center'}}>{n(costeo.margenObjetivo).toFixed(1)}%</span>
+                                            <div style={{display:'flex',alignItems:'center',gap:2}}>
+                                                <input type="number" step="0.1" min="0.1" max="95" className="cst-margin-input" value={costeo.margenObjetivo} onChange={e=>upd('margenObjetivo',e.target.value)} onBlur={e=>upd('margenObjetivo',String(Math.min(95,Math.max(0.1,n(e.target.value)))))} style={{width:52,fontSize:'15px',fontWeight:'800',color:'#fff',fontFamily:'Fira Code',textAlign:'center',background:'transparent',border:'none',outline:'none',padding:0,MozAppearance:'textfield'}} />
+                                                <span style={{fontSize:'15px',fontWeight:'800',color:'#fff',fontFamily:'Fira Code'}}>%</span>
+                                            </div>
                                             <button onClick={()=>upd('margenObjetivo',String(Math.min(95,Math.round((n(costeo.margenObjetivo)+0.1)*10)/10)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>+</button>
                                         </div>
                                         <button className="cst-pill-btn" onClick={()=>upd('precioVenta',String(precioOptimo))}>Aplicar {money(precioOptimo)} ✓</button>
