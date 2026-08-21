@@ -1359,6 +1359,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         logisticaActiva: 0,
         costosExtra: [{ nombre:'Empaque / Caja', monto:'50' }, { nombre:'Papelería', monto:'10' }],
         suscripciones: [],
+        paquetes: [
+            { unidades: 2, descuento: 8, nombre: 'Combo 2 unidades' },
+            { unidades: 3, descuento: 15, nombre: 'Combo 3 unidades' }
+        ],
+        downsells: [
+            { descuento: 5, margenMinimo: 10, activo: true },
+            { descuento: 10, margenMinimo: 10, activo: true },
+            { descuento: 15, margenMinimo: 10, activo: true }
+        ],
     };
     const [costeo, setCosteo] = useState(() => {
         try { return { ...COSTEO_DEFAULTS, ...JSON.parse(localStorage.getItem('costeoCalcV2') || '{}') }; }
@@ -1367,6 +1376,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     useEffect(() => { try { localStorage.setItem('costeoCalcV2', JSON.stringify(costeo)); } catch {} }, [costeo]);
     const [costeoMoneda, setCosteoMoneda] = useState('DOP');
     const [costeoTab,    setCosteoTab]    = useState('calculadora');
+    const [paqueteSeleccionado, setPaqueteSeleccionado] = useState(null);
+    const [downsellSeleccionado, setDownsellSeleccionado] = useState(null);
     const [proyeccionCantidad, setProyeccionCantidad] = useState(50);
     const [calcList, setCalcList] = useState(() => {
         try { const saved = JSON.parse(localStorage.getItem('calcListV1')); return Array.isArray(saved) && saved.length>0 ? saved : [1,2,3]; }
@@ -3586,7 +3597,31 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const delSuscripcion = (i) => setCosteo(c=>({...c, suscripciones:(c.suscripciones||[]).filter((_,idx)=>idx!==i)}));
                     const addCalc = () => setCalcList(arr=>[...arr, (arr[arr.length-1]||0)+1]);
                     const delCalc = (id) => { try { sessionStorage.removeItem('calcStateV1_'+id); } catch {} setCalcList(arr=> arr.length<=1 ? arr : arr.filter(x=>x!==id)); };
-                    const tabs = [['calculadora','Calculadora Precio'],['multi','Calculadoras'],['proyeccion','Proyección']];
+                    const tabs = [['calculadora','Calculadora Precio'],['paquetes','Paquetes & Downsells'],['multi','Calculadoras'],['proyeccion','Proyección']];
+
+                    // ── FUNCIONES PARA PAQUETES Y DOWNSELLS ──
+                    const calcularPaquete = (unidades, descuentoPct) => {
+                        const precioBruto = precio * unidades;
+                        const descuentoMonto = precioBruto * (descuentoPct / 100);
+                        const precioFinal = precioBruto - descuentoMonto;
+                        const costosUnitarios = costosOp * unidades;
+                        const cpaDistribuido = cpaReal * unidades;
+                        const costosTotalPaq = costosUnitarios + cpaDistribuido;
+                        const gananciaBruta = precioFinal - costosTotalPaq;
+                        const margenPaq = precioFinal > 0 ? (gananciaBruta / precioFinal) * 100 : 0;
+                        const roiPaq = costosTotalPaq > 0 ? gananciaBruta / costosTotalPaq : 0;
+                        return { precioBruto, descuentoMonto, precioFinal, costosTotalPaq, gananciaBruta, margenPaq, roiPaq, unidades };
+                    };
+
+                    const calcularDownsell = (descuentoPct) => {
+                        const precioDownsell = precio * (1 - descuentoPct / 100);
+                        const costosDownsell = costosOp + cpaReal;
+                        const gananciaDownsell = precioDownsell - costosDownsell;
+                        const margenDownsell = precioDownsell > 0 ? (gananciaDownsell / precioDownsell) * 100 : 0;
+                        const margenMinimo = profit * 1.1; // 10% por encima de la ganancia principal
+                        const esViable = gananciaDownsell >= margenMinimo;
+                        return { precioDownsell, gananciaDownsell, margenDownsell, esViable, margenMinimo };
+                    };
 
                     return <>
                     <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
@@ -3623,6 +3658,73 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             <div style={{marginTop:28,padding:'22px 26px',borderRadius:14,background:profit>=0?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${profit>=0?'var(--orange-border)':'rgba(160,56,56,0.24)'}`}}>
                                 <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:6}}>Utilidad neta proyectada</div>
                                 <div style={{fontSize:34,fontWeight:800,fontFamily:'Fira Code',color:profit>=0?'var(--orange)':'#A03B3B'}}>{money(profit*proyeccionCantidad)}</div>
+                            </div>
+                        </div>
+                    ) : costeoTab==='paquetes' ? (
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+                            {/* PAQUETES */}
+                            <div className="card glass" style={{padding:'26px 28px'}}>
+                                <div style={{fontSize:15,fontWeight:800,color:'var(--text)',marginBottom:20}}>📦 Paquetes (Mismo Producto)</div>
+                                <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:18}}>Crear ofertas con múltiples unidades del mismo producto a descuento progresivo.</p>
+                                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                                    {(costeo.paquetes||[]).map((paq,i)=>{
+                                        const calcPaq = calcularPaquete(paq.unidades, paq.descuento);
+                                        return (
+                                            <div key={i} style={{padding:'16px',borderRadius:12,background:'var(--surface-3)',border:'1px solid var(--glass-border)',cursor:'pointer'}} onClick={()=>setPaqueteSeleccionado(i)} className={paqueteSeleccionado===i?'':''}>
+                                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:12}}>
+                                                    <div>
+                                                        <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:4}}>{paq.nombre}</div>
+                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{paq.unidades} unidades × {money(precio)} − {paq.descuento}% descuento</div>
+                                                    </div>
+                                                    <span style={{fontSize:18,fontWeight:800,color:'var(--orange)',fontFamily:'Fira Code'}}>{money(calcPaq.precioFinal)}</span>
+                                                </div>
+                                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,fontSize:11}}>
+                                                    <div style={{padding:'8px',background:'var(--cream-dark)',borderRadius:8}}>
+                                                        <div style={{color:'var(--text-dimmer)',fontSize:'10px',marginBottom:2}}>Ganancia</div>
+                                                        <div style={{color:calcPaq.gananciaBruta>=0?'var(--orange)':'#A03B3B',fontWeight:700}}>{money(calcPaq.gananciaBruta)}</div>
+                                                    </div>
+                                                    <div style={{padding:'8px',background:'var(--cream-dark)',borderRadius:8}}>
+                                                        <div style={{color:'var(--text-dimmer)',fontSize:'10px',marginBottom:2}}>Margen</div>
+                                                        <div style={{color:calcPaq.margenPaq>=30?'var(--orange)':'#FF7A63',fontWeight:700}}>{calcPaq.margenPaq.toFixed(1)}%</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* DOWNSELLS */}
+                            <div className="card glass" style={{padding:'26px 28px'}}>
+                                <div style={{fontSize:15,fontWeight:800,color:'var(--text)',marginBottom:20}}>⬇️ Downsells (Recuperación)</div>
+                                <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:18}}>Ofertas con descuento para recuperar carritos abandonados. Mínimo: +10% rentabilidad vs oferta principal.</p>
+                                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                                    {[5,10,15].map((desc)=>{
+                                        const calcDown = calcularDownsell(desc);
+                                        return (
+                                            <div key={desc} style={{padding:'16px',borderRadius:12,background:calcDown.esViable?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${calcDown.esViable?'var(--orange-border)':'rgba(160,56,56,0.24)'}`,cursor:'pointer'}} onClick={()=>setDownsellSeleccionado(desc)}>
+                                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:12}}>
+                                                    <div>
+                                                        <div style={{fontSize:13,fontWeight:700,color:calcDown.esViable?'var(--text)':'#A03B3B',marginBottom:4}}>−{desc}% descuento</div>
+                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{money(precio)} → {money(calcDown.precioDownsell)}</div>
+                                                    </div>
+                                                    <span style={{fontSize:16,fontWeight:800,color:calcDown.esViable?'var(--orange)':'#A03B3B',fontFamily:'Fira Code'}}>{calcDown.esViable?'✓':'✗'}</span>
+                                                </div>
+                                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,fontSize:11}}>
+                                                    <div style={{padding:'8px',background:'rgba(0,0,0,0.04)',borderRadius:8}}>
+                                                        <div style={{color:'var(--text-dimmer)',fontSize:'10px',marginBottom:2}}>Ganancia</div>
+                                                        <div style={{color:calcDown.esViable?'var(--orange)':'#A03B3B',fontWeight:700}}>{money(calcDown.gananciaDownsell)}</div>
+                                                    </div>
+                                                    <div style={{padding:'8px',background:'rgba(0,0,0,0.04)',borderRadius:8}}>
+                                                        <div style={{color:'var(--text-dimmer)',fontSize:'10px',marginBottom:2}}>Margen</div>
+                                                        <div style={{color:calcDown.esViable?'var(--orange)':'#A03B3B',fontWeight:700}}>{calcDown.margenDownsell.toFixed(1)}%</div>
+                                                    </div>
+                                                </div>
+                                                {!calcDown.esViable && <div style={{marginTop:10,fontSize:10,color:'#A03B3B',fontWeight:600}}>⚠️ No cumple mínimo de +10% rentabilidad</div>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     ) : costeoTab==='multi' ? (
