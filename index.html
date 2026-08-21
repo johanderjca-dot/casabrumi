@@ -3627,9 +3627,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const costosDownsell = basePaquete.costosTotalPaq;
                         const gananciaDownsell = precioDownsell - costosDownsell;
                         const margenDownsell = precioDownsell > 0 ? (gananciaDownsell / precioDownsell) * 100 : 0;
-                        const margenMinimo = profit * 1.1; // 10% por encima de la ganancia de una sola unidad
-                        const esViable = gananciaDownsell >= margenMinimo;
-                        return { precioBase, precioDownsell, gananciaDownsell, margenDownsell, esViable, margenMinimo };
+                        const margenMinimoPct = 10; // margen mínimo aceptable, aunque el precio esté rebajado
+                        const esViable = margenDownsell >= margenMinimoPct;
+                        return { precioBase, precioDownsell, gananciaDownsell, margenDownsell, esViable, margenMinimoPct };
                     };
 
                     return <>
@@ -3710,7 +3710,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             {/* DOWNSELLS */}
                             <div className="card glass" style={{padding:'26px 28px'}}>
                                 <div style={{fontSize:15,fontWeight:800,color:'var(--text)',marginBottom:20}}>⬇️ Downsells (Recuperación)</div>
-                                <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>Ofertas con descuento para recuperar carritos abandonados. Mínimo: +10% rentabilidad vs oferta principal.</p>
+                                <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>Ofertas con descuento para recuperar carritos abandonados. Mínimo: 10% de margen de ganancia.</p>
                                 <div style={{display:'flex',gap:6,marginBottom:16,background:'var(--cream-dark)',borderRadius:10,padding:3,border:'1px solid var(--glass-border)'}}>
                                     {[1,2,3].map(u=>(
                                         <button key={u} onClick={()=>setDownsellUnidades(u)} className="cst-tab" style={{flex:1,padding:'7px 10px',...(downsellUnidades===u?{background:'var(--surface-3)',color:'var(--orange)',boxShadow:'0 1px 4px rgba(11,38,34,0.10)'}:{})}}>{u===1?'1 producto':`Paquete ${u}`}</button>
@@ -3738,7 +3738,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         <div style={{color:calcDown.esViable?'var(--orange)':'#A03B3B',fontWeight:700}}>{calcDown.margenDownsell.toFixed(1)}%</div>
                                                     </div>
                                                 </div>
-                                                {!calcDown.esViable && <div style={{marginTop:10,fontSize:10,color:'#A03B3B',fontWeight:600}}>⚠️ No cumple mínimo de +10% rentabilidad</div>}
+                                                {!calcDown.esViable && <div style={{marginTop:10,fontSize:10,color:'#A03B3B',fontWeight:600}}>⚠️ Con este descuento el margen queda en {calcDown.margenDownsell.toFixed(1)}%, por debajo del mínimo de {calcDown.margenMinimoPct}%</div>}
                                             </div>
                                         );
                                     })}
