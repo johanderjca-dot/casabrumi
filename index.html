@@ -1361,8 +1361,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         costosExtra: [{ nombre:'Empaque / Caja', monto:'50' }, { nombre:'Papelería', monto:'10' }],
         suscripciones: [],
         paquetes: [
-            { unidades: 2, descuento: 8, nombre: 'Combo 2 unidades' },
-            { unidades: 3, descuento: 15, nombre: 'Combo 3 unidades' }
+            { unidades: 2, nombre: 'Combo 2 unidades' },
+            { unidades: 3, nombre: 'Combo 3 unidades' }
         ],
         downsells: [
             { descuento: 5, margenMinimo: 10, activo: true },
@@ -3601,19 +3601,20 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const tabs = [['calculadora','Calculadora Precio'],['paquetes','Paquetes & Downsells'],['multi','Calculadoras'],['proyeccion','Proyección']];
 
                     // ── FUNCIONES PARA PAQUETES Y DOWNSELLS ──
-                    const calcularPaquete = (unidades, descuentoPct) => {
-                        const precioBruto = precio * unidades;
-                        const descuentoMonto = precioBruto * (descuentoPct / 100);
-                        const precioFinal = precioBruto - descuentoMonto;
-                        // Solo el costo de producto escala por unidad. Flete, extras, suscripciones y CPA
-                        // se cobran una sola vez: es el mismo envío y la misma conversión de anuncio para todo el pedido.
-                        const costoProductoTotal = n(costeo.costoProducto) * unidades;
-                        const costosOrdenUnica = fleteAjustado + extras + suscripciones + cpaReal;
-                        const costosTotalPaq = costoProductoTotal + costosOrdenUnica;
+                    // El precio base (precio) ya cubre flete, CPA y % de entrega/confirmación de UN pedido.
+                    // Por cada unidad extra en el mismo pedido solo se suma su costo de producto + la misma
+                    // ganancia unitaria (el envío, el CPA y las tasas de entrega/confirmación no se repiten).
+                    const calcularPaquete = (unidades) => {
+                        const costoUnit = n(costeo.costoProducto);
+                        const precioFinal = precio + (unidades - 1) * (costoUnit + profit);
+                        const precioSinCombo = precio * unidades;
+                        const ahorro = precioSinCombo - precioFinal;
+                        const descuentoEfectivo = precioSinCombo > 0 ? (ahorro / precioSinCombo) * 100 : 0;
+                        const costosTotalPaq = costoUnit * unidades + fleteAjustado + extras + suscripciones + cpaReal;
                         const gananciaBruta = precioFinal - costosTotalPaq;
                         const margenPaq = precioFinal > 0 ? (gananciaBruta / precioFinal) * 100 : 0;
                         const roiPaq = costosTotalPaq > 0 ? gananciaBruta / costosTotalPaq : 0;
-                        return { precioBruto, descuentoMonto, precioFinal, costosTotalPaq, gananciaBruta, margenPaq, roiPaq, unidades };
+                        return { precioSinCombo, ahorro, descuentoEfectivo, precioFinal, costosTotalPaq, gananciaBruta, margenPaq, roiPaq, unidades };
                     };
 
                     const calcularDownsell = (descuentoPct) => {
@@ -3671,13 +3672,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:18}}>Crear ofertas con múltiples unidades del mismo producto a descuento progresivo.</p>
                                 <div style={{display:'flex',flexDirection:'column',gap:14}}>
                                     {(costeo.paquetes||[]).map((paq,i)=>{
-                                        const calcPaq = calcularPaquete(paq.unidades, paq.descuento);
+                                        const calcPaq = calcularPaquete(paq.unidades);
                                         return (
                                             <div key={i} style={{padding:'16px',borderRadius:12,background:'var(--surface-3)',border:'1px solid var(--glass-border)',cursor:'pointer'}} onClick={()=>setPaqueteSeleccionado(i)} className={paqueteSeleccionado===i?'':''}>
                                                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:12}}>
                                                     <div>
                                                         <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:4}}>{paq.nombre}</div>
-                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{paq.unidades} unidades × {money(precio)} − {paq.descuento}% descuento</div>
+                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{money(precio)} + {paq.unidades-1} × ({money(n(costeo.costoProducto))} costo + {money(profit)} ganancia) · Ahorras {calcPaq.descuentoEfectivo.toFixed(1)}% vs. {paq.unidades} por separado</div>
                                                     </div>
                                                     <span style={{fontSize:18,fontWeight:800,color:'var(--orange)',fontFamily:'Fira Code'}}>{money(calcPaq.precioFinal)}</span>
                                                 </div>
