@@ -3605,9 +3605,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const precioBruto = precio * unidades;
                         const descuentoMonto = precioBruto * (descuentoPct / 100);
                         const precioFinal = precioBruto - descuentoMonto;
-                        const costosUnitarios = costosOp * unidades;
-                        const cpaDistribuido = cpaReal * unidades;
-                        const costosTotalPaq = costosUnitarios + cpaDistribuido;
+                        // Solo el costo de producto escala por unidad. Flete, extras, suscripciones y CPA
+                        // se cobran una sola vez: es el mismo envío y la misma conversión de anuncio para todo el pedido.
+                        const costoProductoTotal = n(costeo.costoProducto) * unidades;
+                        const costosOrdenUnica = fleteAjustado + extras + suscripciones + cpaReal;
+                        const costosTotalPaq = costoProductoTotal + costosOrdenUnica;
                         const gananciaBruta = precioFinal - costosTotalPaq;
                         const margenPaq = precioFinal > 0 ? (gananciaBruta / precioFinal) * 100 : 0;
                         const roiPaq = costosTotalPaq > 0 ? gananciaBruta / costosTotalPaq : 0;
