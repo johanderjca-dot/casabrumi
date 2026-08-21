@@ -3888,14 +3888,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <span className="cst-chip">✦ Recomendación</span>
                                         <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',margin:'18px 0 4px',fontWeight:'600'}}>Precio Óptimo Sugerido</div>
                                         <div style={{fontSize:'48px',fontWeight:'800',color:'#fff',letterSpacing:'-2px',lineHeight:1,fontFamily:'Fira Code'}}>{money(precioOptimo)}</div>
-                                        <div style={{fontSize:'12px',color:'rgba(255,255,255,0.78)',marginTop:8}}>Margen objetivo: <strong>{n(costeo.margenObjetivo)}%</strong> · Margen estimado: <strong>{margenOptimo.toFixed(1)}%</strong></div>
+                                        <div style={{fontSize:'12px',color:'rgba(255,255,255,0.78)',marginTop:8}}>Margen objetivo: <strong>{n(costeo.margenObjetivo).toFixed(1)}%</strong> · Margen estimado: <strong>{margenOptimo.toFixed(1)}%</strong></div>
                                     </div>
                                     <div style={{textAlign:'right'}}>
                                         <div style={{fontSize:'9px',fontWeight:'700',color:'rgba(255,255,255,0.6)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:10}}>Estrategia de precio</div>
                                         <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end',marginBottom:10}}>
-                                            <button onClick={()=>upd('margenObjetivo',String(Math.max(5,n(costeo.margenObjetivo)-5)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>−</button>
-                                            <span style={{fontSize:'15px',fontWeight:'800',color:'#fff',fontFamily:'Fira Code',minWidth:46,textAlign:'center'}}>{n(costeo.margenObjetivo)}%</span>
-                                            <button onClick={()=>upd('margenObjetivo',String(Math.min(95,n(costeo.margenObjetivo)+5)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>+</button>
+                                            <button onClick={()=>upd('margenObjetivo',String(Math.max(0.1,Math.round((n(costeo.margenObjetivo)-0.1)*10)/10)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>−</button>
+                                            <span style={{fontSize:'15px',fontWeight:'800',color:'#fff',fontFamily:'Fira Code',minWidth:46,textAlign:'center'}}>{n(costeo.margenObjetivo).toFixed(1)}%</span>
+                                            <button onClick={()=>upd('margenObjetivo',String(Math.min(95,Math.round((n(costeo.margenObjetivo)+0.1)*10)/10)))} style={{width:26,height:26,borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',cursor:'pointer',fontSize:'15px',lineHeight:1}}>+</button>
                                         </div>
                                         <button className="cst-pill-btn" onClick={()=>upd('precioVenta',String(precioOptimo))}>Aplicar {money(precioOptimo)} ✓</button>
                                         <div style={{fontSize:'10px',color:'rgba(255,255,255,0.6)',marginTop:8,fontStyle:'italic',maxWidth:180}}>Aplica el precio óptimo a tu simulación</div>
