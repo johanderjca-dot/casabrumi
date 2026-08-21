@@ -1355,6 +1355,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         pctConfirmacion: '80',
         pctEntrega: '60',
         margenObjetivo: '30',
+        pctComparacion: '20',
         tasaCambio: '61',
         logistica: [{ nombre:'Transportadora A', costoEnvio:'180', devolucionActiva:true }],
         logisticaActiva: 0,
@@ -3571,6 +3572,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const roi = costosTotales>0 ? profit/costosTotales : 0;
                     const margenActual = precio>0 ? profit/precio*100 : 0;
                     const cpaBreakeven = precio - costosOp;
+                    // Precio de comparación: el que subes en Shopify (compare_at_price) por encima del real.
+                    // Paquetes y downsells usan este número como referencia "antes", no el precio real,
+                    // para que el % de descuento que ve el cliente se vea más alto.
+                    const precioComparacion = precio * (1 + n(costeo.pctComparacion) / 100);
                     const mObj = n(costeo.margenObjetivo)/100;
                     const precioOptimoRaw = mObj<1 ? costosTotales/(1-mObj) : costosTotales;
                     const precioOptimo = Math.ceil(precioOptimoRaw/50)*50;
@@ -3608,7 +3613,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const calcularPaquete = (unidades) => {
                         const costoUnit = n(costeo.costoProducto);
                         const precioFinal = precio + (unidades - 1) * (costoUnit + profit);
-                        const precioSinCombo = precio * unidades;
+                        // Referencia "antes": el precio de comparación (el que se ve tachado en Shopify),
+                        // no el precio real, para que el % de descuento mostrado sea más alto.
+                        const precioSinCombo = precioComparacion * unidades;
                         const ahorro = precioSinCombo - precioFinal;
                         const descuentoEfectivo = precioSinCombo > 0 ? (ahorro / precioSinCombo) * 100 : 0;
                         const costosTotalPaq = costoUnit * unidades + fleteAjustado + extras + suscripciones + cpaReal;
@@ -3622,14 +3629,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     // y le aplica el % de descuento. Los costos no cambian con el descuento.
                     const calcularDownsell = (unidades, descuentoPct) => {
                         const basePaquete = calcularPaquete(unidades);
-                        const precioBase = basePaquete.precioFinal;
-                        const precioDownsell = precioBase * (1 - descuentoPct / 100);
+                        // El descuento real se aplica sobre el precio real del paquete: así se calculan
+                        // bien la ganancia y el margen, que no pueden inflarse.
+                        const precioDownsell = basePaquete.precioFinal * (1 - descuentoPct / 100);
                         const costosDownsell = basePaquete.costosTotalPaq;
                         const gananciaDownsell = precioDownsell - costosDownsell;
                         const margenDownsell = precioDownsell > 0 ? (gananciaDownsell / precioDownsell) * 100 : 0;
                         const margenMinimoPct = 10; // margen mínimo aceptable, aunque el precio esté rebajado
                         const esViable = margenDownsell >= margenMinimoPct;
-                        return { precioBase, precioDownsell, gananciaDownsell, margenDownsell, esViable, margenMinimoPct };
+                        // "Antes" que ve el cliente: el precio de comparación (Shopify) de ese mismo paquete,
+                        // no el precio real. Por eso el % de descuento mostrado es más alto que el descuentoPct.
+                        const precioBase = precioComparacion + (unidades - 1) * (n(costeo.costoProducto) + profit);
+                        const descuentoVisual = precioBase > 0 ? ((precioBase - precioDownsell) / precioBase) * 100 : 0;
+                        return { precioBase, precioDownsell, gananciaDownsell, margenDownsell, esViable, margenMinimoPct, descuentoVisual };
                     };
 
                     return <>
@@ -3723,8 +3735,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <div key={desc} style={{padding:'16px',borderRadius:12,background:calcDown.esViable?'var(--orange-dim)':'rgba(160,56,56,0.08)',border:`1px solid ${calcDown.esViable?'var(--orange-border)':'rgba(160,56,56,0.24)'}`,cursor:'pointer'}} onClick={()=>setDownsellSeleccionado(desc)}>
                                                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:12}}>
                                                     <div>
-                                                        <div style={{fontSize:13,fontWeight:700,color:calcDown.esViable?'var(--text)':'#A03B3B',marginBottom:4}}>−{desc}% descuento</div>
-                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{money(calcDown.precioBase)} → {money(calcDown.precioDownsell)}</div>
+                                                        <div style={{fontSize:13,fontWeight:700,color:calcDown.esViable?'var(--text)':'#A03B3B',marginBottom:4}}>−{desc}% descuento real · −{calcDown.descuentoVisual.toFixed(1)}% en Shopify</div>
+                                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}><span style={{textDecoration:'line-through'}}>{money(calcDown.precioBase)}</span> → {money(calcDown.precioDownsell)}</div>
                                                     </div>
                                                     <span style={{fontSize:16,fontWeight:800,color:calcDown.esViable?'var(--orange)':'#A03B3B',fontFamily:'Fira Code'}}>{calcDown.esViable?'✓':'✗'}</span>
                                                 </div>
@@ -3924,7 +3936,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 </div>
                             </div>
 
-                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:14}}>
                                 <div className="card glass cst-card">
                                     <div style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>Profit por pedido (1 ud)</div>
                                     <div style={{fontSize:'30px',fontWeight:'800',fontFamily:'Fira Code',color:profit>=0?'#3D7C47':'#A03B3B',letterSpacing:'-1px',lineHeight:1}}>{money(profit)}</div>
@@ -3934,6 +3946,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <div style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>CPA Breakeven</div>
                                     <div style={{fontSize:'30px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)',letterSpacing:'-1px',lineHeight:1}}>{money(cpaBreakeven)}</div>
                                     <div style={{fontSize:'11px',color:'var(--text-dimmer)',marginTop:6}}>Máximo que puedes gastar en ads (real) por venta antes de perder.</div>
+                                </div>
+                                <div className="card glass cst-card">
+                                    <div style={{fontSize:'9.5px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>Precio de comparación (Shopify)</div>
+                                    <div style={{fontSize:'30px',fontWeight:'800',fontFamily:'Fira Code',color:'var(--orange)',letterSpacing:'-1px',lineHeight:1}}>{money(precioComparacion)}</div>
+                                    <div style={{fontSize:'11px',color:'var(--text-dimmer)',marginTop:6,display:'flex',alignItems:'center',gap:4}}>
+                                        Markup: <input type="number" step="1" min="0" className="cst-margin-input" value={costeo.pctComparacion} onChange={e=>upd('pctComparacion',e.target.value)} style={{width:34,fontFamily:'Fira Code',fontWeight:700,color:'var(--text-dim)',background:'transparent',border:'none',borderBottom:'1px dashed var(--glass-border)',outline:'none',padding:0}} />% sobre el precio real (va en compare_at_price)
+                                    </div>
                                 </div>
                             </div>
 
