@@ -1493,6 +1493,76 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const deleteProveedor = id => { if (confirm('¿Eliminar este proveedor?')) db.collection('proveedores').doc(id).delete().catch(console.error); };
 
 
+    // ── Salarios (nómina): empleados con salario fijo + historial de pagos por mes ──
+    const EMPLEADO_DEFAULT = { nombre:'', puesto:'', salario:'', diaPago:'1', notas:'', activo:true };
+    const [empleados,        setEmpleados]        = useState([]);
+    const [showEmpleadoModal, setShowEmpleadoModal] = useState(false);
+    const [editingEmpleado,  setEditingEmpleado]  = useState(null);
+    const [empleadoForm,     setEmpleadoForm]     = useState(EMPLEADO_DEFAULT);
+    const [savingEmpleado,   setSavingEmpleado]   = useState(false);
+    const [pagosSalarios,    setPagosSalarios]    = useState([]);
+    const [salariosMesNomina, setSalariosMesNomina] = useState(() => fechaLocalISO().slice(0,7));
+
+    useEffect(() => {
+        const unsub = db.collection('empleados').orderBy('creadoEn','desc').onSnapshot(
+            snap => setEmpleados(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Empleados:', err)
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('pagos_salarios').orderBy('mes','desc').onSnapshot(
+            snap => setPagosSalarios(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Pagos salarios:', err)
+        );
+        return unsub;
+    }, []);
+
+    const saveEmpleado = async () => {
+        if (!empleadoForm.nombre.trim() || savingEmpleado) return;
+        setSavingEmpleado(true);
+        try {
+            const data = {
+                nombre: empleadoForm.nombre.trim(),
+                puesto: empleadoForm.puesto.trim(),
+                salario: parseFloat(empleadoForm.salario) || 0,
+                diaPago: Math.min(Math.max(parseInt(empleadoForm.diaPago) || 1, 1), 31),
+                notas: empleadoForm.notas.trim(),
+                activo: !!empleadoForm.activo,
+            };
+            if (editingEmpleado) {
+                await db.collection('empleados').doc(editingEmpleado.id).update(data);
+            } else {
+                await db.collection('empleados').add({ ...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+            setEmpleadoForm(EMPLEADO_DEFAULT);
+            setEditingEmpleado(null);
+            setShowEmpleadoModal(false);
+        } catch(err) { console.error('Error guardando empleado:', err); }
+        finally { setSavingEmpleado(false); }
+    };
+    const openEditEmpleado = em => { setEditingEmpleado(em); setEmpleadoForm({ nombre:em.nombre||'', puesto:em.puesto||'', salario:String(em.salario||''), diaPago:String(em.diaPago||'1'), notas:em.notas||'', activo:em.activo!==false }); setShowEmpleadoModal(true); };
+    const deleteEmpleado = id => { if (confirm('¿Eliminar este empleado? También se pierde su historial de pagos.')) db.collection('empleados').doc(id).delete().catch(console.error); };
+
+    // doc id = `${empleadoId}_${mes}`: un solo registro por empleado y mes, fácil de crear/actualizar
+    const togglePagoSalario = async (empleado, mes) => {
+        const docId = `${empleado.id}_${mes}`;
+        const yaPagado = pagosSalarios.some(p => p.id === docId && p.pagado);
+        try {
+            if (yaPagado) {
+                await db.collection('pagos_salarios').doc(docId).set({ pagado:false, fechaPago:null }, {merge:true});
+            } else {
+                await db.collection('pagos_salarios').doc(docId).set({
+                    empleadoId: empleado.id, empleadoNombre: empleado.nombre, mes,
+                    monto: empleado.salario || 0, tiendaId: activeTiendaId,
+                    pagado: true, fechaPago: fechaLocalISO(),
+                }, {merge:true});
+            }
+        } catch(err) { console.error('Error registrando pago:', err); }
+    };
+
+
     // ── Tiendas (multi-negocio) ──
     const [tiendas,         setTiendas]         = useState([]);
     const [activeTiendaId,  setActiveTiendaId]  = useState(() => localStorage.getItem('brumi_active_tienda') || DEFAULT_TIENDA_ID);
@@ -1864,6 +1934,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ['vendedores','Usuarios'], ['proveedores','Proveedores'], ['ganadores','Productos'],
         ['cierre','Cierre Diario'], ['contabilidad','Contabilidad'], ['costeo','Calculadora Costeo'],
         ['diccionario','Diccionario'], ['accesos','Accesos Rápidos'], ['tiendas','Tiendas'],
+        ['salarios','Salarios'],
     ];
 
     const crearUsuario = async () => {
@@ -2280,6 +2351,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_target = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
     const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
     const I_balanza = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M12 6 5 6l3.5 8a3.5 3.5 0 0 0 7 0L19 6l-7 0"/><line x1="7" y1="20" x2="17" y2="20"/></svg>;
+    const I_wallet = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>;
 
     // Usuarios (gestión de cuentas) es siempre exclusivo del master, sin importar los checkboxes
     // de permisos guardados — evita que un vendedor con ese permiso cree/edite otras cuentas.
@@ -2298,6 +2370,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'ganadores',   label: 'Productos', icon: I_star },
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
             { key: 'contabilidad', label: 'Contabilidad', icon: I_balanza },
+            { key: 'salarios', label: 'Salarios', icon: I_wallet },
         ]},
         { label: 'Estrategia', items: [
             { key: 'plan', label: 'Plan Estratégico', icon: I_target },
@@ -2656,6 +2729,121 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             ))}
                         </div>
                     )}
+                    </>;
+                })()}
+
+                {activeTab === 'salarios' && (() => {
+                    const misEmpleados = empleados.filter(perteneceATienda);
+                    const empleadosActivos = misEmpleados.filter(e=>e.activo!==false);
+                    const empleadosInactivos = misEmpleados.filter(e=>e.activo===false);
+                    const misPagos = pagosSalarios.filter(p=>(p.tiendaId||DEFAULT_TIENDA_ID)===activeTiendaId);
+                    const pagoDe = empId => misPagos.find(p=>p.id===`${empId}_${salariosMesNomina}`);
+                    const totalNomina = empleadosActivos.reduce((s,e)=>s+(e.salario||0),0);
+                    const totalPagado = empleadosActivos.reduce((s,e)=>{ const p=pagoDe(e.id); return s+(p&&p.pagado?(p.monto||e.salario||0):0); },0);
+                    const totalPendiente = totalNomina - totalPagado;
+                    const historialPagado = misPagos.filter(p=>p.pagado).sort((a,b)=>(b.mes||'').localeCompare(a.mes||''));
+
+                    return <>
+                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+                        <div><h1>Salarios</h1><p>Nómina de empleados: salario fijo, día de pago y control mensual.</p></div>
+                        <button className="btn btn-gold" onClick={()=>{setEditingEmpleado(null);setEmpleadoForm(EMPLEADO_DEFAULT);setShowEmpleadoModal(true);}}>{I.plus} Nuevo empleado</button>
+                    </div>
+
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:14,marginBottom:20}}>
+                        <div className="card glass" style={{padding:'18px 20px'}}>
+                            <div style={{fontSize:'9.5px',fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>Nómina mensual (activos)</div>
+                            <div style={{fontSize:26,fontWeight:800,fontFamily:'Fira Code',color:'var(--text)'}}>RD${totalNomina.toLocaleString('es-DO')}</div>
+                        </div>
+                        <div className="card glass" style={{padding:'18px 20px'}}>
+                            <div style={{fontSize:'9.5px',fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>Pagado en {salariosMesNomina}</div>
+                            <div style={{fontSize:26,fontWeight:800,fontFamily:'Fira Code',color:'var(--orange)'}}>RD${totalPagado.toLocaleString('es-DO')}</div>
+                        </div>
+                        <div className="card glass" style={{padding:'18px 20px'}}>
+                            <div style={{fontSize:'9.5px',fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1.2px',marginBottom:8}}>Pendiente</div>
+                            <div style={{fontSize:26,fontWeight:800,fontFamily:'Fira Code',color:totalPendiente>0?'#A03B3B':'var(--text)'}}>RD${totalPendiente.toLocaleString('es-DO')}</div>
+                        </div>
+                    </div>
+
+                    <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:14}}>
+                        <label style={{fontSize:12,color:'var(--text-dim)'}}>Mes de nómina</label>
+                        <input type="month" className="form-input glass no-icon" style={{width:'auto',border:'1px solid var(--glass-border)'}} value={salariosMesNomina} onChange={e=>setSalariosMesNomina(e.target.value)} />
+                    </div>
+
+                    {empleadosActivos.length===0 ? (
+                        <div className="card glass"><div className="empty"><div className="empty-icon">{I_wallet}</div><h3>Sin empleados activos</h3><p>Agrega tu primer empleado para armar la nómina.</p></div></div>
+                    ) : (
+                        <div className="card glass" style={{overflowX:'auto',marginBottom:20}}>
+                            <table style={{minWidth:620}}>
+                                <thead><tr><th>Empleado</th><th>Puesto</th><th className="td-num">Salario</th><th>Día de pago</th><th>Estado {salariosMesNomina}</th><th></th></tr></thead>
+                                <tbody>
+                                    {empleadosActivos.map(em=>{
+                                        const pago = pagoDe(em.id);
+                                        const pagado = !!(pago && pago.pagado);
+                                        return (
+                                            <tr key={em.id}>
+                                                <td>{em.nombre}</td>
+                                                <td style={{color:'var(--text-dim)'}}>{em.puesto||'—'}</td>
+                                                <td className="td-num" style={{fontFamily:'Fira Code',fontWeight:700}}>RD${(em.salario||0).toLocaleString('es-DO')}</td>
+                                                <td>{em.diaPago||1}</td>
+                                                <td>
+                                                    <button className={`btn btn-sm ${pagado?'btn-gold':'btn-glass'}`} onClick={()=>togglePagoSalario(em,salariosMesNomina)}>
+                                                        {pagado ? `✓ Pagado ${pago.fechaPago||''}` : 'Marcar pagado'}
+                                                    </button>
+                                                </td>
+                                                <td>
+                                                    <div style={{display:'flex',gap:6}}>
+                                                        <button className="btn btn-glass btn-sm" onClick={()=>openEditEmpleado(em)}>{I.edit}</button>
+                                                        <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={()=>deleteEmpleado(em.id)}>Eliminar</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {empleadosInactivos.length>0 && (
+                        <div style={{marginBottom:20}}>
+                            <div style={{fontSize:12,fontWeight:700,color:'var(--text-dim)',marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>Inactivos</div>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:10}}>
+                                {empleadosInactivos.map(em=>(
+                                    <div key={em.id} className="card glass" style={{padding:'14px 16px',opacity:0.6}}>
+                                        <strong style={{fontSize:13}}>{em.nombre}</strong>
+                                        <div style={{fontSize:11,color:'var(--text-dimmer)'}}>{em.puesto||'—'} · RD${(em.salario||0).toLocaleString('es-DO')}</div>
+                                        <div style={{display:'flex',gap:8,marginTop:10}}>
+                                            <button className="btn btn-glass btn-sm" onClick={()=>openEditEmpleado(em)}>{I.edit} Editar</button>
+                                            <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={()=>deleteEmpleado(em.id)}>Eliminar</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <div style={{fontSize:12,fontWeight:700,color:'var(--text-dim)',marginBottom:8,textTransform:'uppercase',letterSpacing:1}}>Historial de pagos</div>
+                        {historialPagado.length===0 ? (
+                            <div className="card glass"><div className="empty"><p>Aún no hay pagos registrados.</p></div></div>
+                        ) : (
+                            <div className="card glass" style={{overflowX:'auto'}}>
+                                <table style={{minWidth:480}}>
+                                    <thead><tr><th>Mes</th><th>Empleado</th><th className="td-num">Monto</th><th>Fecha de pago</th></tr></thead>
+                                    <tbody>
+                                        {historialPagado.map(p=>(
+                                            <tr key={p.id}>
+                                                <td>{p.mes}</td>
+                                                <td>{p.empleadoNombre}</td>
+                                                <td className="td-num" style={{fontFamily:'Fira Code'}}>RD${(p.monto||0).toLocaleString('es-DO')}</td>
+                                                <td>{p.fechaPago}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
                     </>;
                 })()}
 
@@ -4853,6 +5041,54 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <button className="btn btn-glass" onClick={() => { setShowProveedorModal(false); setEditingProveedor(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={saveProveedor} disabled={savingProveedor||!proveedorForm.nombre.trim()}>
                                     {savingProveedor ? 'Guardando...' : (editingProveedor ? <>{I.edit} Guardar</> : <>{I.plus} Crear Proveedor</>)}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showEmpleadoModal && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowEmpleadoModal(false); setEditingEmpleado(null); } }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
+                            <div className="modal-hd">
+                                <h2>{editingEmpleado ? 'Editar Empleado' : 'Nuevo Empleado'}</h2>
+                                <button className="modal-close" onClick={() => { setShowEmpleadoModal(false); setEditingEmpleado(null); }}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Nombre completo</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={empleadoForm.nombre} onChange={e=>setEmpleadoForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Maria Lopez" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Puesto / Cargo</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={empleadoForm.puesto} onChange={e=>setEmpleadoForm(f=>({...f,puesto:e.target.value}))} placeholder="Ej. Atención al cliente" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Salario fijo mensual (RD$)</label>
+                                <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={empleadoForm.salario} onChange={e=>setEmpleadoForm(f=>({...f,salario:e.target.value}))} placeholder="0.00" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Día de pago (del mes)</label>
+                                <input type="number" min="1" max="31" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={empleadoForm.diaPago} onChange={e=>setEmpleadoForm(f=>({...f,diaPago:e.target.value}))} placeholder="1-31" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Notas</label>
+                                <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}}
+                                    value={empleadoForm.notas} onChange={e=>setEmpleadoForm(f=>({...f,notas:e.target.value}))} placeholder="Método de pago, cuenta bancaria, etc." />
+                            </div>
+                            <div className="form-group">
+                                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'var(--text-dim)',cursor:'pointer'}}>
+                                    <input type="checkbox" checked={empleadoForm.activo} onChange={e=>setEmpleadoForm(f=>({...f,activo:e.target.checked}))} />
+                                    Empleado activo
+                                </label>
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={() => { setShowEmpleadoModal(false); setEditingEmpleado(null); }}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={saveEmpleado} disabled={savingEmpleado||!empleadoForm.nombre.trim()}>
+                                    {savingEmpleado ? 'Guardando...' : (editingEmpleado ? <>{I.edit} Guardar</> : <>{I.plus} Crear Empleado</>)}
                                 </button>
                             </div>
                         </div>
