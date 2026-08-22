@@ -1466,6 +1466,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const PROVEEDOR_PAISES = ['China','República Dominicana','Venezuela','Estados Unidos','Otro'];
     const [proveedores,   setProveedores]   = useState([]);
     const [savingProveedorFila, setSavingProveedorFila] = useState(false);
+    const [proveedorSearch,     setProveedorSearch]     = useState('');
 
     useEffect(() => {
         const unsub = db.collection('proveedores').orderBy('creadoEn','desc').onSnapshot(
@@ -2778,14 +2779,25 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 })()}
 
                 {activeTab === 'proveedores' && (() => {
-                    const misProveedores = proveedores.filter(perteneceATienda);
+                    const q = proveedorSearch.trim().toLowerCase();
+                    const misProveedores = proveedores.filter(perteneceATienda).filter(pr => !q ||
+                        [pr.nombre, pr.pais, pr.contacto, pr.link, pr.notas].some(v => (v||'').toLowerCase().includes(q)));
                     return <>
-                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
                         <div><h1>Proveedores</h1><p>Gestión por país de origen</p></div>
-                        <button className="btn btn-gold" onClick={addProveedorFila} disabled={savingProveedorFila}>{I.plus} Nuevo proveedor</button>
+                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                            <div style={{position:'relative'}}>
+                                <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--text-dimmer)',pointerEvents:'none',display:'flex'}}>
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                </span>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',paddingLeft:32,width:220}}
+                                    value={proveedorSearch} onChange={e=>setProveedorSearch(e.target.value)} placeholder="Buscar proveedor..." />
+                            </div>
+                            <button className="btn btn-gold" onClick={addProveedorFila} disabled={savingProveedorFila}>{I.plus} Nuevo proveedor</button>
+                        </div>
                     </div>
                     {misProveedores.length===0 ? (
-                        <div className="card glass"><div className="empty"><div className="empty-icon">{I.truck}</div><h3>Sin proveedores aún</h3><p>Agrega tu primer proveedor para comenzar.</p></div></div>
+                        <div className="card glass"><div className="empty"><div className="empty-icon">{I.truck}</div><h3>{q?'Sin resultados':'Sin proveedores aún'}</h3><p>{q?`Nada coincide con "${proveedorSearch}".`:'Agrega tu primer proveedor para comenzar.'}</p></div></div>
                     ) : (
                         <div className="card glass" style={{overflowX:'auto'}}>
                             <table style={{minWidth:820}}>
