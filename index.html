@@ -1563,6 +1563,79 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     };
 
 
+    // ── Identidad de Marca: paleta de colores, tipografías y tono por marca ──
+    const MARCA_DEFAULT = { nombre:'', logo:'', colores:[], tipografias:[], tono:'', notas:'' };
+    const [marcas,        setMarcas]        = useState([]);
+    const [showMarcaModal, setShowMarcaModal] = useState(false);
+    const [editingMarca,  setEditingMarca]  = useState(null);
+    const [marcaForm,     setMarcaForm]     = useState(MARCA_DEFAULT);
+    const [savingMarca,   setSavingMarca]   = useState(false);
+
+    useEffect(() => {
+        const unsub = db.collection('marcas').orderBy('creadoEn','desc').onSnapshot(
+            snap => setMarcas(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Marcas:', err)
+        );
+        return unsub;
+    }, []);
+
+    const saveMarca = async () => {
+        if (!marcaForm.nombre.trim() || savingMarca) return;
+        setSavingMarca(true);
+        try {
+            const data = {
+                nombre: marcaForm.nombre.trim(),
+                logo: marcaForm.logo || '',
+                colores: (marcaForm.colores||[]).filter(c=>c.hex),
+                tipografias: (marcaForm.tipografias||[]).filter(t=>t.nombre.trim()),
+                tono: marcaForm.tono.trim(),
+                notas: marcaForm.notas.trim(),
+            };
+            if (editingMarca) {
+                await db.collection('marcas').doc(editingMarca.id).update(data);
+            } else {
+                await db.collection('marcas').add({ ...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+            setMarcaForm(MARCA_DEFAULT);
+            setEditingMarca(null);
+            setShowMarcaModal(false);
+        } catch(err) { console.error('Error guardando marca:', err); }
+        finally { setSavingMarca(false); }
+    };
+    const openEditMarca = m => { setEditingMarca(m); setMarcaForm({ nombre:m.nombre||'', logo:m.logo||'', colores:m.colores||[], tipografias:m.tipografias||[], tono:m.tono||'', notas:m.notas||'' }); setShowMarcaModal(true); };
+    const deleteMarca = id => { if (confirm('¿Eliminar esta marca?')) db.collection('marcas').doc(id).delete().catch(console.error); };
+
+    const updColorMarca = (i,k,v) => setMarcaForm(f=>({...f, colores:f.colores.map((c,idx)=>idx===i?{...c,[k]:v}:c)}));
+    const addColorMarca = () => setMarcaForm(f=>({...f, colores:[...(f.colores||[]),{nombre:'',hex:'#0B2622'}]}));
+    const delColorMarca = (i) => setMarcaForm(f=>({...f, colores:f.colores.filter((_,idx)=>idx!==i)}));
+
+    const updFuenteMarca = (i,k,v) => setMarcaForm(f=>({...f, tipografias:f.tipografias.map((t,idx)=>idx===i?{...t,[k]:v}:t)}));
+    const addFuenteMarca = () => setMarcaForm(f=>({...f, tipografias:[...(f.tipografias||[]),{nombre:'',uso:''}]}));
+    const delFuenteMarca = (i) => setMarcaForm(f=>({...f, tipografias:f.tipografias.filter((_,idx)=>idx!==i)}));
+
+    // Logo como dataURL (mismo enfoque que la foto de perfil): evita depender de Storage.
+    // Se reduce a un cuadro de máx. 320px conservando proporción, en PNG (soporta transparencia).
+    const handleLogoMarcaChange = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const maxDim = 320;
+                const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                const w = Math.max(1, Math.round(img.width * scale));
+                const h = Math.max(1, Math.round(img.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                setMarcaForm(f=>({...f, logo: canvas.toDataURL('image/png')}));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+
     // ── Tiendas (multi-negocio) ──
     const [tiendas,         setTiendas]         = useState([]);
     const [activeTiendaId,  setActiveTiendaId]  = useState(() => localStorage.getItem('brumi_active_tienda') || DEFAULT_TIENDA_ID);
@@ -1934,7 +2007,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ['vendedores','Usuarios'], ['proveedores','Proveedores'], ['ganadores','Productos'],
         ['cierre','Cierre Diario'], ['contabilidad','Contabilidad'], ['costeo','Calculadora Costeo'],
         ['diccionario','Diccionario'], ['accesos','Accesos Rápidos'], ['tiendas','Tiendas'],
-        ['salarios','Salarios'],
+        ['salarios','Salarios'], ['marcas','Identidad de Marca'],
     ];
 
     const crearUsuario = async () => {
@@ -2352,6 +2425,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
     const I_balanza = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M12 6 5 6l3.5 8a3.5 3.5 0 0 0 7 0L19 6l-7 0"/><line x1="7" y1="20" x2="17" y2="20"/></svg>;
     const I_wallet = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>;
+    const I_palette = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 0 20 2.5 2.5 0 0 0 0-5 2.5 2.5 0 0 1 0-5h1a5 5 0 0 0 5-5c0-2.76-2.24-5-5-5"/><circle cx="7" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="6" r="1.2" fill="currentColor" stroke="none"/></svg>;
 
     // Usuarios (gestión de cuentas) es siempre exclusivo del master, sin importar los checkboxes
     // de permisos guardados — evita que un vendedor con ese permiso cree/edite otras cuentas.
@@ -2377,6 +2451,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ]},
         { label: 'Herramientas', items: [
             { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
+            { key: 'marcas', label: 'Identidad de Marca', icon: I_palette },
             { key: 'diccionario', label: 'Diccionario', icon: I_book },
             { key: 'accesos', label: 'Accesos Rápidos', icon: I_link },
         ]},
@@ -2844,6 +2919,50 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </div>
                         )}
                     </div>
+                    </>;
+                })()}
+
+                {activeTab === 'marcas' && (() => {
+                    const misMarcas = marcas.filter(perteneceATienda);
+                    return <>
+                    <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                        <div><h1>Identidad de Marca</h1><p>Paleta de colores, tipografías y tono de voz por marca.</p></div>
+                        <button className="btn btn-gold" onClick={()=>{setEditingMarca(null);setMarcaForm(MARCA_DEFAULT);setShowMarcaModal(true);}}>{I.plus} Nueva marca</button>
+                    </div>
+                    {misMarcas.length===0 ? (
+                        <div className="card glass"><div className="empty"><div className="empty-icon">{I_palette}</div><h3>Sin marcas aún</h3><p>Agrega tu primera marca para documentar su identidad visual.</p></div></div>
+                    ) : (
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
+                            {misMarcas.map(m => (
+                                <div key={m.id} className="card glass" style={{padding:'18px 20px'}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+                                        {m.logo
+                                            ? <img src={m.logo} style={{width:44,height:44,objectFit:'contain',borderRadius:8,background:'var(--surface-3)',border:'1px solid var(--glass-border)'}} alt={m.nombre} />
+                                            : <div style={{width:44,height:44,borderRadius:8,background:'var(--surface-3)',border:'1px solid var(--glass-border)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-dimmer)'}}>{I_palette}</div>}
+                                        <strong style={{fontSize:15}}>{m.nombre}</strong>
+                                    </div>
+                                    {(m.colores||[]).length>0 && (
+                                        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+                                            {m.colores.map((c,i)=>(
+                                                <div key={i} title={`${c.nombre||''} ${c.hex}`} style={{width:24,height:24,borderRadius:6,background:c.hex,border:'1px solid var(--glass-border)'}} />
+                                            ))}
+                                        </div>
+                                    )}
+                                    {(m.tipografias||[]).length>0 && (
+                                        <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:6}}>
+                                            {m.tipografias.map(t=>t.nombre).filter(Boolean).join(' · ')}
+                                        </p>
+                                    )}
+                                    {m.tono && <p style={{fontSize:12,color:'var(--text-dimmer)',marginBottom:6,fontStyle:'italic'}}>"{m.tono}"</p>}
+                                    {m.notas && <p style={{fontSize:12,color:'var(--text-dimmer)',whiteSpace:'pre-wrap'}}>{m.notas}</p>}
+                                    <div style={{display:'flex',gap:8,marginTop:14}}>
+                                        <button className="btn btn-glass btn-sm" onClick={()=>openEditMarca(m)}>{I.edit} Editar</button>
+                                        <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={()=>deleteMarca(m.id)}>Eliminar</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     </>;
                 })()}
 
@@ -5089,6 +5208,81 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <button className="btn btn-glass" onClick={() => { setShowEmpleadoModal(false); setEditingEmpleado(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={saveEmpleado} disabled={savingEmpleado||!empleadoForm.nombre.trim()}>
                                     {savingEmpleado ? 'Guardando...' : (editingEmpleado ? <>{I.edit} Guardar</> : <>{I.plus} Crear Empleado</>)}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showMarcaModal && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowMarcaModal(false); setEditingMarca(null); } }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
+                            <div className="modal-hd">
+                                <h2>{editingMarca ? 'Editar Marca' : 'Nueva Marca'}</h2>
+                                <button className="modal-close" onClick={() => { setShowMarcaModal(false); setEditingMarca(null); }}>×</button>
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Nombre de la marca</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={marcaForm.nombre} onChange={e=>setMarcaForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Centella Skincare" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Logo</label>
+                                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                    {marcaForm.logo && <img src={marcaForm.logo} style={{width:56,height:56,objectFit:'contain',borderRadius:8,background:'var(--surface-3)',border:'1px solid var(--glass-border)'}} alt="logo" />}
+                                    <input type="file" accept="image/*" onChange={e=>{ if(e.target.files[0]) handleLogoMarcaChange(e.target.files[0]); e.target.value=''; }} />
+                                </div>
+                            </div>
+
+                            <div className="cst-sec-label" style={{justifyContent:'space-between'}}>
+                                <span>🎨 Paleta de colores</span>
+                                <button type="button" className="cst-add-btn" onClick={addColorMarca}>+ Color</button>
+                            </div>
+                            <div style={{marginBottom:16}}>
+                                {(marcaForm.colores||[]).map((c,i)=>(
+                                    <div key={i} className="cst-extra-row">
+                                        <input type="color" value={c.hex||'#000000'} onChange={ev=>updColorMarca(i,'hex',ev.target.value)} style={{width:32,height:32,border:'none',background:'none',padding:0,cursor:'pointer'}} />
+                                        <input value={c.nombre} onChange={ev=>updColorMarca(i,'nombre',ev.target.value)} placeholder="Nombre (ej. Verde Centella)"
+                                            style={{flex:1,fontSize:'12.5px',fontWeight:'600',color:'var(--text)',background:'transparent',border:'none',outline:'none'}} />
+                                        <input value={c.hex} onChange={ev=>updColorMarca(i,'hex',ev.target.value)} placeholder="#000000"
+                                            style={{width:80,fontSize:'12px',fontFamily:'Fira Code',color:'var(--text-dim)',background:'transparent',border:'none',outline:'none'}} />
+                                        <span onClick={()=>delColorMarca(i)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1,padding:'0 2px'}}>×</span>
+                                    </div>
+                                ))}
+                                {(marcaForm.colores||[]).length===0 && <div style={{fontSize:'11px',color:'var(--text-dimmer)',padding:'8px 2px'}}>Sin colores aún. Agrega los tonos de la marca.</div>}
+                            </div>
+
+                            <div className="cst-sec-label" style={{justifyContent:'space-between'}}>
+                                <span>🔤 Tipografías</span>
+                                <button type="button" className="cst-add-btn" onClick={addFuenteMarca}>+ Fuente</button>
+                            </div>
+                            <div style={{marginBottom:16}}>
+                                {(marcaForm.tipografias||[]).map((t,i)=>(
+                                    <div key={i} className="cst-extra-row">
+                                        <input value={t.nombre} onChange={ev=>updFuenteMarca(i,'nombre',ev.target.value)} placeholder="Ej. Poppins"
+                                            style={{flex:1,fontSize:'12.5px',fontWeight:'600',color:'var(--text)',background:'transparent',border:'none',outline:'none'}} />
+                                        <input value={t.uso} onChange={ev=>updFuenteMarca(i,'uso',ev.target.value)} placeholder="Uso (ej. Títulos)"
+                                            style={{width:120,fontSize:'12px',color:'var(--text-dim)',background:'transparent',border:'none',outline:'none'}} />
+                                        <span onClick={()=>delFuenteMarca(i)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1,padding:'0 2px'}}>×</span>
+                                    </div>
+                                ))}
+                                {(marcaForm.tipografias||[]).length===0 && <div style={{fontSize:'11px',color:'var(--text-dimmer)',padding:'8px 2px'}}>Sin tipografías aún.</div>}
+                            </div>
+
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Tono de voz</label>
+                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                    value={marcaForm.tono} onChange={e=>setMarcaForm(f=>({...f,tono:e.target.value}))} placeholder="Ej. Cercano, cálido, directo" />
+                            </div>
+                            <div className="form-group">
+                                <label style={{color:'var(--text-dim)'}}>Notas</label>
+                                <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}}
+                                    value={marcaForm.notas} onChange={e=>setMarcaForm(f=>({...f,notas:e.target.value}))} placeholder="Guías de uso, referencias, restricciones..." />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-glass" onClick={() => { setShowMarcaModal(false); setEditingMarca(null); }}>Cancelar</button>
+                                <button className="btn btn-gold" onClick={saveMarca} disabled={savingMarca||!marcaForm.nombre.trim()}>
+                                    {savingMarca ? 'Guardando...' : (editingMarca ? <>{I.edit} Guardar</> : <>{I.plus} Crear Marca</>)}
                                 </button>
                             </div>
                         </div>

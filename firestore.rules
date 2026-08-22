@@ -86,6 +86,9 @@ service cloud.firestore {
     match /empleados/{id}      { allow read, write: if tienePermiso('salarios'); }
     match /pagos_salarios/{id} { allow read, write: if tienePermiso('salarios'); }
 
+    // ── marcas ── identidad de marca (logo, paleta de colores, tipografías, tono)
+    match /marcas/{id} { allow read, write: if tienePermiso('marcas'); }
+
     // ── campanas ── Planeacion de Campanas, solo master
     match /campanas/{id}   { allow read, write: if isMaster(); }
 
