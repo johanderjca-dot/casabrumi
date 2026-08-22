@@ -3172,17 +3172,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const totalDespachados = todosPedidos.reduce((s,e)=>s+(e.despachados||0),0);
                     const totalEntregados  = todosPedidos.reduce((s,e)=>s+(e.entregados||0),0);
                     const tasaEntrega = totalDespachados>0 ? (totalEntregados/totalDespachados*100) : null;
+                    const totalRecibidas = lotesActuales.reduce((s,l)=>s+(l.unidadesRecibidas||0),0);
+                    const stockDisponible = totalRecibidas - totalDespachados;
 
                     const guardarLotes = nuevoLotes => db.collection('productos').doc(p.id).update({
                         lotes: nuevoLotes, pedidos: firebase.firestore.FieldValue.delete(), finanzas: firebase.firestore.FieldValue.delete(),
                     }).catch(console.error);
 
                     const crearLote = () => {
-                        const nuevo = { id:'lote_'+Date.now(), nombre:`Lote ${lotesActuales.length+1}`, pedidos:[], finanzas:{} };
+                        const nuevo = { id:'lote_'+Date.now(), nombre:`Lote ${lotesActuales.length+1}`, unidadesRecibidas:0, pedidos:[], finanzas:{} };
                         guardarLotes([...lotesActuales, nuevo]);
                         setLoteActivo(nuevo.id);
                     };
                     const renombrarLote = (loteId, nombre) => guardarLotes(lotesActuales.map(l=>l.id===loteId?{...l,nombre}:l));
+                    // Cantidad de unidades que llegaron físicamente en ese lote/envío — distinto de
+                    // despachados/entregados, que son el seguimiento de los pedidos ya enviados al cliente.
+                    const actualizarRecibidasLote = (loteId, unidades) => guardarLotes(lotesActuales.map(l=>l.id===loteId?{...l,unidadesRecibidas:Math.max(0,parseInt(unidades)||0)}:l));
                     const agregarPedidoLote = (loteId, fecha, despachados, entregados) => {
                         const entrada = { despachados: parseInt(despachados)||0, entregados: parseInt(entregados)||0, fecha: fecha || fechaLocalISO() };
                         guardarLotes(lotesActuales.map(l=>l.id===loteId?{...l,pedidos:[...(l.pedidos||[]),entrada]}:l));
@@ -3244,19 +3249,32 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </div>
                                     <div style={{display:'flex',flexDirection:'column',gap:16}}>
                                         <div className="card glass" style={{padding:'20px'}}>
-                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Descripción</div>
-                                            <div style={{fontSize:'14px',color:'var(--text)',lineHeight:'1.6'}}>{p.descripcion||<span style={{color:'var(--text-dimmer)'}}>Sin descripción — edita el producto para agregarla.</span>}</div>
-                                        </div>
-                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                                            {[
-                                                {label:'Entregados / Despachados', val: `${totalEntregados}/${totalDespachados}`},
-                                                {label:'Unidades vendidas', val: unidadesVendidasCalc||'—'},
-                                            ].map(({label,val})=>(
-                                                <div key={label} className="kpi-card glass glass-mid" style={{padding:'16px'}}>
-                                                    <div className="kpi-label">{label}</div>
-                                                    <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'20px',color:'var(--text)',marginTop:6}}>{val}</div>
+                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Entregados / Despachados por lote</div>
+                                            {lotesActuales.length===0 ? (
+                                                <p style={{fontSize:13,color:'var(--text-dimmer)'}}>Sin lotes aún — créalos desde la pestaña Inventario.</p>
+                                            ) : (
+                                                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                                    {lotesActuales.map(l=>{
+                                                        const desp = (l.pedidos||[]).reduce((s,e)=>s+(e.despachados||0),0);
+                                                        const ent  = (l.pedidos||[]).reduce((s,e)=>s+(e.entregados||0),0);
+                                                        return (
+                                                            <div key={l.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13,padding:'8px 0',borderBottom:'1px solid var(--glass-border)'}}>
+                                                                <span style={{color:'var(--text)',fontWeight:600}}>{l.nombre}</span>
+                                                                <span style={{fontFamily:'Fira Code',color:'var(--text-dim)'}}>{ent} entregados / {desp} despachados</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13,paddingTop:6,fontWeight:700}}>
+                                                        <span>Total</span>
+                                                        <span style={{fontFamily:'Fira Code',color:'var(--orange)'}}>{totalEntregados} entregados / {totalDespachados} despachados</span>
+                                                    </div>
                                                 </div>
-                                            ))}
+                                            )}
+                                        </div>
+                                        <div className="card glass" style={{padding:'16px'}}>
+                                            <div className="kpi-label">Unidades vendidas</div>
+                                            <div style={{fontFamily:'Fira Code',fontWeight:'700',fontSize:'20px',color:'var(--text)',marginTop:6}}>{unidadesVendidasCalc||'—'}</div>
+                                            <div style={{fontSize:11,color:'var(--text-dimmer)',marginTop:4}}>Suma de Cierre Diario — no siempre coincide con entregados: puede incluir ventas fuera del flujo de courier.</div>
                                         </div>
                                     </div>
                                 </div>
@@ -3461,15 +3479,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <>
                                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:16}}>
                                             {[
-                                                {label:'Despachados', val:String(totalDespachados), sub:'órdenes'},
-                                                {label:'Entregados', val:String(totalEntregados), sub:'exitosos sin devolución', ok:true},
-                                                {label:'Tasa de entrega', val:tasaEntrega!==null?`${tasaEntrega.toFixed(1)}%`:'—', sub:'entregados / despachados', ok:tasaEntrega!==null&&tasaEntrega>=70},
-                                                {label:'Vendidos', val:String(unidadesVendidasCalc), sub:'unidades — suma de Cierre Diario', ok:true},
-                                                {label:'Ganancia total', val:`RD$${gananciaTotal.toFixed(2)}`, sub:'facturado — suma de Cierre Diario', ok:gananciaTotal>0},
-                                                {label:'Ganancia neta', val:`RD$${gananciaNeta.toFixed(2)}`, sub:'facturado − gastos del producto', ok:gananciaNeta>0},
-                                            ].map(({label,val,sub,ok})=>(
+                                                {label:'Recibidas', val:String(totalRecibidas), sub:'unidades llegadas por lote', icon:I.box},
+                                                {label:'Stock disponible', val:String(stockDisponible), sub:'recibidas − despachadas', icon:I.box, ok:stockDisponible>0},
+                                                {label:'Despachados', val:String(totalDespachados), sub:'órdenes', icon:I.box},
+                                                {label:'Entregados', val:String(totalEntregados), sub:'exitosos sin devolución', icon:I.box, ok:true},
+                                                {label:'Tasa de entrega', val:tasaEntrega!==null?`${tasaEntrega.toFixed(1)}%`:'—', sub:'entregados / despachados', icon:I.box, ok:tasaEntrega!==null&&tasaEntrega>=70},
+                                                {label:'Vendidos', val:String(unidadesVendidasCalc), sub:'unidades — suma de Cierre Diario', icon:I.box, ok:true},
+                                                {label:'Ganancia total', val:`RD$${gananciaTotal.toFixed(2)}`, sub:'facturado — suma de Cierre Diario', icon:I.dollar, ok:gananciaTotal>0},
+                                                {label:'Ganancia neta', val:`RD$${gananciaNeta.toFixed(2)}`, sub:'facturado − gastos del producto', icon:I.dollar, ok:gananciaNeta>0},
+                                            ].map(({label,val,sub,icon,ok})=>(
                                                 <div key={label} className="kpi-card glass glass-mid">
-                                                    <div className="kpi-top"><div className="kpi-label">{label}</div><div className={`kpi-icon ${ok?'gold':'white'}`}>{I.dollar}</div></div>
+                                                    <div className="kpi-top"><div className="kpi-label">{label}</div><div className={`kpi-icon ${ok?'gold':'white'}`}>{icon}</div></div>
                                                     <div className="kpi-val" style={{fontSize:'20px',color:ok?'var(--sand-dark)':'var(--text)'}}>{val}</div>
                                                     <div className="kpi-sub">{sub}</div>
                                                 </div>
@@ -3491,11 +3511,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         {!loteSel ? (
                                             <div className="card glass"><div className="empty"><h3>Sin lotes aún</h3><p>Crea tu primer lote para registrar pedidos y gastos.</p></div></div>
                                         ) : <>
-                                        <div className="form-group" style={{maxWidth:260,marginBottom:20}}>
-                                            <label style={{color:'var(--text-dim)'}}>Nombre del lote</label>
-                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                defaultValue={loteSel.nombre} key={loteSel.id}
-                                                onBlur={e=>{ if(e.target.value.trim() && e.target.value.trim()!==loteSel.nombre) renombrarLote(loteSel.id, e.target.value.trim()); }} />
+                                        <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:20}}>
+                                            <div className="form-group" style={{maxWidth:260,marginBottom:0}}>
+                                                <label style={{color:'var(--text-dim)'}}>Nombre del lote</label>
+                                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                    defaultValue={loteSel.nombre} key={'nom_'+loteSel.id}
+                                                    onBlur={e=>{ if(e.target.value.trim() && e.target.value.trim()!==loteSel.nombre) renombrarLote(loteSel.id, e.target.value.trim()); }} />
+                                            </div>
+                                            <div className="form-group" style={{maxWidth:180,marginBottom:0}}>
+                                                <label style={{color:'var(--text-dim)'}}>Unidades recibidas</label>
+                                                <input type="number" className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                    defaultValue={loteSel.unidadesRecibidas||0} key={'rec_'+loteSel.id}
+                                                    onBlur={e=>{ if(Number(e.target.value)!==(loteSel.unidadesRecibidas||0)) actualizarRecibidasLote(loteSel.id, e.target.value); }} />
+                                            </div>
                                         </div>
 
                                         <div style={{fontSize:13,fontWeight:600,color:'var(--text)',marginBottom:12}}>Pedidos — despachados vs. entregados exitosos</div>
