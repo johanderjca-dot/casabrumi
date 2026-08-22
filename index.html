@@ -325,6 +325,10 @@
         tbody td:first-child { position: relative; }
         tbody td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2.5px; background: var(--orange); opacity: 0; transition: opacity 150ms ease; }
         @media (hover: hover) and (pointer: fine) { tbody tr:hover td { background: rgba(18,154,143,0.04); } tbody tr:hover td:first-child::before { opacity: 1; } }
+        .cell-input, .cell-select { width: 100%; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 5px 7px; margin: -5px -7px; cursor: text; }
+        .cell-select { cursor: pointer; }
+        .cell-input:hover, .cell-select:hover { background: var(--cream-dark); }
+        .cell-input:focus, .cell-select:focus { background: var(--surface-1); border-color: var(--orange-border); outline: none; box-shadow: 0 0 0 2px var(--orange-dim); }
         .td-num { font-family: 'Fira Code', monospace; font-weight: 600; color: var(--earth-2); }
 
         /* ========= BADGES ========= */
@@ -1456,14 +1460,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const ANALISIS_DEFAULT = { precioProveedor:'', proveedor:'', linkAnuncio:'', checks:{}, angulo1Titulo:'', angulo1Desc:'', angulo2Titulo:'', angulo2Desc:'', angulo3Titulo:'', angulo3Desc:'', comp1Nombre:'', comp1Precio:'', comp2Nombre:'', comp2Precio:'', creativoChecks:{}, notas:'' };
     const [analisisForm, setAnalisisForm] = useState(ANALISIS_DEFAULT);
 
-    // ── Proveedores ──
+    // ── Proveedores (tabla estilo hoja de cálculo, edición en línea por celda) ──
     const PROVEEDOR_PAISES = ['China','República Dominicana','Venezuela','Estados Unidos','Otro'];
-    const PROVEEDOR_DEFAULT = { nombre:'', pais:'China', contacto:'', link:'', notas:'' };
-    const [proveedores,        setProveedores]        = useState([]);
-    const [showProveedorModal, setShowProveedorModal] = useState(false);
-    const [editingProveedor,   setEditingProveedor]   = useState(null);
-    const [proveedorForm,      setProveedorForm]      = useState(PROVEEDOR_DEFAULT);
-    const [savingProveedor,    setSavingProveedor]    = useState(false);
+    const [proveedores,   setProveedores]   = useState([]);
+    const [savingProveedorFila, setSavingProveedorFila] = useState(false);
 
     useEffect(() => {
         const unsub = db.collection('proveedores').orderBy('creadoEn','desc').onSnapshot(
@@ -1473,23 +1473,21 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         return unsub;
     }, []);
 
-    const saveProveedor = async () => {
-        if (!proveedorForm.nombre.trim() || savingProveedor) return;
-        setSavingProveedor(true);
-        try {
-            const data = { nombre: proveedorForm.nombre.trim(), pais: proveedorForm.pais, contacto: proveedorForm.contacto.trim(), link: proveedorForm.link.trim(), notas: proveedorForm.notas.trim() };
-            if (editingProveedor) {
-                await db.collection('proveedores').doc(editingProveedor.id).update(data);
-            } else {
-                await db.collection('proveedores').add({ ...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp() });
-            }
-            setProveedorForm(PROVEEDOR_DEFAULT);
-            setEditingProveedor(null);
-            setShowProveedorModal(false);
-        } catch(err) { console.error('Error guardando proveedor:', err); }
-        finally { setSavingProveedor(false); }
+    // Guarda una sola celda al perder el foco (blur) o al cambiar el select de país.
+    const updProveedorCelda = (id, campo, valor) => {
+        db.collection('proveedores').doc(id).update({ [campo]: valor }).catch(err => console.error('Error guardando proveedor:', err));
     };
-    const openEditProveedor = pr => { setEditingProveedor(pr); setProveedorForm({ nombre:pr.nombre||'', pais:pr.pais||'China', contacto:pr.contacto||'', link:pr.link||'', notas:pr.notas||'' }); setShowProveedorModal(true); };
+    const addProveedorFila = async () => {
+        if (savingProveedorFila) return;
+        setSavingProveedorFila(true);
+        try {
+            await db.collection('proveedores').add({
+                nombre:'', pais: PROVEEDOR_PAISES[0], contacto:'', link:'', notas:'',
+                tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+        } catch(err) { console.error('Error creando proveedor:', err); }
+        finally { setSavingProveedorFila(false); }
+    };
     const deleteProveedor = id => { if (confirm('¿Eliminar este proveedor?')) db.collection('proveedores').doc(id).delete().catch(console.error); };
 
 
@@ -2781,27 +2779,48 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     return <>
                     <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                         <div><h1>Proveedores</h1><p>Gestión por país de origen</p></div>
-                        <button className="btn btn-gold" onClick={()=>{setEditingProveedor(null);setProveedorForm(PROVEEDOR_DEFAULT);setShowProveedorModal(true);}}>{I.plus} Nuevo proveedor</button>
+                        <button className="btn btn-gold" onClick={addProveedorFila} disabled={savingProveedorFila}>{I.plus} Nuevo proveedor</button>
                     </div>
                     {misProveedores.length===0 ? (
                         <div className="card glass"><div className="empty"><div className="empty-icon">{I.truck}</div><h3>Sin proveedores aún</h3><p>Agrega tu primer proveedor para comenzar.</p></div></div>
                     ) : (
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:14}}>
-                            {misProveedores.map(pr => (
-                                <div key={pr.id} className="card glass" style={{padding:'18px 20px'}}>
-                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                                        <strong style={{fontSize:14}}>{pr.nombre}</strong>
-                                        <span className="badge badge-gold" style={{fontSize:10}}><span className="badge-dot"/>{pr.pais}</span>
-                                    </div>
-                                    {pr.contacto && <p style={{fontSize:12,color:'var(--text-dim)',marginBottom:4}}>{pr.contacto}</p>}
-                                    {pr.link && <a href={pr.link} target="_blank" rel="noopener" style={{fontSize:12,color:'var(--orange)',display:'block',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pr.link} ↗</a>}
-                                    {pr.notas && <p style={{fontSize:12,color:'var(--text-dimmer)',marginTop:8,whiteSpace:'pre-wrap'}}>{pr.notas}</p>}
-                                    <div style={{display:'flex',gap:8,marginTop:14}}>
-                                        <button className="btn btn-glass btn-sm" onClick={()=>openEditProveedor(pr)}>{I.edit} Editar</button>
-                                        <button className="btn btn-glass btn-sm" style={{color:'#A03B3B'}} onClick={()=>deleteProveedor(pr.id)}>Eliminar</button>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="card glass" style={{overflowX:'auto'}}>
+                            <table style={{minWidth:820}}>
+                                <thead><tr><th style={{minWidth:160}}>Nombre</th><th style={{minWidth:140}}>País</th><th style={{minWidth:140}}>Contacto</th><th style={{minWidth:180}}>Link</th><th style={{minWidth:200}}>Notas</th><th></th></tr></thead>
+                                <tbody>
+                                    {misProveedores.map(pr => (
+                                        <tr key={pr.id}>
+                                            <td>
+                                                <input className="cell-input" defaultValue={pr.nombre} placeholder="Nombre del proveedor"
+                                                    onBlur={e=>{ if(e.target.value!==pr.nombre) updProveedorCelda(pr.id,'nombre',e.target.value); }} />
+                                            </td>
+                                            <td>
+                                                <select className="cell-select" value={pr.pais||PROVEEDOR_PAISES[0]} onChange={e=>updProveedorCelda(pr.id,'pais',e.target.value)}>
+                                                    {PROVEEDOR_PAISES.map(pais=><option key={pais} value={pais}>{pais}</option>)}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input className="cell-input" defaultValue={pr.contacto} placeholder="Teléfono, email, WhatsApp..."
+                                                    onBlur={e=>{ if(e.target.value!==pr.contacto) updProveedorCelda(pr.id,'contacto',e.target.value); }} />
+                                            </td>
+                                            <td>
+                                                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                                    <input className="cell-input" defaultValue={pr.link} placeholder="https://..."
+                                                        onBlur={e=>{ if(e.target.value!==pr.link) updProveedorCelda(pr.id,'link',e.target.value); }} />
+                                                    {pr.link && <a href={pr.link} target="_blank" rel="noopener" style={{color:'var(--orange)',flexShrink:0}}>↗</a>}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <input className="cell-input" defaultValue={pr.notas} placeholder="Condiciones de pago, tiempos de entrega..."
+                                                    onBlur={e=>{ if(e.target.value!==pr.notas) updProveedorCelda(pr.id,'notas',e.target.value); }} />
+                                            </td>
+                                            <td>
+                                                <span onClick={()=>deleteProveedor(pr.id)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:'17px',lineHeight:1,padding:'0 4px'}} title="Eliminar">×</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                     </>;
@@ -5115,51 +5134,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <button className="btn btn-glass" onClick={() => { setShowTiendaModal(false); setEditingTienda(null); }}>Cancelar</button>
                                 <button className="btn btn-gold" onClick={addTienda} disabled={savingTienda}>
                                     {savingTienda ? 'Guardando...' : (editingTienda ? <>{I.edit} Guardar</> : <>{I.plus} Crear Tienda</>)}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {showProveedorModal && (
-                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowProveedorModal(false); setEditingProveedor(null); } }}>
-                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
-                            <div className="modal-hd">
-                                <h2>{editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h2>
-                                <button className="modal-close" onClick={() => { setShowProveedorModal(false); setEditingProveedor(null); }}>×</button>
-                            </div>
-                            <div className="form-group">
-                                <label style={{color:'var(--text-dim)'}}>Nombre del proveedor</label>
-                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                    value={proveedorForm.nombre} onChange={e=>setProveedorForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Shaanxi Natural Cuikang" />
-                            </div>
-                            <div className="form-group">
-                                <label style={{color:'var(--text-dim)'}}>País de origen</label>
-                                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                                    {PROVEEDOR_PAISES.map(pais=>(
-                                        <button key={pais} className={`btn btn-sm ${proveedorForm.pais===pais?'btn-gold':'btn-glass'}`} onClick={()=>setProveedorForm(f=>({...f,pais}))}>{pais}</button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label style={{color:'var(--text-dim)'}}>Contacto (teléfono, email, WhatsApp...)</label>
-                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                    value={proveedorForm.contacto} onChange={e=>setProveedorForm(f=>({...f,contacto:e.target.value}))} placeholder="Ej. +86 123 456 789" />
-                            </div>
-                            <div className="form-group">
-                                <label style={{color:'var(--text-dim)'}}>Link (Alibaba, sitio web...)</label>
-                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                    value={proveedorForm.link} onChange={e=>setProveedorForm(f=>({...f,link:e.target.value}))} placeholder="https://..." />
-                            </div>
-                            <div className="form-group">
-                                <label style={{color:'var(--text-dim)'}}>Notas</label>
-                                <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}}
-                                    value={proveedorForm.notas} onChange={e=>setProveedorForm(f=>({...f,notas:e.target.value}))} placeholder="Condiciones de pago, tiempos de entrega..." />
-                            </div>
-                            <div className="modal-actions">
-                                <button className="btn btn-glass" onClick={() => { setShowProveedorModal(false); setEditingProveedor(null); }}>Cancelar</button>
-                                <button className="btn btn-gold" onClick={saveProveedor} disabled={savingProveedor||!proveedorForm.nombre.trim()}>
-                                    {savingProveedor ? 'Guardando...' : (editingProveedor ? <>{I.edit} Guardar</> : <>{I.plus} Crear Proveedor</>)}
                                 </button>
                             </div>
                         </div>
