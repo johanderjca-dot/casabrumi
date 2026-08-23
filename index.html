@@ -3056,31 +3056,37 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     {p.imagen
                                                         ? <img src={p.imagen} alt={p.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} />
                                                         : <span style={{fontSize:'48px'}}>📦</span>}
-                                                    {utilidadPorId[p.id]!==undefined && (
-                                                        <span title={`Utilidad histórica: RD$${utilidadPorId[p.id].toFixed(2)}`}
-                                                            style={{
-                                                                position:'absolute',top:8,left:8,width:26,height:26,borderRadius:'50%',
-                                                                display:'flex',alignItems:'center',justifyContent:'center',
-                                                                background: utilidadPorId[p.id]>=0 ? '#3C7840' : '#A03B3B',
-                                                                boxShadow:'0 2px 6px rgba(0,0,0,0.22)',color:'#fff',
-                                                            }}>
-                                                            <span style={{width:13,height:13,display:'flex'}}>{utilidadPorId[p.id]>=0?I.trendUp:I.trendDown}</span>
-                                                        </span>
-                                                    )}
                                                 </div>
                                                 <div style={{padding:'14px 16px'}}>
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
                                                     {p.codigo&&<span className="badge badge-gold" style={{fontFamily:'Fira Code',fontSize:'11px',fontWeight:700,marginBottom:8,display:'inline-block'}}>{p.codigo}</span>}
-                                                    {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={p.proveedor}>{p.proveedor}</div>}
-                                                    <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',justifyContent:'space-between'}}>
+                                                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:(vendido>0||despachadosCard>0)?8:0}}>
+                                                        {p.proveedor
+                                                            ? <div style={{fontSize:'11px',color:'var(--text-dimmer)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',minWidth:0}} title={p.proveedor}>{p.proveedor}</div>
+                                                            : <span/>}
+                                                        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                                                            {utilidadPorId[p.id]!==undefined && (
+                                                                <span title={`Utilidad histórica: RD$${utilidadPorId[p.id].toFixed(2)}`}
+                                                                    style={{
+                                                                        width:20,height:20,borderRadius:'50%',
+                                                                        display:'flex',alignItems:'center',justifyContent:'center',
+                                                                        background: utilidadPorId[p.id]>=0 ? '#3C7840' : '#A03B3B',
+                                                                        color:'#fff',flexShrink:0,
+                                                                    }}>
+                                                                    <span style={{width:10,height:10,display:'flex'}}>{utilidadPorId[p.id]>=0?I.trendUp:I.trendDown}</span>
+                                                                </span>
+                                                            )}
+                                                            <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`} style={{fontSize:'10px',whiteSpace:'nowrap'}}>
+                                                                <span className="badge-dot"/>{p.estado||'Sin estado'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {(vendido>0||despachadosCard>0) && (
                                                         <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
                                                             {vendido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span> vendidos</div>}
                                                             {despachadosCard>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{entregadosCard}</span>/{despachadosCard} entregados</div>}
                                                         </div>
-                                                        <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`} style={{fontSize:'10px'}}>
-                                                            <span className="badge-dot"/>{p.estado||'Sin estado'}
-                                                        </span>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
