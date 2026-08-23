@@ -3056,9 +3056,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     {p.imagen
                                                         ? <img src={p.imagen} alt={p.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} />
                                                         : <span style={{fontSize:'48px'}}>📦</span>}
-                                                    <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`} style={{position:'absolute',top:8,right:8,fontSize:'10px'}}>
-                                                        <span className="badge-dot"/>{p.estado||'Sin estado'}
-                                                    </span>
                                                     {utilidadPorId[p.id]!==undefined && (
                                                         <span title={`Utilidad histórica: RD$${utilidadPorId[p.id].toFixed(2)}`}
                                                             style={{
@@ -3075,9 +3072,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
                                                     {p.codigo&&<span className="badge badge-gold" style={{fontFamily:'Fira Code',fontSize:'11px',fontWeight:700,marginBottom:8,display:'inline-block'}}>{p.codigo}</span>}
                                                     {p.proveedor&&<div style={{fontSize:'11px',color:'var(--text-dimmer)',marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={p.proveedor}>{p.proveedor}</div>}
-                                                    <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-                                                        {vendido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span> vendidos</div>}
-                                                        {despachadosCard>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{entregadosCard}</span>/{despachadosCard} entregados</div>}
+                                                    <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'center',justifyContent:'space-between'}}>
+                                                        <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+                                                            {vendido>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{vendido}</span> vendidos</div>}
+                                                            {despachadosCard>0&&<div style={{fontSize:'11px',color:'var(--text-dim)'}}><span style={{fontFamily:'Fira Code',fontWeight:'700',color:'var(--text)'}}>{entregadosCard}</span>/{despachadosCard} entregados</div>}
+                                                        </div>
+                                                        <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`} style={{fontSize:'10px'}}>
+                                                            <span className="badge-dot"/>{p.estado||'Sin estado'}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
