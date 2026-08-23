@@ -566,48 +566,6 @@ const PLATAFORMAS_GANADORES = [
       como:'Para abastecimiento barato. 1688 (en chino, usa traductor) tiene los precios de fábrica más bajos. Compara contra tu precio proveedor en la calculadora de costeo.' },
 ];
 
-// ── PLAN ESTRATÉGICO (Venture Studio) — checklist por defecto y glosario ──
-const PLAN_ESTRATEGICO_DEFAULTS = [
-    { id:'p1', orden:1, categoria:'Financiero', prioridad:'Alta',
-      titulo:'Separar costos directos de compartidos y calcular MC por SKU',
-      resumen:'Hoy repartes gastos en partes iguales entre productos, lo que esconde cuáles se sostienen solos. El Margen de Contribución (ingresos − costo puesto en bodega − costos variables directos como ads y fulfillment) es el número que decide si un producto vive: negativo se mata, 0–25% sobrevive sin escalar, +35% escala, +40% sostenido 3 ciclos gradúa a marca.' },
-    { id:'p2', orden:2, categoria:'Financiero', prioridad:'Alta',
-      titulo:'Sacar el testeo a línea de portafolio y medir el CAG',
-      resumen:'Los ads de productos que no pegaron no son costo de los que sí pegaron — son tu I+D. Sepáralos como "costos de portafolio" y calcula Costo de Adquisición de Ganador (CAG) = presupuesto de testeo ÷ ganadores encontrados. Así ves si tu búsqueda rinde, no solo si tus ganadores rinden.' },
-    { id:'p3', orden:3, categoria:'Financiero', prioridad:'Alta',
-      titulo:'Prorratear bodega por CBM en vez de partes iguales',
-      resumen:'Con producto pesado, repartir bodega y flete por unidad esconde cuánto consume cada SKU realmente. Usa metros cúbicos ocupados × días para bodega, y CBM o peso para flete — es la diferencia entre saber cuál producto gana de verdad y creerlo.' },
-    { id:'p4', orden:4, categoria:'Equipo', prioridad:'Alta',
-      titulo:'Implementar presupuesto de testeo por buscador',
-      resumen:'Dale a cada buscador un presupuesto mensual de ads/muestras que es suyo para asignar, y ajústalo el mes siguiente según su tasa de acierto. Se autofiltra sin que nadie lo ordene, no genera resentimiento porque no le descuentas nada, y te da gratis la métrica de tasa de acierto por persona.' },
-    { id:'p5', orden:5, categoria:'Filtro de Inversión', prioridad:'Alta',
-      titulo:'Escribir el filtro de inversión y delegarlo al equipo',
-      resumen:'Hoy eres el cuello de botella: el equipo escala la búsqueda pero nada escala tu juicio. Un checklist de criterios eliminatorios (MC≥35%, retorno≥60%, flete≤15%, ≥2 proveedores, etc.) más una puntuación 1–40 te deja evaluar solo los que sobrevivieron el pre-filtro, no todos los candidatos.' },
-    { id:'p6', orden:6, categoria:'Filtro de Inversión', prioridad:'Alta',
-      titulo:'Pedir documentación de origen a proveedores',
-      resumen:'Desde julio 2026 el Decreto 502-26 le da a la DGA facultad de bloquear importaciones vinculadas a trabajo forzoso. Pide declaración de origen y trazabilidad antes de comprar — un contenedor retenido 3 meses con capital pesado inmovilizado te destruye el año.' },
-    { id:'p7', orden:7, categoria:'Equipo', prioridad:'Media',
-      titulo:'Añadir piso de supervivencia + pool colectivo + bono por matar',
-      resumen:'Un fijo pequeño evita que un buscador bueno con mala suerte se vaya en un mes flojo. Un pool colectivo (2–3% de utilidad total) incentiva compartir proveedores y hallazgos. Un bono por matar productos mediocres libera capital atrapado sin que nadie se resista a recomendarlo.' },
-    { id:'p8', orden:8, categoria:'Financiero', prioridad:'Media',
-      titulo:'Evaluar todo por ROIC en vez de margen',
-      resumen:'Retorno sobre capital = margen × rotaciones al año. Un producto con menos margen pero que rota más rápido puede rendir 2–3x más sobre el mismo capital que uno con margen alto y rotación lenta. Define un piso (ej. 60% anual) y evalúa cada SKU contra eso.' },
-    { id:'p9', orden:9, categoria:'Estructura', prioridad:'Media',
-      titulo:'Separar BrandCos de OpCo',
-      resumen:'Cuando un producto gradúa a marca propia (MC≥40% sostenido 3 ciclos + recompra medible), muévelo a una entidad separada. Así puedes vender esa marca a 3–5x utilidad neta sin vender el motor de búsqueda que la produjo — probablemente tu camino más rápido a la meta de los apartamentos.' },
-    { id:'p10', orden:10, categoria:'Estructura', prioridad:'Media',
-      titulo:'Definir ratio bolsa/inmuebles y el waterfall',
-      resumen:'El orden de asignación de capital importa: reserva operativa (3–6 meses de gastos) → capital de trabajo → presupuesto de testeo → graduación de marcas → excedente repartido entre bolsa e inmuebles. Recortar el testeo en un mes flojo produce un buen trimestre y un mal año — evítalo.' },
-].map(it => ({ ...it, estado:'pendiente', notas:'' }));
-
-const PLAN_GLOSARIO = [
-    { term:'MC — Margen de Contribución', def:'Ingresos − costo puesto en bodega − costos variables directos (ads, fulfillment, comisiones). El número que decide si un producto vive o se mata.' },
-    { term:'ROIC — Retorno sobre capital', def:'Margen de contribución × rotaciones al año. Compara productos por lo que rinden sobre el capital invertido, no solo por su margen.' },
-    { term:'CAG — Costo de Adquisición de Ganador', def:'Presupuesto de testeo ÷ número de ganadores encontrados. Mide si tu función de búsqueda vale lo que cuesta.' },
-    { term:'Landed cost', def:'Costo del producto puesto en bodega: FOB + flete (por CBM o peso, nunca por unidad) + seguro + aranceles + transporte a bodega.' },
-    { term:'Stage gates', def:'Test → Validación → Escala → Graduación a Marca. Ningún producto salta etapas; el capital se libera por tramos según compuertas de desempeño.' },
-];
-
 // ── COUNTER ANIMATION ──
 function KpiVal({ value }) {
     const elRef = useRef(null);
@@ -1337,8 +1295,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [vendedores, setVendedores] = useState([]);
     const [ventas,     setVentas]     = useState([]);
     const [cierres,    setCierres]    = useState([]);
-    const [planItems,  setPlanItems]  = useState(PLAN_ESTRATEGICO_DEFAULTS);
-    const [planNuevoTitulo, setPlanNuevoTitulo] = useState('');
     const [showModal,  setShowModal]  = useState(false);
     const [form,       setForm]       = useState({ nombre: '', email: '', password: '', permisos: { cierre: true } });
     const [saving,     setSaving]     = useState(false);
@@ -2202,34 +2158,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     }, []);
 
     useEffect(() => {
-        const ref = db.collection('configuracion').doc('planEstrategico');
-        const unsub = ref.onSnapshot(async doc => {
-            if (!doc.exists) {
-                try { await ref.set({ items: PLAN_ESTRATEGICO_DEFAULTS }); } catch(e) { console.error('Bootstrap plan estratégico:', e); }
-                return;
-            }
-            setPlanItems(doc.data().items || []);
-        }, err => console.error('Plan estratégico:', err));
-        return unsub;
-    }, []);
-
-    const planUpdate = async items => {
-        setPlanItems(items);
-        try { await db.collection('configuracion').doc('planEstrategico').set({ items }); }
-        catch(e) { console.error('Guardar plan estratégico:', e); }
-    };
-    const planSetEstado = (id, estado) => planUpdate(planItems.map(it => it.id===id ? {...it, estado} : it));
-    const planSetNotas  = (id, notas)  => planUpdate(planItems.map(it => it.id===id ? {...it, notas}  : it));
-    const planDelete    = id => planUpdate(planItems.filter(it => it.id!==id));
-    const planAdd = () => {
-        const titulo = planNuevoTitulo.trim();
-        if (!titulo) return;
-        const maxOrden = planItems.reduce((m,it)=>Math.max(m,it.orden||0),0);
-        planUpdate([...planItems, { id:'p'+Date.now(), orden:maxOrden+1, categoria:'Otro', prioridad:'Media', titulo, resumen:'', estado:'pendiente', notas:'' }]);
-        setPlanNuevoTitulo('');
-    };
-
-    useEffect(() => {
         const unsub = db.collection('cierres').orderBy('registradoEn', 'desc').limit(90).onSnapshot(
             snap => setCierres(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             err => console.error('Cierres:', err)
@@ -2432,7 +2360,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_star = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
     const I_calc = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/><line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="12" y1="15" x2="12" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="8" y1="19" x2="16" y2="19"/></svg>;
     const I_book = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
-    const I_target = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
     const I_cierre = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>;
     const I_balanza = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M12 6 5 6l3.5 8a3.5 3.5 0 0 0 7 0L19 6l-7 0"/><line x1="7" y1="20" x2="17" y2="20"/></svg>;
     const I_wallet = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>;
@@ -2443,7 +2370,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // Dashboard es visible para cualquier cuenta autorizada, tampoco depende de un permiso propio.
     const tienePermiso = key => {
         if (user.role === 'master') return true;
-        if (key === 'vendedores' || key === 'plan') return false;
+        if (key === 'vendedores') return false;
         if (key === 'dashboard') return true;
         return !!(user.permisos||{})[key];
     };
@@ -2456,9 +2383,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
             { key: 'contabilidad', label: 'Contabilidad', icon: I_balanza },
             { key: 'salarios', label: 'Salarios', icon: I_wallet },
-        ]},
-        { label: 'Estrategia', items: [
-            { key: 'plan', label: 'Plan Estratégico', icon: I_target },
         ]},
         { label: 'Herramientas', items: [
             { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
@@ -3839,80 +3763,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             )}
                         </>
                     );
-                })()}
-
-                {activeTab === 'plan' && (() => {
-                    const categorias = ['Financiero','Equipo','Filtro de Inversión','Estructura','Otro'];
-                    const porCategoria = cat => planItems.filter(it => (it.categoria||'Otro')===cat).sort((a,b)=>(a.orden||0)-(b.orden||0));
-                    const hechas = planItems.filter(it=>it.estado==='hecho').length;
-                    const total = planItems.length;
-                    const ESTADOS = [['pendiente','Pendiente'],['en_progreso','En progreso'],['hecho','Hecho']];
-                    const PRIORIDAD_COLOR = { Alta:'badge-red', Media:'badge-gold' };
-
-                    return <>
-                    <div className="page-header"><h1>Plan Estratégico 🎯</h1><p>Venture studio de producto físico — checklist de mejoras y conceptos para ir estudiando y aplicando a tu ritmo.</p></div>
-
-                    <div className="card glass" style={{padding:'18px 22px',marginBottom:22,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
-                        <div>
-                            <div style={{fontSize:12,color:'var(--text-dimmer)',marginBottom:4}}>Progreso</div>
-                            <div style={{fontSize:22,fontWeight:800,fontFamily:'Fira Code',color:'var(--orange)'}}>{hechas} / {total} acciones</div>
-                        </div>
-                        <div className="cst-bar-track" style={{flex:'1 1 220px',maxWidth:320}}>
-                            <div className="cst-bar-fill" style={{width:`${total?Math.round(hechas/total*100):0}%`, background:'var(--orange)'}}/>
-                        </div>
-                    </div>
-
-                    {categorias.map(cat => {
-                        const items = porCategoria(cat);
-                        if (items.length===0) return null;
-                        return (
-                        <div key={cat} style={{marginBottom:26}}>
-                            <div style={{fontSize:12,fontWeight:800,color:'var(--text)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:12}}>{cat}</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                                {items.map(it => (
-                                    <div key={it.id} className="card glass" style={{padding:'18px 20px'}}>
-                                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:8}}>
-                                            <div style={{fontSize:14,fontWeight:700,color:'var(--text)',flex:1}}>{it.titulo}</div>
-                                            <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0}}>
-                                                <span className={`badge ${PRIORIDAD_COLOR[it.prioridad]||'badge-gray'}`} style={{fontSize:'9.5px'}}><span className="badge-dot"/>{it.prioridad}</span>
-                                                <span onClick={()=>planDelete(it.id)} style={{cursor:'pointer',color:'var(--text-dimmer)',fontSize:16,lineHeight:1}}>×</span>
-                                            </div>
-                                        </div>
-                                        {it.resumen && <p style={{fontSize:'12.5px',color:'var(--text-dim)',lineHeight:1.6,marginBottom:12}}>{it.resumen}</p>}
-                                        <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
-                                            {ESTADOS.map(([k,label])=>(
-                                                <button key={k} className={`btn btn-sm ${it.estado===k?'btn-gold':'btn-glass'}`} onClick={()=>planSetEstado(it.id,k)}>{label}</button>
-                                            ))}
-                                        </div>
-                                        <textarea className="form-input glass no-icon" placeholder="Tus notas o avances sobre esta acción…" defaultValue={it.notas}
-                                            onBlur={e=>{ if(e.target.value!==it.notas) planSetNotas(it.id, e.target.value); }}
-                                            style={{width:'100%',minHeight:56,fontSize:'12.5px',resize:'vertical',border:'1px solid var(--glass-border)',borderRadius:10,padding:'10px 12px',fontFamily:'inherit',background:'var(--cream-dark)',color:'var(--text)'}} />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        );
-                    })}
-
-                    <div className="card glass" style={{padding:'16px 20px',marginBottom:34,display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
-                        <input className="form-input glass no-icon" style={{flex:'1 1 260px',border:'1px solid var(--glass-border)'}}
-                            placeholder="Agregar otra acción a la lista…" value={planNuevoTitulo}
-                            onChange={e=>setPlanNuevoTitulo(e.target.value)} onKeyDown={e=>e.key==='Enter'&&planAdd()} />
-                        <button className="btn btn-gold" onClick={planAdd}>+ Agregar</button>
-                    </div>
-
-                    <div style={{marginBottom:14}}>
-                        <div style={{fontSize:12,fontWeight:800,color:'var(--text)',textTransform:'uppercase',letterSpacing:'1.5px',marginBottom:12}}>Conceptos clave</div>
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
-                            {PLAN_GLOSARIO.map(g=>(
-                                <div key={g.term} className="card glass" style={{padding:'16px 18px'}}>
-                                    <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:6}}>{g.term}</div>
-                                    <div style={{fontSize:12,color:'var(--text-dim)',lineHeight:1.55}}>{g.def}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    </>;
                 })()}
 
                 {activeTab === 'costeo' && (() => {
