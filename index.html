@@ -3156,25 +3156,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     const inv = p.inventario||{};
                     // Unidades vendidas = suma de lo registrado para este producto en Cierre Diario (por nombre exacto), no un campo manual.
                     const unidadesVendidasCalc = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.cantidad||0),0), 0);
-                    // Ganancia total = facturado real (DOP) de este producto en Cierre Diario, no un estimado por margen.
-                    const gananciaTotal = cierresScoped.reduce((s,c) => s + (c.productos||[]).filter(f=>f.nombre===p.nombre).reduce((s2,f)=>s2+(f.monto||0),0), 0);
-                    const GASTO_CATS_PROD = [
-                        ['publicidad', 'Gasto en Publicidad'],
-                        ['empacado',   'Gasto en Empacado'],
-                        ['proveedor',  'Pago a Proveedor (incl. envío China → USA)'],
-                        ['usaRd',      'Envío USA → RD'],
-                    ];
+                    // Ganancia total / neta = utilidad real de Contabilidad (Libro Diario, partida doble),
+                    // misma fórmula que Contabilidad → Por Producto — no un estimado de Cierre Diario.
+                    const contabProd = calcularUtilidadesPorProducto(
+                        cuentas.filter(perteneceATienda),
+                        asientos.filter(perteneceATienda),
+                        productos.filter(pr=>pr.estado==='Activo'),
+                    ).filas.find(f=>f.id===p.id) || { ingresos:0, gastos:0, utilidad:0 };
+                    const gananciaTotal = contabProd.ingresos;
+                    const gananciaNeta  = contabProd.utilidad;
 
-                    // ── Lotes: Pedidos y Gastos del producto viven POR LOTE; lo de arriba
-                    // (Despachados/Entregados/Ganancia Neta) es la suma de todos los lotes juntos.
+                    // ── Lotes: Pedidos del producto viven POR LOTE; lo de arriba
+                    // (Despachados/Entregados) es la suma de todos los lotes juntos.
                     // Migra en caliente los datos viejos (sin lotes) a un "Lote 1" la primera vez
                     // que se guarda algo, sin perder lo ya registrado.
                     const lotesActuales = (p.lotes && p.lotes.length) ? p.lotes
                         : ((p.pedidos?.length || Object.keys(p.finanzas||{}).length) ? [{ id:'lote_legacy', nombre:'Lote 1', pedidos:p.pedidos||[], finanzas:p.finanzas||{} }] : []);
-
-                    const totalGastoCatLote = (lote, key) => ((lote.finanzas||{})[key]||[]).reduce((s,e)=>s+(e.monto||0),0);
-                    const totalGastosProd = lotesActuales.reduce((s,l)=>s+GASTO_CATS_PROD.reduce((s2,[key])=>s2+totalGastoCatLote(l,key),0),0);
-                    const gananciaNeta = gananciaTotal - totalGastosProd;
 
                     const todosPedidos = lotesActuales.flatMap(l=>l.pedidos||[]);
                     const totalDespachados = todosPedidos.reduce((s,e)=>s+(e.despachados||0),0);
@@ -3493,8 +3490,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 {label:'Entregados', val:String(totalEntregados), sub:'exitosos sin devolución', icon:I.box, ok:true},
                                                 {label:'Tasa de entrega', val:tasaEntrega!==null?`${tasaEntrega.toFixed(1)}%`:'—', sub:'entregados / despachados', icon:I.box, ok:tasaEntrega!==null&&tasaEntrega>=70},
                                                 {label:'Vendidos', val:String(unidadesVendidasCalc), sub:'unidades — suma de Cierre Diario', icon:I.box, ok:true},
-                                                {label:'Ganancia total', val:`RD$${gananciaTotal.toFixed(2)}`, sub:'facturado — suma de Cierre Diario', icon:I.dollar, ok:gananciaTotal>0},
-                                                {label:'Ganancia neta', val:`RD$${gananciaNeta.toFixed(2)}`, sub:'facturado − gastos del producto', icon:I.dollar, ok:gananciaNeta>0},
+                                                {label:'Ganancia total', val:`RD$${gananciaTotal.toFixed(2)}`, sub:'ingresos — Contabilidad', icon:I.dollar, ok:gananciaTotal>0},
+                                                {label:'Ganancia neta', val:`RD$${gananciaNeta.toFixed(2)}`, sub:'utilidad — Contabilidad', icon:I.dollar, ok:gananciaNeta>0},
                                             ].map(({label,val,sub,icon,ok})=>(
                                                 <div key={label} className="kpi-card glass glass-mid">
                                                     <div className="kpi-top"><div className="kpi-label">{label}</div><div className={`kpi-icon ${ok?'gold':'white'}`}>{icon}</div></div>
