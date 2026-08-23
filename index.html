@@ -204,7 +204,7 @@
         /* ========= KPI GRID — FEATURE CARD LAYOUT ========= */
         .kpi-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         @media (max-width: 1200px) { .kpi-grid { grid-template-columns: 1fr 1fr 1fr; } }
-        .kpi-card { border-radius: var(--r); padding: 22px 24px; transition: transform var(--t-normal), box-shadow var(--t-normal); cursor: default; position: relative; animation: rise 0.52s cubic-bezier(0.22, 0.68, 0.32, 1) backwards; border: 1px solid var(--glass-border); background: var(--surface-2); }
+        .kpi-card { border-radius: var(--r); padding: 22px 24px; transition: transform var(--t-normal), box-shadow var(--t-normal); cursor: default; position: relative; overflow: hidden; animation: rise 0.52s cubic-bezier(0.22, 0.68, 0.32, 1) backwards; border: 1px solid var(--glass-border); background: var(--surface-2); }
         .kpi-grid .kpi-card:first-child { grid-row: span 2; display: flex; flex-direction: column; justify-content: space-between; background: var(--earth); border-color: transparent; }
         .kpi-grid .kpi-card:first-child .kpi-label { color: rgba(239,251,249,0.55); }
         .kpi-grid .kpi-card:first-child .kpi-val { font-size: 48px; letter-spacing: -2px; color: var(--cream); -webkit-text-fill-color: var(--cream); }
@@ -215,7 +215,7 @@
         .kpi-grid .kpi-card:nth-child(4) { animation-delay: 0.16s; }
         .kpi-grid .kpi-card:nth-child(5) { animation-delay: 0.20s; }
         .kpi-grid .kpi-card:nth-child(6) { animation-delay: 0.24s; }
-        .kpi-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: var(--r) var(--r) 0 0; background: linear-gradient(90deg, var(--orange) 0%, var(--orange-light) 100%); opacity: 0; transition: opacity var(--t-normal); }
+        .kpi-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--orange) 0%, var(--orange-light) 100%); opacity: 0; transition: opacity var(--t-normal); }
         @media (hover: hover) and (pointer: fine) { .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px -8px rgba(11,38,34,0.16); } .kpi-card:hover::after { opacity: 1; } }
         .kpi-grid .kpi-card:first-child::after { display: none; }
 
