@@ -1765,6 +1765,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [resultDesde,      setResultDesde]      = useState('');
     const [resultHasta,      setResultHasta]      = useState('');
     const [porProductoFiltro, setPorProductoFiltro] = useState('');
+    const [porProductoExpandido, setPorProductoExpandido] = useState(null);
     const [auxCuentaId,      setAuxCuentaId]      = useState('');
     const [auxFecha,         setAuxFecha]         = useState('');
     const [salariosMes,      setSalariosMes]      = useState(() => fechaLocalISO().slice(0,7));
@@ -4942,6 +4943,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         const { filas: filasProdSinOrdenar, gastoGeneral, gastoGeneralPorProducto } = calcularUtilidadesPorProducto(cuentasScope, asientosPeriodo, productosActivosScope);
                         const filasProd = [...filasProdSinOrdenar].sort((a,b)=>b.utilidad-a.utilidad);
 
+                        // Desglose de gastos directos por cuenta (ej. Publicidad, Empacado...) para cada producto,
+                        // para poder ver en qué se fue el gasto y no solo el total.
+                        const cuentasById = Object.fromEntries(cuentasScope.map(c=>[c.id,c]));
+                        const gastosPorCuenta = {};
+                        asientosPeriodo.forEach(a => (a.lineas||[]).forEach(l => {
+                            if (!l.productoId) return;
+                            const cuenta = cuentasById[l.cuentaId];
+                            if (!cuenta || (cuenta.tipo!=='Gasto' && cuenta.tipo!=='Costo')) return;
+                            const acc = gastosPorCuenta[l.productoId] || (gastosPorCuenta[l.productoId] = {});
+                            const fila = acc[cuenta.id] || (acc[cuenta.id] = { nombre: cuenta.nombre, monto: 0 });
+                            fila.monto += (l.debe||0) - (l.haber||0);
+                        }));
+
                         // Lista para el dropdown: todos los productos del scope, activos o no,
                         // para poder aislar uno específico aunque no tenga movimientos todavía.
                         const productosParaFiltro = contabScope==='todas' ? productos : productos.filter(perteneceATienda);
@@ -4981,14 +4995,42 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <table style={{minWidth:520}}>
                                     <thead><tr><th>Producto</th><th className="td-num">Ingresos</th><th className="td-num">Gastos</th><th className="td-num">Utilidad</th></tr></thead>
                                     <tbody>
-                                        {filasMostradas.map(p=>(
-                                            <tr key={p.id}>
-                                                <td>{p.codigo?`${p.codigo} — ${p.nombre}`:p.nombre}</td>
-                                                <td className="td-num">{fmtCtb(p.ingresos,contabMoneda)}</td>
-                                                <td className="td-num">{fmtCtb(p.gastos,contabMoneda)}</td>
-                                                <td className="td-num" style={{fontWeight:'700',color:p.utilidad>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(p.utilidad,contabMoneda)}</td>
-                                            </tr>
-                                        ))}
+                                        {filasMostradas.map(p=>{
+                                            const desglose = Object.values(gastosPorCuenta[p.id]||{}).sort((a,b)=>b.monto-a.monto);
+                                            const expandible = desglose.length>0 || p.gastoAsignado>0;
+                                            const expandido = porProductoExpandido===p.id;
+                                            return (
+                                                <React.Fragment key={p.id}>
+                                                    <tr style={expandible?{cursor:'pointer'}:undefined} onClick={()=>expandible && setPorProductoExpandido(expandido?null:p.id)}>
+                                                        <td>
+                                                            {expandible && <span style={{display:'inline-block',width:10,marginRight:6,fontSize:10,color:'var(--text-dimmer)',transition:'transform var(--t-fast)',transform:expandido?'rotate(90deg)':'none'}}>›</span>}
+                                                            {p.codigo?`${p.codigo} — ${p.nombre}`:p.nombre}
+                                                        </td>
+                                                        <td className="td-num">{fmtCtb(p.ingresos,contabMoneda)}</td>
+                                                        <td className="td-num">{fmtCtb(p.gastos,contabMoneda)}</td>
+                                                        <td className="td-num" style={{fontWeight:'700',color:p.utilidad>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(p.utilidad,contabMoneda)}</td>
+                                                    </tr>
+                                                    {expandido && expandible && (
+                                                        <tr>
+                                                            <td colSpan={4} style={{background:'var(--glass-bg-mid)',padding:'12px 16px'}}>
+                                                                <div style={{display:'flex',flexWrap:'wrap',gap:'6px 24px'}}>
+                                                                    {desglose.map(d=>(
+                                                                        <div key={d.nombre} style={{fontSize:12,color:'var(--text-dim)'}}>
+                                                                            {d.nombre}: <span style={{fontFamily:'Fira Code',fontWeight:700,color:'var(--text)'}}>{fmtCtb(d.monto,contabMoneda)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                    {p.gastoAsignado>0 && (
+                                                                        <div style={{fontSize:12,color:'var(--text-dim)'}}>
+                                                                            Gasto general (prorrateado): <span style={{fontFamily:'Fira Code',fontWeight:700,color:'var(--text)'}}>{fmtCtb(p.gastoAsignado,contabMoneda)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </tbody>
                                     <tfoot><tr style={{borderTop:'2px solid var(--glass-border)'}}>
                                         <td style={{fontWeight:'700'}}>Total</td>
