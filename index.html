@@ -1385,7 +1385,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showProdModal,      setShowProdModal]      = useState(false);
     const [editingProducto,    setEditingProducto]    = useState(null);
     const [savingProd,         setSavingProd]         = useState(false);
-    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Testeo', proveedor:'', imagen:'', codigo:'' });
+    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Testeo', proveedor:'', vendedor:'', imagen:'', codigo:'' });
     const [editSeccion,        setEditSeccion]        = useState(null); // 'inventario'
     const [invForm,            setInvForm]            = useState({ precioCompra:'', precioVenta:'' });
     // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
@@ -2227,7 +2227,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (!prodForm.nombre) return;
         const data = {
             nombre: prodForm.nombre, descripcion: prodForm.descripcion,
-            estado: prodForm.estado, proveedor: prodForm.proveedor,
+            estado: prodForm.estado, proveedor: prodForm.proveedor, vendedor: prodForm.vendedor,
             imagen: prodForm.imagen, codigo: prodForm.codigo.trim(),
             facebook: editingProducto?.facebook || {}, inventario: editingProducto?.inventario || {},
         };
@@ -2237,7 +2237,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         } else {
             db.collection('productos').add({...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
         }
-        setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',imagen:'',codigo:''});
+        setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:''});
         setEditingProducto(null); setShowProdModal(false);
     };
 
@@ -2248,7 +2248,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openEditProd = (p) => {
         setEditingProducto(p);
-        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', imagen:p.imagen||'', codigo:p.codigo||''});
+        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', vendedor:p.vendedor||'', imagen:p.imagen||'', codigo:p.codigo||''});
         setShowProdModal(true);
     };
 
@@ -2426,7 +2426,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
             {showCmdK && (() => {
                 const acciones = [
-                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',imagen:'',codigo:''}); setShowProdModal(true); } },
+                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',vendedor:'',imagen:'',codigo:''}); setShowProdModal(true); } },
                     { key:'vendedores', label: 'Nuevo usuario',          icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
                     { key:'accesos', label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
                 ].filter(a => tienePermiso(a.key));
@@ -2956,7 +2956,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                 <div><h1>Productos</h1><p>Gestiona y analiza tus mejores productos</p></div>
-                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
+                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
                             </div>
                             {productos.length===0 ? (
                                 <div className="card glass"><div className="empty">
@@ -3044,6 +3044,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <label style={{color:'var(--text-dim)'}}>Proveedor</label>
                                             <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                                 value={prodForm.proveedor} onChange={e=>setProdForm(f=>({...f,proveedor:e.target.value}))} placeholder="Nombre del proveedor" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Vendedor</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.vendedor} onChange={e=>setProdForm(f=>({...f,vendedor:e.target.value}))} placeholder="Quién vende este producto" />
                                         </div>
                                         <div className="form-group">
                                             <label style={{color:'var(--text-dim)'}}>Código interno</label>
@@ -3143,7 +3148,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <button className="btn btn-glass btn-sm" onClick={()=>{setActiveProducto(null);setEditSeccion(null);}}>← Productos</button>
                                     <div>
                                         <h1 style={{display:'flex',alignItems:'center',gap:10}}>{p.nombre} <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`}><span className="badge-dot"/>{p.estado}</span></h1>
-                                        {p.proveedor&&<p>{p.proveedor}</p>}
+                                        {p.proveedor&&<p>{p.proveedor}{p.vendedor?` · Vendedor: ${p.vendedor}`:''}</p>}
                                     </div>
                                 </div>
                                 <div style={{display:'flex',gap:8}}>
@@ -3732,6 +3737,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <label style={{color:'var(--text-dim)'}}>Proveedor</label>
                                             <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                                 value={prodForm.proveedor} onChange={e=>setProdForm(f=>({...f,proveedor:e.target.value}))} placeholder="Nombre del proveedor" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Vendedor</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.vendedor} onChange={e=>setProdForm(f=>({...f,vendedor:e.target.value}))} placeholder="Quién vende este producto" />
                                         </div>
                                         <div className="form-group">
                                             <label style={{color:'var(--text-dim)'}}>Código interno</label>
@@ -4918,17 +4928,27 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     })()}
 
                     {contabTab==='salarios' && (() => {
-                        // La comisión sale de la ganancia neta de TODOS los productos activos en el mes
-                        // (ingresos del Libro Diario menos sus gastos directos y su parte de gasto general),
-                        // no de Cierre Diario — misma fórmula que Contabilidad → Por Producto, sumada.
+                        // Dos comisiones sobre la misma ganancia neta del Libro Diario (no Cierre Diario):
+                        // 1) cada vendedor asignado a un producto se lleva el % sobre la utilidad de SU producto;
+                        // 2) servicio al cliente se lleva el % sobre lo que queda DESPUÉS de pagarle a los vendedores
+                        //    (la ganancia neta total menos la suma de esas comisiones por producto).
                         const asientosDelMes = asientosCtbScope.filter(a => a.fecha?.startsWith(salariosMes));
                         const productosActivosSalarios = (contabScope==='todas' ? productos : productos.filter(perteneceATienda)).filter(p=>p.estado==='Activo');
+                        const vendedorPorProductoId = Object.fromEntries(productosActivosSalarios.map(p=>[p.id, p.vendedor||'']));
                         const { filas: filasSalarios } = calcularUtilidadesPorProducto(cuentasCtbScope, asientosDelMes, productosActivosSalarios);
-                        const filasSalariosOrdenadas = [...filasSalarios].sort((a,b)=>b.utilidad-a.utilidad);
-                        const totalIngSalarios = filasSalarios.reduce((s,p)=>s+p.ingresos,0);
-                        const totalGasSalarios = filasSalarios.reduce((s,p)=>s+p.gastos,0);
+                        const comisionPctNum = parseFloat(comisionPct)||0;
+                        const filasConComision = filasSalarios.map(p => {
+                            const vendedor = vendedorPorProductoId[p.id] || '';
+                            const comisionVendedor = vendedor ? Math.max(0,p.utilidad) * comisionPctNum / 100 : 0;
+                            return {...p, vendedor, comisionVendedor};
+                        });
+                        const filasSalariosOrdenadas = [...filasConComision].sort((a,b)=>b.utilidad-a.utilidad);
+                        const totalIngSalarios = filasConComision.reduce((s,p)=>s+p.ingresos,0);
+                        const totalGasSalarios = filasConComision.reduce((s,p)=>s+p.gastos,0);
                         const gananciaNetaComision = totalIngSalarios - totalGasSalarios;
-                        const montoComision = gananciaNetaComision * (parseFloat(comisionPct)||0) / 100;
+                        const totalComisionVendedores = filasConComision.reduce((s,p)=>s+p.comisionVendedor,0);
+                        const baseServicioCliente = gananciaNetaComision - totalComisionVendedores;
+                        const montoComision = baseServicioCliente * comisionPctNum / 100;
 
                         return <>
                         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:20}}>
@@ -4955,26 +4975,43 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <span>Ganancia neta de todos los productos (mes)</span>
                                 <span style={{fontFamily:'Fira Code',color:gananciaNetaComision>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(gananciaNetaComision,'DOP')}</span>
                             </div>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0',color:'#A03B3B'}}>
+                                <span>− Comisión vendedores por producto ({comisionPct}% de la utilidad de cada uno)</span>
+                                <span style={{fontFamily:'Fira Code',fontWeight:700}}>{fmtCtb(totalComisionVendedores,'DOP')}</span>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:14,fontWeight:800,padding:'10px 0',marginTop:6,borderTop:'1px solid var(--glass-border)'}}>
+                                <span>Base para servicio al cliente</span>
+                                <span style={{fontFamily:'Fira Code',color:baseServicioCliente>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(baseServicioCliente,'DOP')}</span>
+                            </div>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:16,fontWeight:800,padding:'12px 0',marginTop:8,borderTop:'2px solid var(--orange)',color:'var(--orange)'}}>
-                                <span>{comisionPct}% a pagar</span>
+                                <span>Servicio al cliente — {comisionPct}% a pagar</span>
                                 <span style={{fontFamily:'Fira Code'}}>{fmtCtb(montoComision,'DOP')}</span>
                             </div>
                         </div>
 
                         {filasSalariosOrdenadas.length>0 && (
                             <div className="card glass" style={{overflowX:'auto'}}>
-                                <table style={{minWidth:480}}>
-                                    <thead><tr><th>Producto</th><th className="td-num">Ingresos</th><th className="td-num">Gastos</th><th className="td-num">Utilidad</th></tr></thead>
+                                <table style={{minWidth:640}}>
+                                    <thead><tr><th>Producto</th><th>Vendedor</th><th className="td-num">Ingresos</th><th className="td-num">Gastos</th><th className="td-num">Utilidad</th><th className="td-num">Comisión vendedor</th></tr></thead>
                                     <tbody>
                                         {filasSalariosOrdenadas.map(p=>(
                                             <tr key={p.id}>
                                                 <td>{p.codigo?`${p.codigo} — ${p.nombre}`:p.nombre}</td>
+                                                <td style={{color:p.vendedor?'var(--text-dim)':'var(--text-dimmer)'}}>{p.vendedor||'—'}</td>
                                                 <td className="td-num">{fmtCtb(p.ingresos,'DOP')}</td>
                                                 <td className="td-num">{fmtCtb(p.gastos,'DOP')}</td>
                                                 <td className="td-num" style={{fontWeight:700,color:p.utilidad>=0?'var(--sand-dark)':'#A03B3B'}}>{fmtCtb(p.utilidad,'DOP')}</td>
+                                                <td className="td-num" style={{fontWeight:700}}>{p.vendedor?fmtCtb(p.comisionVendedor,'DOP'):'—'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
+                                    <tfoot><tr style={{borderTop:'2px solid var(--glass-border)'}}>
+                                        <td style={{fontWeight:'700'}} colSpan={2}>Total</td>
+                                        <td className="td-num" style={{fontWeight:'800'}}>{fmtCtb(totalIngSalarios,'DOP')}</td>
+                                        <td className="td-num" style={{fontWeight:'800'}}>{fmtCtb(totalGasSalarios,'DOP')}</td>
+                                        <td className="td-num" style={{fontWeight:'800'}}>{fmtCtb(gananciaNetaComision,'DOP')}</td>
+                                        <td className="td-num" style={{fontWeight:'800'}}>{fmtCtb(totalComisionVendedores,'DOP')}</td>
+                                    </tr></tfoot>
                                 </table>
                             </div>
                         )}
