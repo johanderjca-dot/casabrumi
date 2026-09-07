@@ -1382,7 +1382,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // verificación en FB Ads, aprobación) — se abre al hacer clic en un link del listado.
     const [activeTiktok,       setActiveTiktok]       = useState(null);
     const TIKTOK_APROBACION = ['Pendiente','Aprobado','Rechazado'];
-    const TIKTOK_ANALISIS_DEFAULT = { nombreProducto:'', precioDetal:'', precioVenta:'', linkProducto:'', verificacionFbAds:'', aprobacion:'Pendiente', angulos:[] };
+    const TIKTOK_ANALISIS_DEFAULT = { nombreProducto:'', precioDetal:'', precioVenta:'', linkProducto:'', verificacionFbAds:false, aprobacion:'Pendiente', angulos:[] };
     const [tiktokAnalisisForm, setTiktokAnalisisForm] = useState(TIKTOK_ANALISIS_DEFAULT);
     const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
     const [loteActivo,         setLoteActivo]         = useState(null);
@@ -2297,8 +2297,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openTiktokDetail = (t) => {
         setActiveTiktok(t);
+        // El nombre del producto NUNCA se hereda del link ni de la nota — es un campo aparte
+        // que se define aquí adentro, y una vez guardado es lo que se muestra afuera en el listado.
         setTiktokAnalisisForm(t.analisis || {
-            ...TIKTOK_ANALISIS_DEFAULT, nombreProducto: t.nota || '',
+            ...TIKTOK_ANALISIS_DEFAULT,
             angulos: [{ id:'ang_'+Date.now(), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo: t.link || '' }],
         });
     };
@@ -2308,6 +2310,54 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             setTiktokLinks(prev => prev.map(x => x.id===activeTiktok.id ? {...x, analisis: tiktokAnalisisForm} : x));
             setActiveTiktok(x => x ? {...x, analisis: tiktokAnalisisForm} : x);
         }).catch(avisarErrorGuardado);
+    };
+
+    // Próximo código de producto (ej. "CB-014" → "CB-015"), tomando el prefijo y el ancho de
+    // relleno del código más alto ya usado en Productos de la tienda activa.
+    const nextProductoCodigo = () => {
+        const nums = productosScoped.map(p => {
+            const m = /^([A-Za-z]+)-(\d+)$/.exec((p.codigo||'').trim());
+            return m ? { prefix: m[1].toUpperCase(), num: parseInt(m[2],10), width: m[2].length } : null;
+        }).filter(Boolean);
+        if (nums.length === 0) return 'CB-001';
+        const top = nums.reduce((a,b) => b.num > a.num ? b : a);
+        return `${top.prefix}-${String(top.num+1).padStart(top.width,'0')}`;
+    };
+
+    // Al aprobar un producto a testear, lo crea automáticamente del lado de Productos
+    // (estado Testeo, mismo nombre, código correlativo) — solo una vez por link.
+    const crearProductoDesdeTiktok = (form) => {
+        const nombre = (form.nombreProducto || '').trim();
+        if (!nombre) { alert('Ponle un nombre al producto antes de marcarlo como Aprobado.'); return; }
+        const codigo = nextProductoCodigo();
+        db.collection('productos').add({
+            nombre, descripcion:'', estado:'Testeo', proveedor:'', vendedor:'', imagen:'', codigo,
+            tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+        }).then(ref => {
+            const nuevaForm = {...form, aprobacion:'Aprobado', productoCreadoId: ref.id, productoCreadoCodigo: codigo};
+            setTiktokAnalisisForm(nuevaForm);
+            db.collection('tiktokLinks').doc(activeTiktok.id).update({
+                'analisis.aprobacion':'Aprobado', 'analisis.productoCreadoId': ref.id, 'analisis.productoCreadoCodigo': codigo,
+                estado: 'Convertido a producto',
+            }).then(() => {
+                setTiktokLinks(prev => prev.map(x => x.id===activeTiktok.id ? {...x, analisis: nuevaForm, estado:'Convertido a producto'} : x));
+                setActiveTiktok(x => x ? {...x, analisis: nuevaForm, estado:'Convertido a producto'} : x);
+            }).catch(avisarErrorGuardado);
+        }).catch(avisarErrorGuardado);
+    };
+
+    const setTiktokAprobacion = (a) => {
+        if (a==='Aprobado' && !tiktokAnalisisForm.productoCreadoId) { crearProductoDesdeTiktok(tiktokAnalisisForm); return; }
+        setTiktokAnalisisForm(f => ({...f, aprobacion:a}));
+        db.collection('tiktokLinks').doc(activeTiktok.id).update({'analisis.aprobacion':a}).catch(avisarErrorGuardado);
+    };
+
+    const irAProductoCreado = (productoId) => {
+        const prod = productos.find(x=>x.id===productoId);
+        setActiveTiktok(null);
+        setProdSeccion('productos');
+        setActiveProducto(prod || {id:productoId});
+        setProductoTab('general');
     };
 
     const addAnguloRow = () => setTiktokAnalisisForm(f => ({...f, angulos:[...(f.angulos||[]), { id:'ang_'+Date.now(), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo:'' }]}));
@@ -3081,42 +3131,77 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     </div>
                                                     <div className="form-group" style={{marginBottom:0,gridColumn:'1 / -1'}}>
                                                         <label style={{color:'var(--text-dim)'}}>Verificación en FB ADS</label>
-                                                        <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:60,resize:'vertical'}}
-                                                            placeholder="Qué encontraste al buscarlo en la Biblioteca de Anuncios de Meta..." value={f.verificacionFbAds} onChange={e=>setTiktokAnalisisForm(x=>({...x,verificacionFbAds:e.target.value}))} />
+                                                        <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'var(--text)',cursor:'pointer',padding:'9px 0'}}>
+                                                            <input type="checkbox" checked={!!f.verificacionFbAds} onChange={e=>setTiktokAnalisisForm(x=>({...x,verificacionFbAds:e.target.checked}))} />
+                                                            Verificado en la Biblioteca de Anuncios de Meta
+                                                        </label>
                                                     </div>
                                                 </div>
                                                 <div className="form-group" style={{marginBottom:0}}>
                                                     <label style={{color:'var(--text-dim)'}}>Aprobación</label>
-                                                    <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                    <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
                                                         {TIKTOK_APROBACION.map(a=>(
                                                             <button key={a} className={`btn btn-sm ${f.aprobacion===a?'btn-gold':'btn-glass'}`}
-                                                                onClick={()=>setTiktokAnalisisForm(x=>({...x,aprobacion:a}))}>{a}</button>
+                                                                onClick={()=>setTiktokAprobacion(a)}>{a}</button>
                                                         ))}
+                                                        {f.productoCreadoId && (
+                                                            <span className="badge badge-gold" style={{marginLeft:6,cursor:'pointer'}} onClick={()=>irAProductoCreado(f.productoCreadoId)}>
+                                                                <span className="badge-dot"/>Creado como {f.productoCreadoCodigo} → Ver en Productos
+                                                            </span>
+                                                        )}
                                                     </div>
+                                                    {!f.productoCreadoId && <p style={{fontSize:'11px',color:'var(--text-dimmer)',marginTop:6}}>Al marcar "Aprobado" se crea automáticamente en Productos con estado Testeo.</p>}
                                                 </div>
                                             </div>
 
-                                            <div className="card glass" style={{padding:'20px',marginBottom:16,overflowX:'auto'}}>
-                                                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                                                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Ángulos de venta</div>
-                                                    <button className="btn btn-glass btn-sm" onClick={addAnguloRow}>{I.plus} Agregar ángulo</button>
-                                                </div>
-                                                <table>
-                                                    <thead><tr><th>Ángulo de Ventas</th><th>Ángulo de Ventas (Imagen)</th><th>Comentarios</th><th>Necesidad, Solución y Beneficio</th><th>Comentarios</th><th>Link de Video</th><th></th></tr></thead>
-                                                    <tbody>
-                                                        {(f.angulos||[]).map((a,idx)=>(
-                                                            <tr key={a.id||idx}>
-                                                                <td><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',minWidth:140}} value={a.angulo} onChange={e=>updateAnguloField(idx,'angulo',e.target.value)} /></td>
-                                                                <td><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',minWidth:140}} value={a.anguloImagen} onChange={e=>updateAnguloField(idx,'anguloImagen',e.target.value)} /></td>
-                                                                <td><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',minWidth:140}} value={a.comentario1} onChange={e=>updateAnguloField(idx,'comentario1',e.target.value)} /></td>
-                                                                <td><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',minWidth:180}} value={a.necesidad} onChange={e=>updateAnguloField(idx,'necesidad',e.target.value)} /></td>
-                                                                <td><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',minWidth:140}} value={a.comentario2} onChange={e=>updateAnguloField(idx,'comentario2',e.target.value)} /></td>
-                                                                <td><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',minWidth:180}} placeholder="https://..." value={a.linkVideo} onChange={e=>updateAnguloField(idx,'linkVideo',e.target.value)} /></td>
-                                                                <td><button className="btn btn-glass btn-sm" onClick={()=>removeAnguloRow(idx)} style={{color:'#8B3535'}}>×</button></td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                                                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Ángulos de venta</div>
+                                                <button className="btn btn-glass btn-sm" onClick={addAnguloRow}>{I.plus} Agregar ángulo</button>
+                                            </div>
+
+                                            <div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:16}}>
+                                                {(f.angulos||[]).map((a,idx)=>(
+                                                    <div key={a.id||idx} className="card glass" style={{padding:'20px'}}>
+                                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                                                            <span style={{fontSize:'12px',fontWeight:700,color:'var(--text-dim)'}}>Ángulo {idx+1}</span>
+                                                            <button className="btn btn-glass btn-sm" onClick={()=>removeAnguloRow(idx)} style={{color:'#8B3535'}}>Eliminar ángulo</button>
+                                                        </div>
+                                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
+                                                            <div className="form-group" style={{marginBottom:0}}>
+                                                                <label style={{color:'var(--text-dim)'}}>Ángulo de Ventas</label>
+                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                    value={a.angulo} onChange={e=>updateAnguloField(idx,'angulo',e.target.value)} />
+                                                            </div>
+                                                            <div className="form-group" style={{marginBottom:0}}>
+                                                                <label style={{color:'var(--text-dim)'}}>Ángulo de Ventas (IMAGEN)</label>
+                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                    value={a.anguloImagen} onChange={e=>updateAnguloField(idx,'anguloImagen',e.target.value)} />
+                                                            </div>
+                                                            <div className="form-group" style={{marginBottom:0}}>
+                                                                <label style={{color:'var(--text-dim)'}}>Comentarios</label>
+                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                    value={a.comentario1} onChange={e=>updateAnguloField(idx,'comentario1',e.target.value)} />
+                                                            </div>
+                                                        </div>
+                                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+                                                            <div className="form-group" style={{marginBottom:0}}>
+                                                                <label style={{color:'var(--text-dim)'}}>Necesidad, Solución y Beneficio</label>
+                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                    value={a.necesidad} onChange={e=>updateAnguloField(idx,'necesidad',e.target.value)} />
+                                                            </div>
+                                                            <div className="form-group" style={{marginBottom:0}}>
+                                                                <label style={{color:'var(--text-dim)'}}>Comentarios</label>
+                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                    value={a.comentario2} onChange={e=>updateAnguloField(idx,'comentario2',e.target.value)} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="form-group" style={{marginBottom:0}}>
+                                                            <label style={{color:'var(--text-dim)'}}>Link de Video</label>
+                                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                                placeholder="https://..." value={a.linkVideo} onChange={e=>updateAnguloField(idx,'linkVideo',e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
 
                                             <button className="btn btn-gold" onClick={saveTiktokAnalisis}>{I.edit} Guardar</button>
