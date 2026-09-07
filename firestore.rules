@@ -78,6 +78,10 @@ service cloud.firestore {
     match /links/{id}      { allow read, write: if tienePermiso('accesos'); }
     match /productos/{id}  { allow read, write: if tienePermiso('ganadores'); }
 
+    // ── tiktokLinks ── Listado TikTok, pestaña de Productos: links de TikTok/Instagram
+    // en investigación, mismo permiso que Productos
+    match /tiktokLinks/{id} { allow read, write: if tienePermiso('ganadores'); }
+
     // ── proveedores ── ficha de cada proveedor, gateada por su permiso
     match /proveedores/{id} { allow read, write: if tienePermiso('proveedores'); }
 

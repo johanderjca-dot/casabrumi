@@ -1371,6 +1371,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [productos,          setProductos]          = useState([]);
     const [activeProducto,     setActiveProducto]     = useState(null);
     const [productoTab,        setProductoTab]        = useState('general');
+    // ── Listado TikTok: pestaña dentro de Productos para llevar seguimiento de links de
+    // TikTok/Instagram encontrados en investigación de producto, antes de decidir si valen la pena.
+    const [prodSeccion,        setProdSeccion]        = useState('productos'); // 'productos' | 'tiktok'
+    const TIKTOK_ESTADOS = ['En búsqueda','Guardado','Convertido a producto','Descartado'];
+    const [tiktokLinks,        setTiktokLinks]        = useState([]);
+    const [tiktokForm,         setTiktokForm]         = useState({ link:'', plataforma:'TikTok', nota:'' });
+    const [savingTiktok,       setSavingTiktok]       = useState(false);
     const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
     const [loteActivo,         setLoteActivo]         = useState(null);
     useEffect(() => { setLoteActivo(null); }, [activeProducto?.id]);
@@ -2101,6 +2108,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         return unsub;
     }, []);
 
+    useEffect(() => {
+        const unsub = db.collection('tiktokLinks').orderBy('creadoEn','desc').onSnapshot(
+            snap => setTiktokLinks(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('TikTok links:', err)
+        );
+        return unsub;
+    }, []);
+
     // Checklist de Contenido: plantilla compartida por todos los productos, editable por el master.
     useEffect(() => {
         const ref = db.collection('configuracion').doc('contenidoGrupos');
@@ -2252,6 +2267,23 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setShowProdModal(true);
     };
 
+    const saveTiktokLink = () => {
+        const link = tiktokForm.link.trim();
+        if (!link || savingTiktok) return;
+        setSavingTiktok(true);
+        db.collection('tiktokLinks').add({
+            link, plataforma: tiktokForm.plataforma, nota: tiktokForm.nota.trim(),
+            estado: 'En búsqueda', tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+        }).catch(console.error).finally(() => setSavingTiktok(false));
+        setTiktokForm({ link:'', plataforma: tiktokForm.plataforma, nota:'' });
+    };
+
+    const updateTiktokEstado = (id, estado) => db.collection('tiktokLinks').doc(id).update({ estado }).catch(console.error);
+
+    const deleteTiktokLink = (id) => {
+        if (confirm('¿Eliminar este link?')) db.collection('tiktokLinks').doc(id).delete().catch(console.error);
+    };
+
     const saveSeccion = (id, seccion, data) => {
         db.collection('productos').doc(id).update({[seccion]: data}).catch(console.error);
         setActiveProducto(p => p ? {...p, [seccion]: data} : p);
@@ -2345,6 +2377,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const vendedoresScoped = vendedores.filter(perteneceATienda);
     const gastosScoped     = gastos.filter(perteneceATienda);
     const productosScoped  = productos.filter(perteneceATienda);
+    const tiktokLinksScoped = tiktokLinks.filter(perteneceATienda);
     const cierresScoped    = cierres.filter(perteneceATienda);
 
     const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
@@ -2956,8 +2989,81 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                 <div><h1>Productos</h1><p>Gestiona y analiza tus mejores productos</p></div>
-                                <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>
+                                {prodSeccion==='productos' && <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>}
                             </div>
+
+                            <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
+                                <button className={`btn ${prodSeccion==='productos'?'btn-gold':'btn-glass'}`} onClick={()=>setProdSeccion('productos')}>Productos</button>
+                                <button className={`btn ${prodSeccion==='tiktok'?'btn-gold':'btn-glass'}`} onClick={()=>setProdSeccion('tiktok')}>Listado TikTok</button>
+                            </div>
+
+                            {prodSeccion==='tiktok' ? (
+                                <>
+                                    <div className="card glass" style={{padding:'16px',marginBottom:16}}>
+                                        <div style={{display:'grid',gridTemplateColumns:'110px 1fr 1fr auto',gap:10,alignItems:'end'}}>
+                                            <div className="form-group" style={{marginBottom:0}}>
+                                                <label style={{color:'var(--text-dim)'}}>Plataforma</label>
+                                                <select className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                    value={tiktokForm.plataforma} onChange={e=>setTiktokForm(f=>({...f,plataforma:e.target.value}))}>
+                                                    <option value="TikTok">TikTok</option>
+                                                    <option value="Instagram">Instagram</option>
+                                                </select>
+                                            </div>
+                                            <div className="form-group" style={{marginBottom:0}}>
+                                                <label style={{color:'var(--text-dim)'}}>Link</label>
+                                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                    placeholder="https://..." value={tiktokForm.link}
+                                                    onChange={e=>setTiktokForm(f=>({...f,link:e.target.value}))}
+                                                    onKeyDown={e=>{if(e.key==='Enter')saveTiktokLink();}} />
+                                            </div>
+                                            <div className="form-group" style={{marginBottom:0}}>
+                                                <label style={{color:'var(--text-dim)'}}>Nota</label>
+                                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                    placeholder="Ej. posible producto ganador, nicho fitness..." value={tiktokForm.nota}
+                                                    onChange={e=>setTiktokForm(f=>({...f,nota:e.target.value}))}
+                                                    onKeyDown={e=>{if(e.key==='Enter')saveTiktokLink();}} />
+                                            </div>
+                                            <button className="btn btn-gold" disabled={!tiktokForm.link.trim()||savingTiktok} onClick={saveTiktokLink}>{I.plus} Agregar</button>
+                                        </div>
+                                    </div>
+
+                                    {tiktokLinksScoped.length===0 ? (
+                                        <div className="card glass"><div className="empty">
+                                            <div style={{fontSize:'40px',marginBottom:14}}>🔍</div>
+                                            <h3>Sin links aún</h3><p>Agrega el primer link de TikTok o Instagram para empezar a investigar.</p>
+                                        </div></div>
+                                    ) : (
+                                        <div className="card glass" style={{overflowX:'auto'}}>
+                                            <table>
+                                                <thead><tr><th>Plataforma</th><th>Link</th><th>Nota</th><th>Estado</th><th></th></tr></thead>
+                                                <tbody>
+                                                    {tiktokLinksScoped.map(t => (
+                                                        <tr key={t.id} style={t.estado==='Descartado'?{opacity:0.55}:undefined}>
+                                                            <td><span className="badge badge-gray" style={{whiteSpace:'nowrap'}}>{t.plataforma==='Instagram'?'📸':'🎵'} {t.plataforma}</span></td>
+                                                            <td style={{maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                                                <a href={t.link} target="_blank" rel="noopener noreferrer" style={{color:'var(--orange)',textDecoration:t.estado==='Descartado'?'line-through':'none'}}>{t.link}</a>
+                                                            </td>
+                                                            <td style={{color:'var(--text-dim)',fontSize:'12.5px'}}>{t.nota||'—'}</td>
+                                                            <td>
+                                                                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                                                                    {TIKTOK_ESTADOS.map(e=>(
+                                                                        <button key={e} className={`btn btn-sm ${t.estado===e?'btn-gold':'btn-glass'}`}
+                                                                            onClick={()=>updateTiktokEstado(t.id,e)}>{e}</button>
+                                                                    ))}
+                                                                </div>
+                                                            </td>
+                                                            <td style={{textAlign:'right'}}>
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>deleteTiktokLink(t.id)} style={{color:'#8B3535'}}>Eliminar</button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                            <>
                             {productos.length===0 ? (
                                 <div className="card glass"><div className="empty">
                                     <div style={{fontSize:'40px',marginBottom:14}}>⭐</div>
@@ -3077,6 +3183,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         </div>
                                     </div>
                                 </div>
+                            )}
+                            </>
                             )}
                         </>
                     );
