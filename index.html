@@ -1382,7 +1382,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // verificación en FB Ads, aprobación) — se abre al hacer clic en un link del listado.
     const [activeTiktok,       setActiveTiktok]       = useState(null);
     const TIKTOK_APROBACION = ['Pendiente','Aprobado','Rechazado'];
-    const TIKTOK_ANALISIS_DEFAULT = { nombreProducto:'', precioDetal:'', precioVenta:'', linkProducto:'', verificacionFbAds:false, aprobacion:'Pendiente', angulos:[] };
+    const TIKTOK_ANALISIS_DEFAULT = { nombreProducto:'', precioDetal:'', precioVenta:'', linkProducto:'', verificacionFbAds:false, aprobacion:'Pendiente', angulos:[], linksVideos:'' };
     const [tiktokAnalisisForm, setTiktokAnalisisForm] = useState(TIKTOK_ANALISIS_DEFAULT);
     // ── Brief de Creativos: se crea automáticamente (vacío, en Borrador) al aprobar un producto
     // a testear. El master lo llena; el diseñador (permiso 'creativos') solo ve los que ya
@@ -2310,12 +2310,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (activeTiktok?.id===id) setActiveTiktok(null);
     };
 
-    const nuevaOpcion = (linkVideo='') => ({ id:'ang_'+Date.now()+'_'+Math.random().toString(36).slice(2), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo });
+    const nuevaOpcion = () => ({ id:'ang_'+Date.now()+'_'+Math.random().toString(36).slice(2), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'' });
     // Siempre exactamente 4 opciones — sin botón de agregar/quitar. Si ya hay guardadas menos
-    // de 4 (datos viejos), se completan con opciones vacías; la primera se siembra con el link
-    // capturado en el listado.
-    const ensureFourOpciones = (angulos, seedLink) => {
-        const base = (angulos && angulos.length) ? [...angulos] : [nuevaOpcion(seedLink)];
+    // de 4 (datos viejos), se completan con opciones vacías.
+    const ensureFourOpciones = (angulos) => {
+        const base = (angulos && angulos.length) ? [...angulos] : [nuevaOpcion()];
         while (base.length < 4) base.push(nuevaOpcion());
         return base.slice(0,4);
     };
@@ -2324,9 +2323,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setActiveTiktok(t);
         // El nombre del producto NUNCA se hereda del link ni de la nota — es un campo aparte
         // que se define aquí adentro, y una vez guardado es lo que se muestra afuera en el listado.
+        // Los links de video van en un listado aparte (no uno por opción); el link capturado en
+        // el listado de afuera se siembra ahí como primera línea.
         setTiktokAnalisisForm(t.analisis
-            ? { ...t.analisis, angulos: ensureFourOpciones(t.analisis.angulos, t.link) }
-            : { ...TIKTOK_ANALISIS_DEFAULT, angulos: ensureFourOpciones([], t.link) }
+            ? { ...t.analisis, angulos: ensureFourOpciones(t.analisis.angulos) }
+            : { ...TIKTOK_ANALISIS_DEFAULT, angulos: ensureFourOpciones([]), linksVideos: t.link || '' }
         );
     };
 
@@ -3269,13 +3270,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                     value={a.comentario2} onChange={e=>updateAnguloField(idx,'comentario2',e.target.value)} />
                                                             </div>
                                                         </div>
-                                                        <div className="form-group" style={{marginBottom:0}}>
-                                                            <label style={{color:'var(--text-dim)'}}>Link de Video</label>
-                                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                                placeholder="https://..." value={a.linkVideo} onChange={e=>updateAnguloField(idx,'linkVideo',e.target.value)} />
-                                                        </div>
                                                     </div>
                                                 ))}
+                                            </div>
+
+                                            <div className="card glass" style={{padding:'20px',marginBottom:16}}>
+                                                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Links de Video</div>
+                                                <textarea className="form-input glass no-icon" rows={6} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                    placeholder={'https://...\nhttps://...'} value={f.linksVideos} onChange={e=>setTiktokAnalisisForm(x=>({...x,linksVideos:e.target.value}))} />
                                             </div>
 
                                             <button className="btn btn-gold" onClick={saveTiktokAnalisis}>{I.edit} Guardar</button>
