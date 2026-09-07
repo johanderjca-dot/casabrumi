@@ -1371,7 +1371,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [productos,          setProductos]          = useState([]);
     const [activeProducto,     setActiveProducto]     = useState(null);
     const [productoTab,        setProductoTab]        = useState('general');
-    // ── Listado TikTok: pestaña dentro de Productos para llevar seguimiento de links de
+    // ── Listado Productos a Testear: pestaña dentro de Productos para llevar seguimiento de links de
     // TikTok/Instagram encontrados en investigación de producto, antes de decidir si valen la pena.
     const [prodSeccion,        setProdSeccion]        = useState('productos'); // 'productos' | 'tiktok'
     const TIKTOK_ESTADOS = ['En búsqueda','Guardado','Convertido a producto','Descartado'];
@@ -2994,7 +2994,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                             <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
                                 <button className={`btn ${prodSeccion==='productos'?'btn-gold':'btn-glass'}`} onClick={()=>setProdSeccion('productos')}>Productos</button>
-                                <button className={`btn ${prodSeccion==='tiktok'?'btn-gold':'btn-glass'}`} onClick={()=>setProdSeccion('tiktok')}>Listado TikTok</button>
+                                <button className={`btn ${prodSeccion==='tiktok'?'btn-gold':'btn-glass'}`} onClick={()=>setProdSeccion('tiktok')}>Listado Productos a Testear</button>
                             </div>
 
                             {prodSeccion==='tiktok' ? (
