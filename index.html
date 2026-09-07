@@ -2295,14 +2295,24 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         if (activeTiktok?.id===id) setActiveTiktok(null);
     };
 
+    const nuevaOpcion = (linkVideo='') => ({ id:'ang_'+Date.now()+'_'+Math.random().toString(36).slice(2), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo });
+    // Siempre exactamente 4 opciones — sin botón de agregar/quitar. Si ya hay guardadas menos
+    // de 4 (datos viejos), se completan con opciones vacías; la primera se siembra con el link
+    // capturado en el listado.
+    const ensureFourOpciones = (angulos, seedLink) => {
+        const base = (angulos && angulos.length) ? [...angulos] : [nuevaOpcion(seedLink)];
+        while (base.length < 4) base.push(nuevaOpcion());
+        return base.slice(0,4);
+    };
+
     const openTiktokDetail = (t) => {
         setActiveTiktok(t);
         // El nombre del producto NUNCA se hereda del link ni de la nota — es un campo aparte
         // que se define aquí adentro, y una vez guardado es lo que se muestra afuera en el listado.
-        setTiktokAnalisisForm(t.analisis || {
-            ...TIKTOK_ANALISIS_DEFAULT,
-            angulos: [{ id:'ang_'+Date.now(), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo: t.link || '' }],
-        });
+        setTiktokAnalisisForm(t.analisis
+            ? { ...t.analisis, angulos: ensureFourOpciones(t.analisis.angulos, t.link) }
+            : { ...TIKTOK_ANALISIS_DEFAULT, angulos: ensureFourOpciones([], t.link) }
+        );
     };
 
     const saveTiktokAnalisis = () => {
@@ -2360,9 +2370,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setProductoTab('general');
     };
 
-    const addAnguloRow = () => setTiktokAnalisisForm(f => ({...f, angulos:[...(f.angulos||[]), { id:'ang_'+Date.now(), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo:'' }]}));
     const updateAnguloField = (idx, field, value) => setTiktokAnalisisForm(f => ({...f, angulos: f.angulos.map((a,i)=>i===idx?{...a,[field]:value}:a)}));
-    const removeAnguloRow = (idx) => setTiktokAnalisisForm(f => ({...f, angulos: f.angulos.filter((_,i)=>i!==idx)}));
     // Ref callback que hace crecer el textarea a la altura de su contenido en cada render
     // (incluyendo la carga inicial de texto largo ya guardado), en vez de quedarse fijo y
     // obligar a hacer scroll adentro de la caja.
@@ -3158,17 +3166,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 </div>
                                             </div>
 
-                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                                                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Ángulos de venta</div>
-                                                <button className="btn btn-glass btn-sm" onClick={addAnguloRow}>{I.plus} Agregar ángulo</button>
-                                            </div>
+                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Ángulos de venta</div>
 
                                             <div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:16}}>
                                                 {(f.angulos||[]).map((a,idx)=>(
                                                     <div key={a.id||idx} className="card glass" style={{padding:'20px'}}>
-                                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                                                            <span style={{fontSize:'12px',fontWeight:700,color:'var(--text-dim)'}}>Ángulo {idx+1}</span>
-                                                            <button className="btn btn-glass btn-sm" onClick={()=>removeAnguloRow(idx)} style={{color:'#8B3535'}}>Eliminar ángulo</button>
+                                                        <div style={{marginBottom:12}}>
+                                                            <span style={{fontSize:'12px',fontWeight:700,color:'var(--text-dim)'}}>Opción {idx+1}</span>
                                                         </div>
                                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
                                                             <div className="form-group" style={{marginBottom:0}}>
