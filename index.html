@@ -2273,6 +2273,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setShowProdModal(true);
     };
 
+    // Muestra el error real de Firestore (ej. "Missing or insufficient permissions" si las
+    // reglas no se han desplegado) en vez de dejarlo morir en la consola sin que nadie lo note.
+    const avisarErrorGuardado = err => { console.error(err); alert('No se pudo guardar: ' + (err?.message || err)); };
+
     const saveTiktokLink = () => {
         const link = tiktokForm.link.trim();
         if (!link || savingTiktok) return;
@@ -2280,14 +2284,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         db.collection('tiktokLinks').add({
             link, plataforma: tiktokForm.plataforma, nota: tiktokForm.nota.trim(),
             estado: 'En búsqueda', tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
-        }).catch(console.error).finally(() => setSavingTiktok(false));
+        }).catch(avisarErrorGuardado).finally(() => setSavingTiktok(false));
         setTiktokForm({ link:'', plataforma: tiktokForm.plataforma, nota:'' });
     };
 
-    const updateTiktokEstado = (id, estado) => db.collection('tiktokLinks').doc(id).update({ estado }).catch(console.error);
+    const updateTiktokEstado = (id, estado) => db.collection('tiktokLinks').doc(id).update({ estado }).catch(avisarErrorGuardado);
 
     const deleteTiktokLink = (id) => {
-        if (confirm('¿Eliminar este link?')) db.collection('tiktokLinks').doc(id).delete().catch(console.error);
+        if (confirm('¿Eliminar este link?')) db.collection('tiktokLinks').doc(id).delete().catch(avisarErrorGuardado);
         if (activeTiktok?.id===id) setActiveTiktok(null);
     };
 
@@ -2300,9 +2304,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     };
 
     const saveTiktokAnalisis = () => {
-        db.collection('tiktokLinks').doc(activeTiktok.id).update({ analisis: tiktokAnalisisForm }).catch(console.error);
-        setTiktokLinks(prev => prev.map(x => x.id===activeTiktok.id ? {...x, analisis: tiktokAnalisisForm} : x));
-        setActiveTiktok(x => x ? {...x, analisis: tiktokAnalisisForm} : x);
+        db.collection('tiktokLinks').doc(activeTiktok.id).update({ analisis: tiktokAnalisisForm }).then(() => {
+            setTiktokLinks(prev => prev.map(x => x.id===activeTiktok.id ? {...x, analisis: tiktokAnalisisForm} : x));
+            setActiveTiktok(x => x ? {...x, analisis: tiktokAnalisisForm} : x);
+        }).catch(avisarErrorGuardado);
     };
 
     const addAnguloRow = () => setTiktokAnalisisForm(f => ({...f, angulos:[...(f.angulos||[]), { id:'ang_'+Date.now(), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo:'' }]}));
