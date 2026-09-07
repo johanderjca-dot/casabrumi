@@ -1398,7 +1398,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [showProdModal,      setShowProdModal]      = useState(false);
     const [editingProducto,    setEditingProducto]    = useState(null);
     const [savingProd,         setSavingProd]         = useState(false);
-    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Testeo', proveedor:'', vendedor:'', imagen:'', codigo:'' });
+    const [prodForm,           setProdForm]           = useState({ nombre:'', descripcion:'', estado:'Testeo', proveedor:'', vendedor:'', imagen:'', codigo:'', temporada:'' });
     const [editSeccion,        setEditSeccion]        = useState(null); // 'inventario'
     const [invForm,            setInvForm]            = useState({ precioCompra:'', precioVenta:'' });
     // El 4to valor indica qué respuesta ('si' o 'no') es la favorable para el puntaje; por defecto 'si'.
@@ -2249,7 +2249,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const data = {
             nombre: prodForm.nombre, descripcion: prodForm.descripcion,
             estado: prodForm.estado, proveedor: prodForm.proveedor, vendedor: prodForm.vendedor,
-            imagen: prodForm.imagen, codigo: prodForm.codigo.trim(),
+            imagen: prodForm.imagen, codigo: prodForm.codigo.trim(), temporada: prodForm.temporada.trim(),
             facebook: editingProducto?.facebook || {}, inventario: editingProducto?.inventario || {},
         };
         if (editingProducto) {
@@ -2258,7 +2258,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         } else {
             db.collection('productos').add({...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
         }
-        setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:''});
+        setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:'',temporada:''});
         setEditingProducto(null); setShowProdModal(false);
     };
 
@@ -2269,7 +2269,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openEditProd = (p) => {
         setEditingProducto(p);
-        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', vendedor:p.vendedor||'', imagen:p.imagen||'', codigo:p.codigo||''});
+        setProdForm({nombre:p.nombre||'', descripcion:p.descripcion||'', estado:p.estado||'Activo', proveedor:p.proveedor||'', vendedor:p.vendedor||'', imagen:p.imagen||'', codigo:p.codigo||'', temporada:p.temporada||''});
         setShowProdModal(true);
     };
 
@@ -2363,6 +2363,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const addAnguloRow = () => setTiktokAnalisisForm(f => ({...f, angulos:[...(f.angulos||[]), { id:'ang_'+Date.now(), angulo:'', anguloImagen:'', comentario1:'', necesidad:'', comentario2:'', linkVideo:'' }]}));
     const updateAnguloField = (idx, field, value) => setTiktokAnalisisForm(f => ({...f, angulos: f.angulos.map((a,i)=>i===idx?{...a,[field]:value}:a)}));
     const removeAnguloRow = (idx) => setTiktokAnalisisForm(f => ({...f, angulos: f.angulos.filter((_,i)=>i!==idx)}));
+    // Ref callback que hace crecer el textarea a la altura de su contenido en cada render
+    // (incluyendo la carga inicial de texto largo ya guardado), en vez de quedarse fijo y
+    // obligar a hacer scroll adentro de la caja.
+    const autoGrowRef = el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } };
 
     const saveSeccion = (id, seccion, data) => {
         db.collection('productos').doc(id).update({[seccion]: data}).catch(console.error);
@@ -2539,7 +2543,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
             {showCmdK && (() => {
                 const acciones = [
-                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',vendedor:'',imagen:'',codigo:''}); setShowProdModal(true); } },
+                    { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',vendedor:'',imagen:'',codigo:'',temporada:''}); setShowProdModal(true); } },
                     { key:'vendedores', label: 'Nuevo usuario',          icon: I.users,  kind: 'Acción', run: () => { setActiveTab('vendedores'); setShowModal(true); } },
                     { key:'accesos', label: 'Nuevo acceso rápido',    icon: I_link,   kind: 'Acción', run: () => { setActiveTab('accesos'); setEditingLink(null); setLinkForm({nombre:'',url:'',icono:'🔗'}); setShowLinkModal(true); } },
                 ].filter(a => tienePermiso(a.key));
@@ -3069,7 +3073,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                         <>
                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                 <div><h1>Productos</h1><p>Gestiona y analiza tus mejores productos</p></div>
-                                {prodSeccion==='productos' && <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>}
+                                {prodSeccion==='productos' && <button className="btn btn-gold" onClick={()=>{setEditingProducto(null);setProdForm({nombre:'',descripcion:'',estado:'Testeo',proveedor:'',vendedor:'',imagen:'',codigo:'',temporada:''});setShowProdModal(true);}}>{I.plus} Agregar Producto</button>}
                             </div>
 
                             <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
@@ -3169,29 +3173,29 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
                                                             <div className="form-group" style={{marginBottom:0}}>
                                                                 <label style={{color:'var(--text-dim)'}}>Ángulo de Ventas</label>
-                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:96}}
                                                                     value={a.angulo} onChange={e=>updateAnguloField(idx,'angulo',e.target.value)} />
                                                             </div>
                                                             <div className="form-group" style={{marginBottom:0}}>
                                                                 <label style={{color:'var(--text-dim)'}}>Ángulo de Ventas (IMAGEN)</label>
-                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:96}}
                                                                     value={a.anguloImagen} onChange={e=>updateAnguloField(idx,'anguloImagen',e.target.value)} />
                                                             </div>
                                                             <div className="form-group" style={{marginBottom:0}}>
                                                                 <label style={{color:'var(--text-dim)'}}>Comentarios</label>
-                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:96}}
                                                                     value={a.comentario1} onChange={e=>updateAnguloField(idx,'comentario1',e.target.value)} />
                                                             </div>
                                                         </div>
                                                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
                                                             <div className="form-group" style={{marginBottom:0}}>
                                                                 <label style={{color:'var(--text-dim)'}}>Necesidad, Solución y Beneficio</label>
-                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:96}}
                                                                     value={a.necesidad} onChange={e=>updateAnguloField(idx,'necesidad',e.target.value)} />
                                                             </div>
                                                             <div className="form-group" style={{marginBottom:0}}>
                                                                 <label style={{color:'var(--text-dim)'}}>Comentarios</label>
-                                                                <textarea className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
+                                                                <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={4} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:96}}
                                                                     value={a.comentario2} onChange={e=>updateAnguloField(idx,'comentario2',e.target.value)} />
                                                             </div>
                                                         </div>
@@ -3301,7 +3305,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 </div>
                                                 <div style={{padding:'14px 16px'}}>
                                                     <div style={{fontWeight:'700',fontSize:'14px',color:'var(--text)',marginBottom:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nombre}</div>
-                                                    {p.codigo&&<span className="badge badge-gold" style={{fontFamily:'Fira Code',fontSize:'11px',fontWeight:700,marginBottom:8,display:'inline-block'}}>{p.codigo}</span>}
+                                                    {(p.codigo||p.temporada)&&<div style={{marginBottom:8,display:'flex',gap:6,flexWrap:'wrap'}}>
+                                                        {p.codigo&&<span className="badge badge-gold" style={{fontFamily:'Fira Code',fontSize:'11px',fontWeight:700}}>{p.codigo}</span>}
+                                                        {p.temporada&&<span className="badge badge-gray" style={{fontSize:'11px'}}>{p.temporada}</span>}
+                                                    </div>}
                                                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:(vendido>0||despachadosCard>0)?8:0}}>
                                                         {p.proveedor
                                                             ? <div style={{fontSize:'11px',color:'var(--text-dimmer)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',minWidth:0}} title={p.proveedor}>{p.proveedor}</div>
@@ -3371,6 +3378,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <label style={{color:'var(--text-dim)'}}>Código interno</label>
                                             <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                                 value={prodForm.codigo} onChange={e=>setProdForm(f=>({...f,codigo:e.target.value}))} placeholder="Ej. CB-014" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Temporada (opcional)</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.temporada} onChange={e=>setProdForm(f=>({...f,temporada:e.target.value}))} placeholder="Ej. Navidad, Verano, San Valentín..." />
                                         </div>
                                         <div className="form-group">
                                             <label style={{color:'var(--text-dim)'}}>Estado inicial</label>
@@ -3467,7 +3479,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <button className="btn btn-glass btn-sm" onClick={()=>{setActiveProducto(null);setEditSeccion(null);}}>← Productos</button>
                                     <div>
                                         <h1 style={{display:'flex',alignItems:'center',gap:10}}>{p.nombre} <span className={`badge ${PROD_ESTADO_COLOR[p.estado]||'badge-gray'}`}><span className="badge-dot"/>{p.estado}</span></h1>
-                                        {p.proveedor&&<p>{p.proveedor}{p.vendedor?` · Vendedor: ${p.vendedor}`:''}</p>}
+                                        {p.proveedor&&<p>{p.proveedor}{p.vendedor?` · Vendedor: ${p.vendedor}`:''}{p.temporada?` · ${p.temporada}`:''}</p>}
                                     </div>
                                 </div>
                                 <div style={{display:'flex',gap:8}}>
@@ -4066,6 +4078,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <label style={{color:'var(--text-dim)'}}>Código interno</label>
                                             <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
                                                 value={prodForm.codigo} onChange={e=>setProdForm(f=>({...f,codigo:e.target.value}))} placeholder="Ej. CB-014" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label style={{color:'var(--text-dim)'}}>Temporada (opcional)</label>
+                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                value={prodForm.temporada} onChange={e=>setProdForm(f=>({...f,temporada:e.target.value}))} placeholder="Ej. Navidad, Verano, San Valentín..." />
                                         </div>
                                         <div className="form-group">
                                             <label style={{color:'var(--text-dim)'}}>Estado inicial</label>
