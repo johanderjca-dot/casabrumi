@@ -82,6 +82,13 @@ service cloud.firestore {
     // en investigación, mismo permiso que Productos
     match /tiktokLinks/{id} { allow read, write: if tienePermiso('ganadores'); }
 
+    // ── briefs ── Brief de Creativos para el diseñador. Se crean automáticamente al aprobar
+    // un producto a testear. El master (o quien tenga permiso 'ganadores') los llena y los
+    // marca "Listo"; quien solo tiene el permiso 'creativos' (el diseñador) también puede leer
+    // y escribir aquí — el filtro de solo ver los que ya están "Listo" se hace en el cliente,
+    // igual que el resto de módulos gateados solo por permiso.
+    match /briefs/{id} { allow read, write: if tienePermiso('ganadores') || tienePermiso('creativos'); }
+
     // ── proveedores ── ficha de cada proveedor, gateada por su permiso
     match /proveedores/{id} { allow read, write: if tienePermiso('proveedores'); }
 

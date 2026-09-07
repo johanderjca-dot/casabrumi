@@ -1384,6 +1384,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const TIKTOK_APROBACION = ['Pendiente','Aprobado','Rechazado'];
     const TIKTOK_ANALISIS_DEFAULT = { nombreProducto:'', precioDetal:'', precioVenta:'', linkProducto:'', verificacionFbAds:false, aprobacion:'Pendiente', angulos:[] };
     const [tiktokAnalisisForm, setTiktokAnalisisForm] = useState(TIKTOK_ANALISIS_DEFAULT);
+    // ── Brief de Creativos: se crea automáticamente (vacío, en Borrador) al aprobar un producto
+    // a testear. El master lo llena; el diseñador (permiso 'creativos') solo ve los que ya
+    // están marcados "Listo" — así no le aparece nada hasta que Johander termine de llenarlo.
+    const [briefs,          setBriefs]          = useState([]);
+    const [activeBrief,     setActiveBrief]     = useState(null);
+    const [briefForm,       setBriefForm]       = useState(null);
+    const BRIEF_DEFAULT_ELEMENTOS = [{label:'Logo',valor:''},{label:'Sello',valor:''},{label:'Pie',valor:''},{label:'Producto',valor:''}];
     const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
     const [loteActivo,         setLoteActivo]         = useState(null);
     useEffect(() => { setLoteActivo(null); }, [activeProducto?.id]);
@@ -1987,7 +1994,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ['vendedores','Usuarios'], ['proveedores','Proveedores'], ['ganadores','Productos'],
         ['cierre','Cierre Diario'], ['contabilidad','Contabilidad'], ['costeo','Calculadora Costeo'],
         ['diccionario','Diccionario'], ['accesos','Accesos Rápidos'], ['tiendas','Tiendas'],
-        ['salarios','Salarios'], ['marcas','Identidad de Marca'],
+        ['salarios','Salarios'], ['marcas','Identidad de Marca'], ['creativos','Brief de Creativos'],
     ];
 
     const crearUsuario = async () => {
@@ -2118,6 +2125,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         const unsub = db.collection('tiktokLinks').orderBy('creadoEn','desc').onSnapshot(
             snap => setTiktokLinks(snap.docs.map(d=>({id:d.id,...d.data()}))),
             err => console.error('TikTok links:', err)
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const unsub = db.collection('briefs').orderBy('creadoEn','desc').onSnapshot(
+            snap => setBriefs(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Briefs:', err)
         );
         return unsub;
     }, []);
@@ -2353,6 +2368,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 setTiktokLinks(prev => prev.map(x => x.id===activeTiktok.id ? {...x, analisis: nuevaForm, estado:'Convertido a producto'} : x));
                 setActiveTiktok(x => x ? {...x, analisis: nuevaForm, estado:'Convertido a producto'} : x);
             }).catch(avisarErrorGuardado);
+            // El brief se crea vacío en Borrador — al diseñador no le aparece hasta que se llene
+            // y se marque "Listo" desde Brief de Creativos.
+            db.collection('briefs').add({
+                productoId: ref.id, productoNombre: nombre, productoCodigo: codigo, tiendaId: activeTiendaId,
+                piezas:'', formato:'', medidas:'', destino:'',
+                elementosFijos: BRIEF_DEFAULT_ELEMENTOS, slides: [],
+                estado: 'Borrador', creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+            }).catch(avisarErrorGuardado);
         }).catch(avisarErrorGuardado);
     };
 
@@ -2369,6 +2392,43 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setActiveProducto(prod || {id:productoId});
         setProductoTab('general');
     };
+
+    // ── Brief de Creativos ──
+    const openBrief = (b) => { setActiveBrief(b); setBriefForm({ piezas:'', formato:'', medidas:'', destino:'', elementosFijos: BRIEF_DEFAULT_ELEMENTOS, slides: [], ...b }); };
+    const closeBrief = () => { setActiveBrief(null); setBriefForm(null); };
+
+    const saveBrief = () => {
+        db.collection('briefs').doc(activeBrief.id).update({
+            piezas: briefForm.piezas, formato: briefForm.formato, medidas: briefForm.medidas, destino: briefForm.destino,
+            elementosFijos: briefForm.elementosFijos, slides: briefForm.slides,
+        }).then(() => {
+            setBriefs(prev => prev.map(x => x.id===activeBrief.id ? {...x, ...briefForm} : x));
+            setActiveBrief(x => x ? {...x, ...briefForm} : x);
+        }).catch(avisarErrorGuardado);
+    };
+
+    const setBriefEstado = (estado) => {
+        db.collection('briefs').doc(activeBrief.id).update({ estado }).then(() => {
+            setBriefs(prev => prev.map(x => x.id===activeBrief.id ? {...x, estado} : x));
+            setActiveBrief(x => x ? {...x, estado} : x);
+        }).catch(avisarErrorGuardado);
+    };
+
+    const deleteBrief = (id) => {
+        if (confirm('¿Eliminar este brief?')) db.collection('briefs').doc(id).delete().catch(avisarErrorGuardado);
+        if (activeBrief?.id===id) closeBrief();
+    };
+
+    const addElementoFijo = () => setBriefForm(f => ({...f, elementosFijos:[...(f.elementosFijos||[]), {label:'',valor:''}]}));
+    const updateElementoFijo = (idx, campo, value) => setBriefForm(f => ({...f, elementosFijos: f.elementosFijos.map((e,i)=>i===idx?{...e,[campo]:value}:e)}));
+    const removeElementoFijo = (idx) => setBriefForm(f => ({...f, elementosFijos: f.elementosFijos.filter((_,i)=>i!==idx)}));
+
+    const addSlide = () => setBriefForm(f => ({...f, slides:[...(f.slides||[]), { titulo:`Slide ${(f.slides||[]).length+1}`, subtitulo:'', campos:[{label:'',valor:''}] }]}));
+    const updateSlideField = (idx, campo, value) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===idx?{...s,[campo]:value}:s)}));
+    const removeSlide = (idx) => setBriefForm(f => ({...f, slides: f.slides.filter((_,i)=>i!==idx)}));
+    const addCampoSlide = (slideIdx) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:[...(s.campos||[]),{label:'',valor:''}]}:s)}));
+    const updateCampoSlide = (slideIdx, campoIdx, campo, value) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:s.campos.map((c,j)=>j===campoIdx?{...c,[campo]:value}:c)}:s)}));
+    const removeCampoSlide = (slideIdx, campoIdx) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:s.campos.filter((_,j)=>j!==campoIdx)}:s)}));
 
     const updateAnguloField = (idx, field, value) => setTiktokAnalisisForm(f => ({...f, angulos: f.angulos.map((a,i)=>i===idx?{...a,[field]:value}:a)}));
     // Ref callback que hace crecer el textarea a la altura de su contenido en cada render
@@ -2470,6 +2530,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const gastosScoped     = gastos.filter(perteneceATienda);
     const productosScoped  = productos.filter(perteneceATienda);
     const tiktokLinksScoped = tiktokLinks.filter(perteneceATienda);
+    const briefsScoped = briefs.filter(perteneceATienda);
+    // El diseñador (sin ser master) solo ve los briefs ya marcados "Listo" — mientras se llenan
+    // quedan en Borrador y no le aparecen.
+    const briefsVisibles = user.role==='master' ? briefsScoped : briefsScoped.filter(b=>b.estado==='Listo');
     const cierresScoped    = cierres.filter(perteneceATienda);
 
     const totalVentas = ventas.reduce((s, v) => s + (v.monto || 0), 0);
@@ -2489,6 +2553,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_balanza = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M12 6 5 6l3.5 8a3.5 3.5 0 0 0 7 0L19 6l-7 0"/><line x1="7" y1="20" x2="17" y2="20"/></svg>;
     const I_wallet = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>;
     const I_palette = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 0 20 2.5 2.5 0 0 0 0-5 2.5 2.5 0 0 1 0-5h1a5 5 0 0 0 5-5c0-2.76-2.24-5-5-5"/><circle cx="7" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="6" r="1.2" fill="currentColor" stroke="none"/></svg>;
+    const I_brief = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>;
 
     // Usuarios (gestión de cuentas) es siempre exclusivo del master, sin importar los checkboxes
     // de permisos guardados — evita que un vendedor con ese permiso cree/edite otras cuentas.
@@ -2508,6 +2573,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
             { key: 'contabilidad', label: 'Contabilidad', icon: I_balanza },
             { key: 'salarios', label: 'Salarios', icon: I_wallet },
+            { key: 'creativos', label: 'Brief de Creativos', icon: I_brief },
         ]},
         { label: 'Herramientas', items: [
             { key: 'costeo',  label: 'Calculadora Costeo', icon: I_calc },
@@ -4109,6 +4175,164 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+                        </>
+                    );
+                })()}
+
+                {activeTab === 'creativos' && (() => {
+                    const esMaster = user.role === 'master';
+
+                    if (activeBrief && briefForm) {
+                        const b = briefForm;
+                        return (
+                            <>
+                                <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                        <button className="btn btn-glass btn-sm" onClick={closeBrief}>← Listado</button>
+                                        <div>
+                                            <h1 style={{display:'flex',alignItems:'center',gap:10}}>{activeBrief.productoNombre}
+                                                <span className={`badge ${activeBrief.estado==='Listo'?'badge-gold':'badge-gray'}`}><span className="badge-dot"/>{activeBrief.estado}</span>
+                                            </h1>
+                                            {activeBrief.productoCodigo && <p>{activeBrief.productoCodigo}</p>}
+                                        </div>
+                                    </div>
+                                    {esMaster && <button className="btn btn-glass" onClick={()=>deleteBrief(activeBrief.id)} style={{color:'#8B3535'}}>Eliminar</button>}
+                                </div>
+
+                                {esMaster ? (
+                                    <>
+                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
+                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:14}}>Datos generales</div>
+                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12}}>
+                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Piezas</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. 2 slides" value={b.piezas} onChange={e=>setBriefForm(f=>({...f,piezas:e.target.value}))} /></div>
+                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Formato</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. 1:1 cuadrado" value={b.formato} onChange={e=>setBriefForm(f=>({...f,formato:e.target.value}))} /></div>
+                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Medidas</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. 2048 x 2048 px" value={b.medidas} onChange={e=>setBriefForm(f=>({...f,medidas:e.target.value}))} /></div>
+                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Destino</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. Web Shopify" value={b.destino} onChange={e=>setBriefForm(f=>({...f,destino:e.target.value}))} /></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
+                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                                                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Elementos fijos <span style={{fontWeight:400,textTransform:'none',letterSpacing:0}}>— van en todas las piezas</span></div>
+                                                <button className="btn btn-glass btn-sm" onClick={addElementoFijo}>{I.plus} Agregar elemento</button>
+                                            </div>
+                                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                                {(b.elementosFijos||[]).map((el,idx)=>(
+                                                    <div key={idx} style={{display:'grid',gridTemplateColumns:'160px 1fr auto',gap:8,alignItems:'start'}}>
+                                                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Etiqueta (ej. Logo)" value={el.label} onChange={e=>updateElementoFijo(idx,'label',e.target.value)} />
+                                                        <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={1} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:44}} placeholder="Valor" value={el.valor} onChange={e=>updateElementoFijo(idx,'valor',e.target.value)} />
+                                                        <button className="btn btn-glass btn-sm" onClick={()=>removeElementoFijo(idx)} style={{color:'#8B3535'}}>×</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Slides / piezas</div>
+                                            <button className="btn btn-glass btn-sm" onClick={addSlide}>{I.plus} Agregar slide</button>
+                                        </div>
+                                        <div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:20}}>
+                                            {(b.slides||[]).map((s,sIdx)=>(
+                                                <div key={sIdx} className="card glass" style={{padding:'20px'}}>
+                                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:10,marginBottom:14,alignItems:'end'}}>
+                                                        <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Nombre del slide</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={s.titulo} onChange={e=>updateSlideField(sIdx,'titulo',e.target.value)} /></div>
+                                                        <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Tipo (ej. Gancho + Beneficios)</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={s.subtitulo} onChange={e=>updateSlideField(sIdx,'subtitulo',e.target.value)} /></div>
+                                                        <button className="btn btn-glass btn-sm" onClick={()=>removeSlide(sIdx)} style={{color:'#8B3535'}}>Eliminar slide</button>
+                                                    </div>
+                                                    <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
+                                                        {(s.campos||[]).map((c,cIdx)=>(
+                                                            <div key={cIdx} style={{display:'grid',gridTemplateColumns:'160px 1fr auto',gap:8,alignItems:'start'}}>
+                                                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Etiqueta (ej. Título 1)" value={c.label} onChange={e=>updateCampoSlide(sIdx,cIdx,'label',e.target.value)} />
+                                                                <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={1} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:44}} placeholder="Valor" value={c.valor} onChange={e=>updateCampoSlide(sIdx,cIdx,'valor',e.target.value)} />
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>removeCampoSlide(sIdx,cIdx)} style={{color:'#8B3535'}}>×</button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <button className="btn btn-glass btn-sm" onClick={()=>addCampoSlide(sIdx)}>{I.plus} Agregar campo</button>
+                                                </div>
+                                            ))}
+                                            {(b.slides||[]).length===0 && <p style={{fontSize:12.5,color:'var(--text-dimmer)'}}>Sin slides aún — agrega el primero.</p>}
+                                        </div>
+
+                                        <div style={{display:'flex',gap:10}}>
+                                            <button className="btn btn-gold" onClick={saveBrief}>{I.edit} Guardar</button>
+                                            <button className={`btn ${activeBrief.estado==='Listo'?'btn-glass':'btn-gold'}`} onClick={()=>setBriefEstado(activeBrief.estado==='Listo'?'Borrador':'Listo')}>
+                                                {activeBrief.estado==='Listo' ? 'Volver a Borrador' : 'Marcar como Listo para diseño'}
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
+                                            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14}}>
+                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Piezas</div><div style={{fontWeight:700}}>{b.piezas||'—'}</div></div>
+                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Formato</div><div style={{fontWeight:700}}>{b.formato||'—'}</div></div>
+                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Medidas</div><div style={{fontWeight:700}}>{b.medidas||'—'}</div></div>
+                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Destino</div><div style={{fontWeight:700}}>{b.destino||'—'}</div></div>
+                                            </div>
+                                        </div>
+                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
+                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Elementos fijos</div>
+                                            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                                                {(b.elementosFijos||[]).filter(el=>el.label||el.valor).map((el,idx)=>(
+                                                    <div key={idx} style={{display:'grid',gridTemplateColumns:'140px 1fr',gap:10,paddingBottom:8,borderBottom:'1px solid var(--glass-border)'}}>
+                                                        <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase'}}>{el.label}</div>
+                                                        <div style={{whiteSpace:'pre-wrap'}}>{el.valor}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {(b.slides||[]).map((s,sIdx)=>(
+                                            <div key={sIdx} className="card glass" style={{padding:'20px',marginBottom:16}}>
+                                                <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:14}}>
+                                                    <div style={{fontWeight:700,fontSize:15}}>{s.titulo}</div>
+                                                    {s.subtitulo && <div style={{fontSize:11,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1}}>{s.subtitulo}</div>}
+                                                </div>
+                                                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                                                    {(s.campos||[]).filter(c=>c.label||c.valor).map((c,cIdx)=>(
+                                                        <div key={cIdx} style={{display:'grid',gridTemplateColumns:'140px 1fr',gap:10,paddingBottom:8,borderBottom:'1px solid var(--glass-border)'}}>
+                                                            <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase'}}>{c.label}</div>
+                                                            <div style={{whiteSpace:'pre-wrap'}}>{c.valor}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </>
+                        );
+                    }
+
+                    return (
+                        <>
+                            <div className="page-header"><h1>Brief de Creativos</h1><p>{esMaster ? 'Se crean solos al aprobar un producto a testear — llénalos y márcalos "Listo" para el diseñador.' : 'Briefs listos para diseñar.'}</p></div>
+                            {briefsVisibles.length===0 ? (
+                                <div className="card glass"><div className="empty">
+                                    <div style={{fontSize:'40px',marginBottom:14}}>🎨</div>
+                                    <h3>Sin briefs {esMaster?'aún':'listos por ahora'}</h3>
+                                    <p>{esMaster ? 'Se crean automáticamente al aprobar un producto en el Listado de Productos a Testear.' : 'Cuando haya uno listo para diseñar, aparecerá aquí.'}</p>
+                                </div></div>
+                            ) : (
+                                <div className="card glass" style={{overflowX:'auto'}}>
+                                    <table>
+                                        <thead><tr><th>Producto</th>{esMaster && <th>Estado</th>}<th>Formato</th><th>Destino</th><th></th></tr></thead>
+                                        <tbody>
+                                            {briefsVisibles.map(b=>(
+                                                <tr key={b.id} style={{cursor:'pointer'}} onClick={()=>openBrief(b)}>
+                                                    <td><strong>{b.productoNombre}</strong>{b.productoCodigo&&<span className="badge badge-gold" style={{marginLeft:8,fontSize:'9.5px'}}>{b.productoCodigo}</span>}</td>
+                                                    {esMaster && <td><span className={`badge ${b.estado==='Listo'?'badge-gold':'badge-gray'}`}><span className="badge-dot"/>{b.estado}</span></td>}
+                                                    <td style={{color:'var(--text-dim)'}}>{b.formato||'—'}</td>
+                                                    <td style={{color:'var(--text-dim)'}}>{b.destino||'—'}</td>
+                                                    <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}>
+                                                        {esMaster && <button className="btn btn-glass btn-sm" onClick={()=>deleteBrief(b.id)} style={{color:'#8B3535'}}>Eliminar</button>}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
                         </>
