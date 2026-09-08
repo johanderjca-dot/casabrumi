@@ -1383,7 +1383,14 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // verificación en FB Ads, aprobación) — se abre al hacer clic en un link del listado.
     const [activeTiktok,       setActiveTiktok]       = useState(null);
     const TIKTOK_APROBACION = ['Pendiente','Aprobado','Rechazado'];
-    const TIKTOK_ANALISIS_DEFAULT = { nombreProducto:'', precioDetal:'', precioVenta:'', linkProducto:'', verificacionFbAds:false, aprobacion:'Pendiente', angulos:[], linksVideos:'' };
+    const TIKTOK_ANALISIS_DEFAULT = { nombreProducto:'', precioDetal:'', precioVenta:'', linkProducto:'', verificacionFbAds:false, aprobacion:'Pendiente', angulos:[], linksVideos:[''] };
+    // Un cuadro por link — acepta el formato viejo (un solo texto multilínea) migrándolo a la
+    // primera vez que se abre la ficha, sin perder lo ya guardado.
+    const normalizeLinksVideos = (v, seedLink) => {
+        if (Array.isArray(v)) return v.length ? v : [seedLink || ''];
+        if (typeof v === 'string' && v.trim()) return v.split('\n').map(s=>s.trim()).filter(Boolean);
+        return [seedLink || ''];
+    };
     const [tiktokAnalisisForm, setTiktokAnalisisForm] = useState(TIKTOK_ANALISIS_DEFAULT);
     // ── Brief de Creativos: se crea automáticamente (vacío, en Borrador) al aprobar un producto
     // a testear. El master lo llena; el diseñador (permiso 'creativos') solo ve los que ya
@@ -2327,8 +2334,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         // Los links de video van en un listado aparte (no uno por opción); el link capturado en
         // el listado de afuera se siembra ahí como primera línea.
         setTiktokAnalisisForm(t.analisis
-            ? { ...t.analisis, angulos: ensureFourOpciones(t.analisis.angulos) }
-            : { ...TIKTOK_ANALISIS_DEFAULT, angulos: ensureFourOpciones([]), linksVideos: t.link || '' }
+            ? { ...t.analisis, angulos: ensureFourOpciones(t.analisis.angulos), linksVideos: normalizeLinksVideos(t.analisis.linksVideos, t.link) }
+            : { ...TIKTOK_ANALISIS_DEFAULT, angulos: ensureFourOpciones([]), linksVideos: normalizeLinksVideos(null, t.link) }
         );
     };
 
@@ -2449,6 +2456,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const removeCampoSlide = (slideIdx, campoIdx) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:s.campos.filter((_,j)=>j!==campoIdx)}:s)}));
 
     const updateAnguloField = (idx, field, value) => setTiktokAnalisisForm(f => ({...f, angulos: f.angulos.map((a,i)=>i===idx?{...a,[field]:value}:a)}));
+    const updateLinkVideo = (idx, value) => setTiktokAnalisisForm(f => ({...f, linksVideos: f.linksVideos.map((v,i)=>i===idx?value:v)}));
+    const addLinkVideo = () => setTiktokAnalisisForm(f => ({...f, linksVideos: [...(f.linksVideos||[]), '']}));
+    const removeLinkVideo = (idx) => setTiktokAnalisisForm(f => ({...f, linksVideos: f.linksVideos.filter((_,i)=>i!==idx)}));
     // Ref callback que hace crecer el textarea a la altura de su contenido en cada render
     // (incluyendo la carga inicial de texto largo ya guardado), en vez de quedarse fijo y
     // obligar a hacer scroll adentro de la caja.
@@ -3293,8 +3303,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                                             <div className="card glass" style={{padding:'20px',marginBottom:16}}>
                                                 <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Links de Video</div>
-                                                <textarea className="form-input glass no-icon" rows={6} style={{border:'1px solid var(--glass-border)',resize:'vertical'}}
-                                                    placeholder={'https://...\nhttps://...'} value={f.linksVideos} onChange={e=>setTiktokAnalisisForm(x=>({...x,linksVideos:e.target.value}))} />
+                                                <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
+                                                    {(f.linksVideos||['']).map((link,idx)=>(
+                                                        <div key={idx} style={{display:'flex',gap:8}}>
+                                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                                                placeholder="https://..." value={link} onChange={e=>updateLinkVideo(idx,e.target.value)} />
+                                                            {(f.linksVideos||[]).length>1 &&
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>removeLinkVideo(idx)} style={{color:'#8B3535'}}>×</button>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <button className="btn btn-glass btn-sm" onClick={addLinkVideo}>{I.plus} Agregar link</button>
                                             </div>
 
                                             <button className="btn btn-gold" onClick={saveTiktokAnalisis}>{I.edit} Guardar</button>
