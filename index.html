@@ -18,7 +18,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&family=Lora:wght@500;600&display=swap" rel="stylesheet">
 
             <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -327,6 +327,34 @@
         tbody td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2.5px; background: var(--orange); opacity: 0; transition: opacity 150ms ease; }
         @media (hover: hover) and (pointer: fine) { tbody tr:hover td { background: rgba(18,154,143,0.04); } tbody tr:hover td:first-child::before { opacity: 1; } }
         .td-num { font-family: 'Fira Code', monospace; font-weight: 600; color: var(--earth-2); }
+
+        /* ========= BRIEF DE CREATIVOS — DOC CARD ========= */
+        .bd-card { background: #FBF4F1; border: 1px solid rgba(122,35,49,0.16); border-radius: 18px; padding: 40px 44px; }
+        .bd-eyebrow { font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 500; letter-spacing: 1.8px; text-transform: uppercase; color: #9C8B84; margin-bottom: 10px; }
+        .bd-title { font-family: 'Lora', serif; font-size: 40px; font-weight: 500; color: #2A1D1A; line-height: 1.1; letter-spacing: -0.5px; margin: 0 0 26px; }
+        .bd-datarow { display: grid; grid-template-columns: repeat(4,1fr); background: #FFFFFF; border: 1px solid rgba(122,35,49,0.16); border-radius: 12px; margin-bottom: 34px; overflow: hidden; }
+        .bd-datacol { padding: 16px 20px; border-right: 1px solid rgba(122,35,49,0.14); }
+        .bd-datacol:last-child { border-right: none; }
+        .bd-datalabel { font-family: 'Fira Code', monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #9C8B84; margin-bottom: 6px; }
+        .bd-dataval { font-family: 'Fira Sans', sans-serif; font-size: 15.5px; font-weight: 700; color: #2E2320; }
+        .bd-dataval-input { border: none; background: transparent; width: 100%; padding: 0; outline: none; }
+        .bd-dataval-input::placeholder { color: rgba(46,35,32,0.32); font-weight: 500; }
+        .bd-sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .bd-sec-badge { width: 27px; height: 27px; border-radius: 7px; background: #7A2331; color: #FBF4F1; font-family: 'Fira Code', monospace; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .bd-sec-title { font-family: 'Lora', serif; font-size: 21px; font-weight: 500; color: #7A2331; }
+        .bd-sec-right { margin-left: auto; font-family: 'Fira Code', monospace; font-size: 10px; font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: #9C8B84; white-space: nowrap; }
+        .bd-sec-rule { height: 2px; background: #7A2331; opacity: 0.85; margin-bottom: 18px; }
+        .bd-elbox { background: #FFFFFF; border: 1px solid rgba(122,35,49,0.16); border-radius: 12px; overflow: hidden; }
+        .bd-elrow { display: grid; grid-template-columns: 130px 1fr auto; gap: 18px; align-items: start; padding: 16px 20px; border-bottom: 1px solid rgba(122,35,49,0.12); }
+        .bd-elrow:last-child { border-bottom: none; }
+        .bd-ellabel { font-family: 'Fira Code', monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #9C8B84; padding-top: 3px; border: none; background: transparent; outline: none; width: 100%; }
+        .bd-elval { font-family: 'Fira Sans', sans-serif; font-size: 14.5px; line-height: 1.55; color: #2E2320; border: none; background: transparent; outline: none; width: 100%; resize: none; overflow: hidden; padding: 0; }
+        .bd-elval::placeholder, .bd-ellabel::placeholder { color: rgba(46,35,32,0.30); }
+        .bd-elremove { opacity: 0.35; transition: opacity 140ms ease; }
+        .bd-elrow:hover .bd-elremove { opacity: 0.85; }
+        .bd-addlink { font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; color: #7A2331; background: none; border: none; cursor: pointer; padding: 12px 20px; display: block; width: 100%; text-align: left; opacity: 0.75; }
+        .bd-addlink:hover { opacity: 1; }
+        .bd-editable:focus { box-shadow: 0 1px 0 0 rgba(122,35,49,0.4); }
 
         /* ========= BADGES ========= */
         .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 100px; font-size: 10.5px; font-weight: 600; }
@@ -4248,34 +4276,59 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     {esMaster && <button className="btn btn-glass" onClick={()=>deleteBrief(activeBrief.id)} style={{color:'#8B3535'}}>Eliminar</button>}
                                 </div>
 
-                                {esMaster ? (
-                                    <>
-                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
-                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:14}}>Datos generales</div>
-                                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12}}>
-                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Piezas</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. 2 slides" value={b.piezas} onChange={e=>setBriefForm(f=>({...f,piezas:e.target.value}))} /></div>
-                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Formato</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. 1:1 cuadrado" value={b.formato} onChange={e=>setBriefForm(f=>({...f,formato:e.target.value}))} /></div>
-                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Medidas</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. 2048 x 2048 px" value={b.medidas} onChange={e=>setBriefForm(f=>({...f,medidas:e.target.value}))} /></div>
-                                                <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Destino</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Ej. Web Shopify" value={b.destino} onChange={e=>setBriefForm(f=>({...f,destino:e.target.value}))} /></div>
-                                            </div>
-                                        </div>
+                                {(() => {
+                                    const nSlides = (b.slides||[]).length;
+                                    const NUM_WORDS = ['cero','un','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez'];
+                                    const slidesWord = nSlides>=1 && nSlides<=10 ? NUM_WORDS[nSlides] : String(nSlides);
+                                    const DATA_FIELDS = [
+                                        {key:'piezas', label:'Piezas', ph:'Ej. 2 slides'},
+                                        {key:'formato', label:'Formato', ph:'Ej. 1:1 cuadrado'},
+                                        {key:'medidas', label:'Medidas', ph:'Ej. 2048 x 2048 px'},
+                                        {key:'destino', label:'Destino', ph:'Ej. Web Shopify'},
+                                    ];
+                                    return (
+                                        <div className="bd-card" style={{marginBottom:16}}>
+                                            <div className="bd-eyebrow">Brief de creativos · {(tiendaActiva?.nombre || 'Brumi Shop').toUpperCase()}</div>
+                                            <h1 className="bd-title">{activeBrief.productoNombre}</h1>
 
-                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
-                                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                                                <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Elementos fijos <span style={{fontWeight:400,textTransform:'none',letterSpacing:0}}>— van en todas las piezas</span></div>
-                                                <button className="btn btn-glass btn-sm" onClick={addElementoFijo}>{I.plus} Agregar elemento</button>
-                                            </div>
-                                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                                                {(b.elementosFijos||[]).map((el,idx)=>(
-                                                    <div key={idx} style={{display:'grid',gridTemplateColumns:'160px 1fr auto',gap:8,alignItems:'start'}}>
-                                                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Etiqueta (ej. Logo)" value={el.label} onChange={e=>updateElementoFijo(idx,'label',e.target.value)} />
-                                                        <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={1} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:44}} placeholder="Valor" value={el.valor} onChange={e=>updateElementoFijo(idx,'valor',e.target.value)} />
-                                                        <button className="btn btn-glass btn-sm" onClick={()=>removeElementoFijo(idx)} style={{color:'#8B3535'}}>×</button>
+                                            <div className="bd-datarow">
+                                                {DATA_FIELDS.map(f => (
+                                                    <div key={f.key} className="bd-datacol">
+                                                        <div className="bd-datalabel">{f.label}</div>
+                                                        {esMaster
+                                                            ? <input className="bd-dataval bd-dataval-input bd-editable" placeholder={f.ph} value={b[f.key]} onChange={e=>setBriefForm(x=>({...x,[f.key]:e.target.value}))} />
+                                                            : <div className="bd-dataval">{b[f.key] || '—'}</div>}
                                                     </div>
                                                 ))}
                                             </div>
-                                        </div>
 
+                                            <div className="bd-sec-head">
+                                                <div className="bd-sec-badge">00</div>
+                                                <div className="bd-sec-title">Elementos fijos</div>
+                                                <div className="bd-sec-right">{nSlides>0 ? `Van en los ${slidesWord} slide${nSlides>1?'s':''}`.toUpperCase() : 'Van en todas las piezas'}</div>
+                                            </div>
+                                            <div className="bd-sec-rule" />
+
+                                            <div className="bd-elbox">
+                                                {(esMaster ? (b.elementosFijos||[]) : (b.elementosFijos||[]).filter(el=>el.label||el.valor)).map((el,idx)=>(
+                                                    <div key={idx} className="bd-elrow">
+                                                        {esMaster
+                                                            ? <input className="bd-ellabel bd-editable" placeholder="Etiqueta" value={el.label} onChange={e=>updateElementoFijo(idx,'label',e.target.value)} />
+                                                            : <div className="bd-ellabel">{el.label}</div>}
+                                                        {esMaster
+                                                            ? <textarea ref={autoGrowRef} rows={1} className="bd-elval bd-editable" placeholder="Valor" value={el.valor} onChange={e=>updateElementoFijo(idx,'valor',e.target.value)} />
+                                                            : <div className="bd-elval" style={{whiteSpace:'pre-wrap'}}>{el.valor}</div>}
+                                                        {esMaster && <button className="btn btn-glass btn-sm bd-elremove" onClick={()=>removeElementoFijo(idx)} style={{color:'#8B3535'}}>×</button>}
+                                                    </div>
+                                                ))}
+                                                {esMaster && <button className="bd-addlink" onClick={addElementoFijo}>{I.plus} Agregar elemento</button>}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {esMaster ? (
+                                    <>
                                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                                             <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px'}}>Slides / piezas</div>
                                             <button className="btn btn-glass btn-sm" onClick={addSlide}>{I.plus} Agregar slide</button>
@@ -4312,25 +4365,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </>
                                 ) : (
                                     <>
-                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
-                                            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14}}>
-                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Piezas</div><div style={{fontWeight:700}}>{b.piezas||'—'}</div></div>
-                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Formato</div><div style={{fontWeight:700}}>{b.formato||'—'}</div></div>
-                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Medidas</div><div style={{fontWeight:700}}>{b.medidas||'—'}</div></div>
-                                                <div><div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',marginBottom:4}}>Destino</div><div style={{fontWeight:700}}>{b.destino||'—'}</div></div>
-                                            </div>
-                                        </div>
-                                        <div className="card glass" style={{padding:'20px',marginBottom:16}}>
-                                            <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:'1px',marginBottom:12}}>Elementos fijos</div>
-                                            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                                                {(b.elementosFijos||[]).filter(el=>el.label||el.valor).map((el,idx)=>(
-                                                    <div key={idx} style={{display:'grid',gridTemplateColumns:'140px 1fr',gap:10,paddingBottom:8,borderBottom:'1px solid var(--glass-border)'}}>
-                                                        <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase'}}>{el.label}</div>
-                                                        <div style={{whiteSpace:'pre-wrap'}}>{el.valor}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
                                         {(b.slides||[]).map((s,sIdx)=>(
                                             <div key={sIdx} className="card glass" style={{padding:'20px',marginBottom:16}}>
                                                 <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:14}}>
