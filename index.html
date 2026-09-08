@@ -1475,21 +1475,17 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         {value:'bloques',        label:'Bloques'},
         {value:'prueba-social',  label:'Prueba social'},
     ];
-    const parseLista = v => (v||'').split('\n').map(s=>s.trim()).filter(Boolean);
-    const stringifyLista = arr => arr.join('\n');
-    const parseBloques = v => (v||'').split(/\n\s*\n/).map(chunk => {
-        const lines = chunk.split('\n');
-        return { titulo: (lines[0]||'').trim(), texto: lines.slice(1).join(' ').trim() };
-    }).filter(b => b.titulo || b.texto);
-    const stringifyBloques = arr => arr.map(b => `${b.titulo||''}\n${b.texto||''}`).join('\n\n');
+    // lista/bloques viven en sus propios arrays (c.items / c.bloques) — NO como texto codificado
+    // con saltos de línea: un ítem recién agregado empieza vacío, y una codificación por string
+    // que filtra vacíos borraría ese ítem en el siguiente render antes de que puedas escribirle.
     const parsePruebaSocial = v => { const lines = (v||'').split('\n'); return { principal: lines[0]||'', secundaria: lines[1]||'' }; };
     const stringifyPruebaSocial = p => `${p.principal||''}\n${p.secundaria||''}`;
     const campoHint = c => {
         switch (c.tipo) {
             case 'titulo':          return 'el texto más grande de la pieza';
             case 'titulo-italico':  return 'más chico, en cursiva';
-            case 'lista':           { const n = parseLista(c.valor).length; return `${n} punto${n===1?'':'s'}, numerados`; }
-            case 'bloques':         { const n = parseBloques(c.valor).length; return `${n} bloque${n===1?'':'s'}, cada uno con su palabra`; }
+            case 'lista':           { const n = (c.items||[]).length; return `${n} punto${n===1?'':'s'}, numerados`; }
+            case 'bloques':         { const n = (c.bloques||[]).length; return `${n} bloque${n===1?'':'s'}, cada uno con su palabra`; }
             default:                return '';
         }
     };
@@ -4508,8 +4504,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                     );
                                                                 }
                                                                 if (c.tipo === 'lista') {
-                                                                    const items = parseLista(c.valor);
-                                                                    const setItems = arr => updateCampoSlide(sIdx,cIdx,'valor', stringifyLista(arr));
+                                                                    const items = c.items||[];
+                                                                    const setItems = arr => updateCampoSlide(sIdx,cIdx,'items', arr);
                                                                     return (
                                                                         <div className="bd-lista-box">
                                                                             {items.map((it,ii)=>(
@@ -4524,8 +4520,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                     );
                                                                 }
                                                                 if (c.tipo === 'bloques') {
-                                                                    const bloques = parseBloques(c.valor);
-                                                                    const setBloques = arr => updateCampoSlide(sIdx,cIdx,'valor', stringifyBloques(arr));
+                                                                    const bloques = c.bloques||[];
+                                                                    const setBloques = arr => updateCampoSlide(sIdx,cIdx,'bloques', arr);
                                                                     return (
                                                                         <div>
                                                                             {bloques.map((bl,bi)=>(
@@ -4569,7 +4565,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     {s.subtitulo && <div className="bd-sec-right">{s.subtitulo}</div>}
                                                 </div>
                                                 <div className="bd-slide-rule" />
-                                                {(s.campos||[]).filter(c=>c.label||c.valor).map((c,cIdx)=>(
+                                                {(s.campos||[]).filter(c=>c.label||c.valor||(c.items&&c.items.length)||(c.bloques&&c.bloques.length)).map((c,cIdx)=>(
                                                     <div key={cIdx} className="bd-field-row" style={{gridTemplateColumns:'118px 1fr'}}>
                                                         <div>
                                                             <div className="bd-field-label">{c.label}</div>
@@ -4588,7 +4584,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                 );
                                                             }
                                                             if (c.tipo === 'lista') {
-                                                                const items = parseLista(c.valor);
+                                                                const items = c.items||[];
                                                                 return (
                                                                     <div className="bd-lista-box">
                                                                         {items.map((it,ii)=>(
@@ -4601,7 +4597,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                 );
                                                             }
                                                             if (c.tipo === 'bloques') {
-                                                                const bloques = parseBloques(c.valor);
+                                                                const bloques = c.bloques||[];
                                                                 return (
                                                                     <div>
                                                                         {bloques.map((bl,bi)=>(
