@@ -1439,7 +1439,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // ── Listado Productos a Testear: pestaña dentro de Productos para llevar seguimiento de links de
     // TikTok/Instagram encontrados en investigación de producto, antes de decidir si valen la pena.
     const [prodSeccion,        setProdSeccion]        = useState('productos'); // 'productos' | 'tiktok'
-    const TIKTOK_ESTADOS = ['En búsqueda','Guardado','Producto para aprobar','Convertido a producto','Descartado'];
+    const TIKTOK_ESTADOS = ['En búsqueda','Guardado','Producto para aprobar','En corrección','Convertido a producto','Descartado'];
     const [tiktokLinks,        setTiktokLinks]        = useState([]);
     const [tiktokForm,         setTiktokForm]         = useState({ link:'', plataforma:'TikTok', nota:'' });
     const [savingTiktok,       setSavingTiktok]       = useState(false);
@@ -3366,7 +3366,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 <div style={{display:'flex',alignItems:'center',gap:12}}>
                                                     <button className="btn btn-glass btn-sm" onClick={()=>setActiveTiktok(null)}>← Listado</button>
                                                     <div>
-                                                        <h1 style={{display:'flex',alignItems:'center',gap:10}}>{f.nombreProducto || 'Producto sin nombre'} <span className={`badge ${t.estado==='Descartado'?'badge-gray':t.estado==='Convertido a producto'?'badge-gold':t.estado==='Producto para aprobar'?'badge-green':'badge-gray'}`}><span className="badge-dot"/>{t.estado}</span></h1>
+                                                        <h1 style={{display:'flex',alignItems:'center',gap:10}}>{f.nombreProducto || 'Producto sin nombre'} <span className={`badge ${t.estado==='Descartado'?'badge-gray':t.estado==='Convertido a producto'?'badge-gold':t.estado==='Producto para aprobar'?'badge-green':t.estado==='En corrección'?'badge-orange':'badge-gray'}`}><span className="badge-dot"/>{t.estado}</span></h1>
                                                         <p>{t.plataforma==='Instagram'?'📸':'🎵'} {t.plataforma} · <a href={t.link} target="_blank" rel="noopener noreferrer" style={{color:'var(--orange)'}}>Link original</a></p>
                                                     </div>
                                                 </div>
