@@ -357,6 +357,37 @@
         .bd-addlink svg { width: 12px; height: 12px; flex-shrink: 0; }
         .bd-editable:focus { box-shadow: 0 1px 0 0 rgba(122,35,49,0.4); }
 
+        /* ── Slide fields — Título/Lista/Bloques/Prueba social ── */
+        .bd-slide-rule { height: 2px; background: #231613; opacity: 0.9; margin-bottom: 14px; }
+        .bd-field-row { display: grid; grid-template-columns: 118px 1fr auto; gap: 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid rgba(122,35,49,0.12); }
+        .bd-field-row:last-child { border-bottom: none; }
+        .bd-field-label { font-family: 'Fira Code', monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: #9C8B84; border: none; background: transparent; outline: none; width: 100%; padding-top: 2px; }
+        .bd-field-hint { font-family: 'Fira Code', monospace; font-size: 9px; color: rgba(46,35,32,0.42); line-height: 1.4; margin-top: 4px; }
+        .bd-tiposel { font-family: 'Fira Code', monospace; font-size: 9px; color: #9C8B84; border: 1px solid rgba(122,35,49,0.18); border-radius: 5px; background: #FFFFFF; padding: 3px 4px; margin-top: 6px; outline: none; cursor: pointer; width: 100%; }
+
+        .bd-val-titulo { font-family: 'Fira Sans', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.2px; text-transform: uppercase; color: #1E1512; line-height: 1.2; border: none; background: transparent; outline: none; width: 100%; }
+        .bd-val-italico { font-family: 'Lora', serif; font-style: italic; font-weight: 500; font-size: 14.5px; color: #7A2331; border: none; background: transparent; outline: none; width: 100%; }
+        .bd-val-ps-principal { font-family: 'Fira Sans', sans-serif; font-weight: 700; font-size: 13px; color: #1E1512; border: none; background: transparent; outline: none; width: 100%; }
+        .bd-val-ps-secundaria { font-family: 'Lora', serif; font-style: italic; font-size: 12.5px; color: #1E1512; border: none; background: transparent; outline: none; width: 100%; margin-top: 4px; display: block; }
+
+        .bd-lista-box { background: #FFFFFF; border: 1px solid rgba(122,35,49,0.16); border-radius: 10px; overflow: hidden; }
+        .bd-lista-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-bottom: 1px solid rgba(122,35,49,0.10); }
+        .bd-lista-row:last-child { border-bottom: none; }
+        .bd-lista-num { font-family: 'Fira Code', monospace; font-weight: 700; font-size: 11.5px; color: #7A2331; padding-top: 1px; flex-shrink: 0; width: 15px; }
+        .bd-lista-txt { font-family: 'Fira Sans', sans-serif; font-weight: 800; font-size: 12px; text-transform: uppercase; color: #1E1512; border: none; background: transparent; outline: none; width: 100%; }
+
+        .bd-bloque { border-left: 2px solid #7A2331; padding-left: 12px; margin-bottom: 12px; }
+        .bd-bloque:last-child { margin-bottom: 0; }
+        .bd-bloque-titulo { font-family: 'Lora', serif; font-style: italic; font-weight: 500; font-size: 13.5px; color: #7A2331; border: none; background: transparent; outline: none; width: 100%; margin-bottom: 3px; display: block; }
+        .bd-bloque-texto { font-family: 'Fira Sans', sans-serif; font-size: 12.5px; line-height: 1.5; color: #2E2320; border: none; background: transparent; outline: none; width: 100%; resize: none; overflow: hidden; }
+
+        .bd-subadd { font-family: 'Fira Code', monospace; font-size: 10px; font-weight: 600; color: #7A2331; background: none; border: none; cursor: pointer; opacity: 0.7; padding: 6px 0 0; display: inline-flex; align-items: center; gap: 4px; }
+        .bd-subadd:hover { opacity: 1; }
+        .bd-subadd svg { width: 11px; height: 11px; flex-shrink: 0; }
+        .bd-subremove { opacity: 0.3; transition: opacity 140ms ease; cursor: pointer; background: none; border: none; color: #8B3535; font-size: 13px; padding: 0 2px; flex-shrink: 0; line-height: 1; }
+        .bd-subrow:hover .bd-subremove { opacity: 0.8; }
+        .bd-field-row:hover .bd-elremove { opacity: 0.85; }
+
         /* ========= BADGES ========= */
         .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 100px; font-size: 10.5px; font-weight: 600; }
         .badge-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
@@ -1432,6 +1463,36 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [activeBrief,     setActiveBrief]     = useState(null);
     const [briefForm,       setBriefForm]       = useState(null);
     const BRIEF_DEFAULT_ELEMENTOS = [{label:'Logo',valor:''},{label:'Sello',valor:''},{label:'Pie',valor:''},{label:'Producto',valor:''}];
+
+    // ── Tipos de campo dentro de un slide — cada uno se tipografía distinto en el cuadro.
+    // 'valor' sigue siendo un solo string por simplicidad de esquema; lista/bloques/prueba
+    // social codifican su estructura con saltos de línea (ver parse*/stringify* abajo).
+    const CAMPO_TIPOS = [
+        {value:'texto',          label:'Texto'},
+        {value:'titulo',         label:'Título grande'},
+        {value:'titulo-italico', label:'Título itálico'},
+        {value:'lista',          label:'Lista numerada'},
+        {value:'bloques',        label:'Bloques'},
+        {value:'prueba-social',  label:'Prueba social'},
+    ];
+    const parseLista = v => (v||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const stringifyLista = arr => arr.join('\n');
+    const parseBloques = v => (v||'').split(/\n\s*\n/).map(chunk => {
+        const lines = chunk.split('\n');
+        return { titulo: (lines[0]||'').trim(), texto: lines.slice(1).join(' ').trim() };
+    }).filter(b => b.titulo || b.texto);
+    const stringifyBloques = arr => arr.map(b => `${b.titulo||''}\n${b.texto||''}`).join('\n\n');
+    const parsePruebaSocial = v => { const lines = (v||'').split('\n'); return { principal: lines[0]||'', secundaria: lines[1]||'' }; };
+    const stringifyPruebaSocial = p => `${p.principal||''}\n${p.secundaria||''}`;
+    const campoHint = c => {
+        switch (c.tipo) {
+            case 'titulo':          return 'el texto más grande de la pieza';
+            case 'titulo-italico':  return 'más chico, en cursiva';
+            case 'lista':           { const n = parseLista(c.valor).length; return `${n} punto${n===1?'':'s'}, numerados`; }
+            case 'bloques':         { const n = parseBloques(c.valor).length; return `${n} bloque${n===1?'':'s'}, cada uno con su palabra`; }
+            default:                return '';
+        }
+    };
     const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
     const [loteActivo,         setLoteActivo]         = useState(null);
     useEffect(() => { setLoteActivo(null); }, [activeProducto?.id]);
@@ -2527,7 +2588,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const addSlide = () => setBriefForm(f => ({...f, slides:[...(f.slides||[]), { titulo:`Slide ${(f.slides||[]).length+1}`, subtitulo:'', campos:[{label:'',valor:''}] }]}));
     const updateSlideField = (idx, campo, value) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===idx?{...s,[campo]:value}:s)}));
     const removeSlide = (idx) => setBriefForm(f => ({...f, slides: f.slides.filter((_,i)=>i!==idx)}));
-    const addCampoSlide = (slideIdx) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:[...(s.campos||[]),{label:'',valor:''}]}:s)}));
+    const addCampoSlide = (slideIdx) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:[...(s.campos||[]),{label:'',valor:'',tipo:'texto'}]}:s)}));
     const updateCampoSlide = (slideIdx, campoIdx, campo, value) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:s.campos.map((c,j)=>j===campoIdx?{...c,[campo]:value}:c)}:s)}));
     const removeCampoSlide = (slideIdx, campoIdx) => setBriefForm(f => ({...f, slides: f.slides.map((s,i)=>i===slideIdx?{...s,campos:s.campos.filter((_,j)=>j!==campoIdx)}:s)}));
 
@@ -4412,22 +4473,80 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         </div>
                                         <div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:20}}>
                                             {(b.slides||[]).map((s,sIdx)=>(
-                                                <div key={sIdx} className="card glass" style={{padding:'20px'}}>
-                                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:10,marginBottom:14,alignItems:'end'}}>
-                                                        <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Nombre del slide</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={s.titulo} onChange={e=>updateSlideField(sIdx,'titulo',e.target.value)} /></div>
-                                                        <div className="form-group" style={{marginBottom:0}}><label style={{color:'var(--text-dim)'}}>Tipo (ej. Gancho + Beneficios)</label><input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} value={s.subtitulo} onChange={e=>updateSlideField(sIdx,'subtitulo',e.target.value)} /></div>
+                                                <div key={sIdx} className="bd-card">
+                                                    <div className="bd-sec-head">
+                                                        <div className="bd-sec-badge">{String(sIdx+1).padStart(2,'0')}</div>
+                                                        <input className="bd-sec-title bd-editable" style={{border:'none',background:'transparent',flex:'1 1 auto',minWidth:60}} value={s.titulo} onChange={e=>updateSlideField(sIdx,'titulo',e.target.value)} />
+                                                        <input className="bd-sec-right bd-editable" style={{border:'none',background:'transparent',textAlign:'right',width:150}} placeholder="GANCHO + BENEFICIOS" value={s.subtitulo} onChange={e=>updateSlideField(sIdx,'subtitulo',e.target.value)} />
                                                         <button className="btn btn-glass btn-sm" onClick={()=>removeSlide(sIdx)} style={{color:'#8B3535'}}>Eliminar slide</button>
                                                     </div>
-                                                    <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
-                                                        {(s.campos||[]).map((c,cIdx)=>(
-                                                            <div key={cIdx} style={{display:'grid',gridTemplateColumns:'160px 1fr auto',gap:8,alignItems:'start'}}>
-                                                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} placeholder="Etiqueta (ej. Título 1)" value={c.label} onChange={e=>updateCampoSlide(sIdx,cIdx,'label',e.target.value)} />
-                                                                <textarea ref={autoGrowRef} className="form-input glass no-icon" rows={1} style={{border:'1px solid var(--glass-border)',resize:'none',overflow:'hidden',minHeight:44}} placeholder="Valor" value={c.valor} onChange={e=>updateCampoSlide(sIdx,cIdx,'valor',e.target.value)} />
-                                                                <button className="btn btn-glass btn-sm" onClick={()=>removeCampoSlide(sIdx,cIdx)} style={{color:'#8B3535'}}>×</button>
+                                                    <div className="bd-slide-rule" />
+                                                    {(s.campos||[]).map((c,cIdx)=>(
+                                                        <div key={cIdx} className="bd-field-row">
+                                                            <div>
+                                                                <input className="bd-field-label bd-editable" placeholder="Etiqueta" value={c.label} onChange={e=>updateCampoSlide(sIdx,cIdx,'label',e.target.value)} />
+                                                                <select className="bd-tiposel" value={c.tipo||'texto'} onChange={e=>updateCampoSlide(sIdx,cIdx,'tipo',e.target.value)}>
+                                                                    {CAMPO_TIPOS.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+                                                                </select>
+                                                                {campoHint(c) && <div className="bd-field-hint">{campoHint(c)}</div>}
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                    <button className="btn btn-glass btn-sm" onClick={()=>addCampoSlide(sIdx)}>{I.plus} Agregar campo</button>
+                                                            {(() => {
+                                                                if (c.tipo === 'titulo') return (
+                                                                    <input className="bd-val-titulo bd-editable" placeholder="El texto más grande" value={c.valor} onChange={e=>updateCampoSlide(sIdx,cIdx,'valor',e.target.value)} />
+                                                                );
+                                                                if (c.tipo === 'titulo-italico') return (
+                                                                    <input className="bd-val-italico bd-editable" placeholder="texto en cursiva" value={c.valor} onChange={e=>updateCampoSlide(sIdx,cIdx,'valor',e.target.value)} />
+                                                                );
+                                                                if (c.tipo === 'prueba-social') {
+                                                                    const ps = parsePruebaSocial(c.valor);
+                                                                    const setPs = patch => updateCampoSlide(sIdx,cIdx,'valor', stringifyPruebaSocial({...ps,...patch}));
+                                                                    return (
+                                                                        <div>
+                                                                            <input className="bd-val-ps-principal bd-editable" placeholder="#1 en su categoría" value={ps.principal} onChange={e=>setPs({principal:e.target.value})} />
+                                                                            <input className="bd-val-ps-secundaria bd-editable" placeholder="+ [cantidad] vendidos este mes" value={ps.secundaria} onChange={e=>setPs({secundaria:e.target.value})} />
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                if (c.tipo === 'lista') {
+                                                                    const items = parseLista(c.valor);
+                                                                    const setItems = arr => updateCampoSlide(sIdx,cIdx,'valor', stringifyLista(arr));
+                                                                    return (
+                                                                        <div className="bd-lista-box">
+                                                                            {items.map((it,ii)=>(
+                                                                                <div key={ii} className="bd-lista-row bd-subrow">
+                                                                                    <div className="bd-lista-num">{ii+1}</div>
+                                                                                    <input className="bd-lista-txt bd-editable" value={it} onChange={e=>{const n=[...items]; n[ii]=e.target.value; setItems(n);}} />
+                                                                                    <button className="bd-subremove" onClick={()=>setItems(items.filter((_,j)=>j!==ii))}>×</button>
+                                                                                </div>
+                                                                            ))}
+                                                                            <button className="bd-subadd" style={{padding:'8px 12px'}} onClick={()=>setItems([...items,''])}>{I.plus} Agregar punto</button>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                if (c.tipo === 'bloques') {
+                                                                    const bloques = parseBloques(c.valor);
+                                                                    const setBloques = arr => updateCampoSlide(sIdx,cIdx,'valor', stringifyBloques(arr));
+                                                                    return (
+                                                                        <div>
+                                                                            {bloques.map((bl,bi)=>(
+                                                                                <div key={bi} className="bd-bloque bd-subrow" style={{position:'relative'}}>
+                                                                                    <input className="bd-bloque-titulo bd-editable" placeholder="Palabra" value={bl.titulo} onChange={e=>{const n=[...bloques]; n[bi]={...n[bi],titulo:e.target.value}; setBloques(n);}} />
+                                                                                    <textarea ref={autoGrowRef} rows={1} className="bd-bloque-texto bd-editable" placeholder="Texto del bloque" value={bl.texto} onChange={e=>{const n=[...bloques]; n[bi]={...n[bi],texto:e.target.value}; setBloques(n);}} />
+                                                                                    <button className="bd-subremove" style={{position:'absolute',top:0,right:0}} onClick={()=>setBloques(bloques.filter((_,j)=>j!==bi))}>×</button>
+                                                                                </div>
+                                                                            ))}
+                                                                            <button className="bd-subadd" onClick={()=>setBloques([...bloques,{titulo:'',texto:''}])}>{I.plus} Agregar bloque</button>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return (
+                                                                    <textarea ref={autoGrowRef} rows={1} className="bd-elval bd-editable" placeholder="Valor" value={c.valor} onChange={e=>updateCampoSlide(sIdx,cIdx,'valor',e.target.value)} />
+                                                                );
+                                                            })()}
+                                                            <button className="btn btn-glass btn-sm bd-elremove" onClick={()=>removeCampoSlide(sIdx,cIdx)} style={{color:'#8B3535'}}>×</button>
+                                                        </div>
+                                                    ))}
+                                                    <button className="bd-addlink" onClick={()=>addCampoSlide(sIdx)}>{I.plus} Agregar campo</button>
                                                 </div>
                                             ))}
                                             {(b.slides||[]).length===0 && <p style={{fontSize:12.5,color:'var(--text-dimmer)'}}>Sin slides aún — agrega el primero.</p>}
@@ -4443,19 +4562,61 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 ) : (
                                     <>
                                         {(b.slides||[]).map((s,sIdx)=>(
-                                            <div key={sIdx} className="card glass" style={{padding:'20px',marginBottom:16}}>
-                                                <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:14}}>
-                                                    <div style={{fontWeight:700,fontSize:15}}>{s.titulo}</div>
-                                                    {s.subtitulo && <div style={{fontSize:11,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1}}>{s.subtitulo}</div>}
+                                            <div key={sIdx} className="bd-card" style={{marginBottom:16}}>
+                                                <div className="bd-sec-head">
+                                                    <div className="bd-sec-badge">{String(sIdx+1).padStart(2,'0')}</div>
+                                                    <div className="bd-sec-title">{s.titulo}</div>
+                                                    {s.subtitulo && <div className="bd-sec-right">{s.subtitulo}</div>}
                                                 </div>
-                                                <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                                                    {(s.campos||[]).filter(c=>c.label||c.valor).map((c,cIdx)=>(
-                                                        <div key={cIdx} style={{display:'grid',gridTemplateColumns:'140px 1fr',gap:10,paddingBottom:8,borderBottom:'1px solid var(--glass-border)'}}>
-                                                            <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase'}}>{c.label}</div>
-                                                            <div style={{whiteSpace:'pre-wrap'}}>{c.valor}</div>
+                                                <div className="bd-slide-rule" />
+                                                {(s.campos||[]).filter(c=>c.label||c.valor).map((c,cIdx)=>(
+                                                    <div key={cIdx} className="bd-field-row" style={{gridTemplateColumns:'118px 1fr'}}>
+                                                        <div>
+                                                            <div className="bd-field-label">{c.label}</div>
+                                                            {campoHint(c) && <div className="bd-field-hint">{campoHint(c)}</div>}
                                                         </div>
-                                                    ))}
-                                                </div>
+                                                        {(() => {
+                                                            if (c.tipo === 'titulo') return <div className="bd-val-titulo">{c.valor}</div>;
+                                                            if (c.tipo === 'titulo-italico') return <div className="bd-val-italico">{c.valor}</div>;
+                                                            if (c.tipo === 'prueba-social') {
+                                                                const ps = parsePruebaSocial(c.valor);
+                                                                return (
+                                                                    <div>
+                                                                        <div className="bd-val-ps-principal">{ps.principal}</div>
+                                                                        {ps.secundaria && <div className="bd-val-ps-secundaria">{ps.secundaria}</div>}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            if (c.tipo === 'lista') {
+                                                                const items = parseLista(c.valor);
+                                                                return (
+                                                                    <div className="bd-lista-box">
+                                                                        {items.map((it,ii)=>(
+                                                                            <div key={ii} className="bd-lista-row">
+                                                                                <div className="bd-lista-num">{ii+1}</div>
+                                                                                <div className="bd-lista-txt">{it}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            if (c.tipo === 'bloques') {
+                                                                const bloques = parseBloques(c.valor);
+                                                                return (
+                                                                    <div>
+                                                                        {bloques.map((bl,bi)=>(
+                                                                            <div key={bi} className="bd-bloque">
+                                                                                <div className="bd-bloque-titulo">{bl.titulo}</div>
+                                                                                <div className="bd-bloque-texto" style={{whiteSpace:'pre-wrap'}}>{bl.texto}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return <div className="bd-elval" style={{whiteSpace:'pre-wrap'}}>{c.valor}</div>;
+                                                        })()}
+                                                    </div>
+                                                ))}
                                             </div>
                                         ))}
                                         {activeBrief.estado==='Listo' && (
