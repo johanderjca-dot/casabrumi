@@ -100,6 +100,10 @@ service cloud.firestore {
     // ── marcas ── identidad de marca (logo, paleta de colores, tipografías, tono)
     match /marcas/{id} { allow read, write: if tienePermiso('marcas'); }
 
+    // ── roles ── roles personalizados (nombre + permisos por módulo) que el master puede
+    // crear y asignar desde Usuarios; solo el master los gestiona
+    match /roles/{id} { allow read, write: if isMaster(); }
+
     // ── campanas ── Planeacion de Campanas, solo master
     match /campanas/{id}   { allow read, write: if isMaster(); }
 
