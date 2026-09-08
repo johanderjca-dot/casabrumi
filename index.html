@@ -2402,18 +2402,20 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setProductoTab('general');
     };
 
-    // Guarda el costeo final (costo y precio de venta) de vuelta en el producto a testear
-    // cargado en la Calculadora — así la ficha de Listado Productos a Testear queda alimentada
-    // sin tener que reescribir los números a mano.
-    const guardarCosteoEnTiktok = () => {
+    // Guarda el costeo final (costo, precio de venta y % de margen real) de vuelta en el
+    // producto a testear cargado en la Calculadora — el % viene del profit que calcula la
+    // Calculadora (incluye CPA, flete, extras, suscripciones), no de un cálculo simple
+    // venta-vs-detal, así la ficha refleja el margen real del negocio.
+    const guardarCosteoEnTiktok = (margenPct) => {
         if (!costeo.tiktokIdCargado) return;
         const prev = tiktokLinks.find(x=>x.id===costeo.tiktokIdCargado);
         if (!prev) return;
         db.collection('tiktokLinks').doc(costeo.tiktokIdCargado).update({
             'analisis.precioDetal': costeo.costoProducto, 'analisis.precioVenta': costeo.precioVenta,
+            'analisis.pctGananciaCalculadora': margenPct,
         }).then(() => {
             setTiktokLinks(list => list.map(x => x.id===costeo.tiktokIdCargado
-                ? {...x, analisis: {...(x.analisis||{}), precioDetal: costeo.costoProducto, precioVenta: costeo.precioVenta}} : x));
+                ? {...x, analisis: {...(x.analisis||{}), precioDetal: costeo.costoProducto, precioVenta: costeo.precioVenta, pctGananciaCalculadora: margenPct}} : x));
             alert(`Precio guardado en "${prev.analisis?.nombreProducto || prev.nota || 'el producto'}".`);
         }).catch(avisarErrorGuardado);
     };
@@ -3188,7 +3190,12 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     const t = tiktokLinksScoped.find(x=>x.id===activeTiktok.id) || activeTiktok;
                                     const f = tiktokAnalisisForm;
                                     const margen = (parseFloat(f.precioVenta)||0) - (parseFloat(f.precioDetal)||0);
-                                    const pctGanancia = parseFloat(f.precioDetal) > 0 ? (margen / parseFloat(f.precioDetal) * 100) : null;
+                                    // Si el precio se guardó desde la Calculadora de Costeo, usa ese % real (ya
+                                    // incluye CPA, flete, extras, suscripciones) en vez del cálculo simple
+                                    // venta-vs-detal, que subestima el margen real del negocio.
+                                    const pctGananciaCalc = f.pctGananciaCalculadora;
+                                    const pctGanancia = (pctGananciaCalc!=null && pctGananciaCalc!=='') ? parseFloat(pctGananciaCalc)
+                                        : (parseFloat(f.precioDetal) > 0 ? (margen / parseFloat(f.precioDetal) * 100) : null);
                                     return (
                                         <>
                                             <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
@@ -3227,7 +3234,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         <div style={{fontFamily:'Fira Code',fontWeight:700,fontSize:15,padding:'9px 0',color:'var(--text)'}}>RD${margen.toFixed(2)}</div>
                                                     </div>
                                                     <div className="form-group" style={{marginBottom:0}}>
-                                                        <label style={{color:'var(--text-dim)'}}>% De Ganancia</label>
+                                                        <label style={{color:'var(--text-dim)'}}>% De Ganancia{pctGananciaCalc!=null && pctGananciaCalc!=='' ? ' (según Calculadora)' : ''}</label>
                                                         <div style={{fontFamily:'Fira Code',fontWeight:700,fontSize:15,padding:'9px 0',color:'var(--text)'}}>{pctGanancia===null?'—':pctGanancia.toFixed(1)+'%'}</div>
                                                     </div>
                                                     <div className="form-group" style={{marginBottom:0,gridColumn:'1 / -1'}}>
@@ -4637,7 +4644,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         {tiktokLinksScoped.map(t=>(<option key={t.id} value={t.id}>{t.analisis?.nombreProducto || t.nota || t.link}</option>))}
                                     </select>
                                     {costeo.tiktokIdCargado && (
-                                        <button className="btn btn-gold btn-sm" style={{marginTop:10,width:'100%',justifyContent:'center'}} onClick={guardarCosteoEnTiktok}>
+                                        <button className="btn btn-gold btn-sm" style={{marginTop:10,width:'100%',justifyContent:'center'}} onClick={()=>guardarCosteoEnTiktok(margenActual)}>
                                             {I.edit} Guardar precio en este producto a testear
                                         </button>
                                     )}
