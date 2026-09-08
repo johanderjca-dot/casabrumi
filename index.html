@@ -1306,6 +1306,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [cmdQuery,   setCmdQuery]   = useState('');
     const COSTEO_DEFAULTS = {
         productoIdCargado: '',
+        tiktokIdCargado: '',
         precioVenta: '1500',
         costoProducto: '400',
         cpaAds: '300',
@@ -2392,6 +2393,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         setProdSeccion('productos');
         setActiveProducto(prod || {id:productoId});
         setProductoTab('general');
+    };
+
+    // Guarda el costeo final (costo y precio de venta) de vuelta en el producto a testear
+    // cargado en la Calculadora — así la ficha de Listado Productos a Testear queda alimentada
+    // sin tener que reescribir los números a mano.
+    const guardarCosteoEnTiktok = () => {
+        if (!costeo.tiktokIdCargado) return;
+        const prev = tiktokLinks.find(x=>x.id===costeo.tiktokIdCargado);
+        if (!prev) return;
+        db.collection('tiktokLinks').doc(costeo.tiktokIdCargado).update({
+            'analisis.precioDetal': costeo.costoProducto, 'analisis.precioVenta': costeo.precioVenta,
+        }).then(() => {
+            setTiktokLinks(list => list.map(x => x.id===costeo.tiktokIdCargado
+                ? {...x, analisis: {...(x.analisis||{}), precioDetal: costeo.costoProducto, precioVenta: costeo.precioVenta}} : x));
+            alert(`Precio guardado en "${prev.analisis?.nombreProducto || prev.nota || 'el producto'}".`);
+        }).catch(avisarErrorGuardado);
     };
 
     // ── Brief de Creativos ──
@@ -4581,6 +4598,30 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                         <option value="">Selecciona un producto…</option>
                                         {productos.map(prod=>(<option key={prod.id} value={prod.id}>{prod.nombre}</option>))}
                                     </select>
+                                </div>
+                            )}
+
+                            {tiktokLinksScoped.length>0 && (
+                                <div style={{marginBottom:18,padding:'12px 14px',borderRadius:12,background:'var(--cream-dark)',border:'1px solid var(--glass-border)'}}>
+                                    <label className="cst-field-label">🔍 Cargar producto a testear</label>
+                                    <select className="cst-input" style={{fontFamily:'inherit',fontWeight:'600',fontSize:'13px'}} value={costeo.tiktokIdCargado||''}
+                                        onChange={e=>{
+                                            const t = tiktokLinksScoped.find(x=>x.id===e.target.value); if(!t) return;
+                                            const a = t.analisis||{};
+                                            setCosteo(c=>({...c,
+                                                costoProducto: a.precioDetal ? String(a.precioDetal) : c.costoProducto,
+                                                precioVenta: a.precioVenta ? String(a.precioVenta) : c.precioVenta,
+                                                tiktokIdCargado: t.id,
+                                            }));
+                                        }}>
+                                        <option value="">Selecciona un producto a testear…</option>
+                                        {tiktokLinksScoped.map(t=>(<option key={t.id} value={t.id}>{t.analisis?.nombreProducto || t.nota || t.link}</option>))}
+                                    </select>
+                                    {costeo.tiktokIdCargado && (
+                                        <button className="btn btn-gold btn-sm" style={{marginTop:10,width:'100%',justifyContent:'center'}} onClick={guardarCosteoEnTiktok}>
+                                            {I.edit} Guardar precio en este producto a testear
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
