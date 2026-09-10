@@ -453,6 +453,14 @@
 </head>
 <body>
 <div class="scene"></div>
+<!-- Se ve mientras se descargan React/Firebase/Babel y se transpila el JSX en el navegador
+     (puede tardar varios segundos en celulares) — sin esto la pantalla se queda en blanco
+     y parece que "no abre". Es HTML/CSS puro, no depende de que el JS haya cargado. -->
+<div id="boot-loader" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:#EAF6F4;font-family:-apple-system,'Fira Sans',sans-serif;">
+    <div style="width:34px;height:34px;border:3px solid rgba(11,38,34,0.12);border-top-color:#129A8F;border-radius:50%;animation:boot-spin 0.8s linear infinite;"></div>
+    <div style="font-size:13px;font-weight:600;color:#103630;letter-spacing:0.2px;">Cargando Casa Brumi…</div>
+</div>
+<style>@keyframes boot-spin{to{transform:rotate(360deg)}}</style>
 <div id="root"></div>
 
 <!-- Firebase init -->
@@ -6402,6 +6410,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 }
 
 ReactDOM.render(<App />, document.getElementById('root'));
+document.getElementById('boot-loader')?.remove();
 </script>
 </body>
 </html>
