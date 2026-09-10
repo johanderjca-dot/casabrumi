@@ -968,6 +968,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         return [seedLink || ''];
     };
     const [tiktokAnalisisForm, setTiktokAnalisisForm] = useState(TIKTOK_ANALISIS_DEFAULT);
+    // Link del producto y Links de Video: se guardan como texto simple, pero en pantalla se
+    // muestran como enlace clicable en vez de input una vez que tienen contenido — "Editar"
+    // los vuelve a convertir en input por si se pusieron por error.
+    const [editingLinkProducto, setEditingLinkProducto] = useState(false);
+    const [editingLinkIdx,      setEditingLinkIdx]      = useState(null);
     // ── Brief de Creativos: se crea automáticamente (vacío, en Borrador) al aprobar un producto
     // a testear. El master lo llena; el diseñador (permiso 'creativos') solo ve los que ya
     // están marcados "Listo" — así no le aparece nada hasta que Johander termine de llenarlo.
@@ -1972,6 +1977,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const openTiktokDetail = (t) => {
         setActiveTiktok(t);
+        setEditingLinkProducto(false);
+        setEditingLinkIdx(null);
         // El nombre del producto NUNCA se hereda del link ni de la nota — es un campo aparte
         // que se define aquí adentro, y una vez guardado es lo que se muestra afuera en el listado.
         // Los links de video van en un listado aparte (no uno por opción); el link capturado en
@@ -2102,8 +2109,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const updateAnguloField = (idx, field, value) => setTiktokAnalisisForm(f => ({...f, angulos: f.angulos.map((a,i)=>i===idx?{...a,[field]:value}:a)}));
     const updateLinkVideo = (idx, value) => setTiktokAnalisisForm(f => ({...f, linksVideos: f.linksVideos.map((v,i)=>i===idx?value:v)}));
-    const addLinkVideo = () => setTiktokAnalisisForm(f => ({...f, linksVideos: [...(f.linksVideos||[]), '']}));
-    const removeLinkVideo = (idx) => setTiktokAnalisisForm(f => ({...f, linksVideos: f.linksVideos.filter((_,i)=>i!==idx)}));
+    const addLinkVideo = () => { setEditingLinkIdx((tiktokAnalisisForm.linksVideos||[]).length); setTiktokAnalisisForm(f => ({...f, linksVideos: [...(f.linksVideos||[]), '']})); };
+    const removeLinkVideo = (idx) => { setEditingLinkIdx(null); setTiktokAnalisisForm(f => ({...f, linksVideos: f.linksVideos.filter((_,i)=>i!==idx)})); };
     // Ref callback que hace crecer el textarea a la altura de su contenido en cada render
     // (incluyendo la carga inicial de texto largo ya guardado), en vez de quedarse fijo y
     // obligar a hacer scroll adentro de la caja.
@@ -2916,8 +2923,21 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     </div>
                                                     <div className="form-group" style={{marginBottom:0,gridColumn:'1 / -1'}}>
                                                         <label style={{color:'var(--text-dim)'}}>Link del producto (proveedor)</label>
-                                                        <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                            placeholder="https://..." value={f.linkProducto} onChange={e=>setTiktokAnalisisForm(x=>({...x,linkProducto:e.target.value}))} />
+                                                        {(!f.linkProducto || editingLinkProducto) ? (
+                                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} autoFocus={editingLinkProducto}
+                                                                placeholder="https://..." value={f.linkProducto}
+                                                                onChange={e=>setTiktokAnalisisForm(x=>({...x,linkProducto:e.target.value}))}
+                                                                onBlur={()=>{ if (f.linkProducto.trim()) setEditingLinkProducto(false); }}
+                                                                onKeyDown={e=>{ if (e.key==='Enter' && f.linkProducto.trim()) e.target.blur(); }} />
+                                                        ) : (
+                                                            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                                                                <a href={f.linkProducto} target="_blank" rel="noopener noreferrer" className="form-input glass no-icon"
+                                                                    style={{border:'1px solid var(--glass-border)',display:'block',color:'var(--orange)',textDecoration:'none',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                                                    {f.linkProducto}
+                                                                </a>
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>setEditingLinkProducto(true)} style={{flexShrink:0}}>{I.edit} Editar</button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="form-group" style={{marginBottom:0,gridColumn:'1 / -1'}}>
                                                         <label style={{color:'var(--text-dim)'}}>Verificación en FB ADS</label>
@@ -2990,10 +3010,21 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
                                                     {(f.linksVideos||['']).map((link,idx)=>(
                                                         <div key={idx} style={{display:'flex',gap:8}}>
-                                                            <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
-                                                                placeholder="https://..." value={link} onChange={e=>updateLinkVideo(idx,e.target.value)} />
+                                                            {(!link || editingLinkIdx===idx) ? (
+                                                                <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}} autoFocus={editingLinkIdx===idx}
+                                                                    placeholder="https://..." value={link} onChange={e=>updateLinkVideo(idx,e.target.value)}
+                                                                    onBlur={()=>{ if (link.trim()) setEditingLinkIdx(x=>x===idx?null:x); }}
+                                                                    onKeyDown={e=>{ if (e.key==='Enter' && link.trim()) e.target.blur(); }} />
+                                                            ) : (
+                                                                <a href={link} target="_blank" rel="noopener noreferrer" className="form-input glass no-icon"
+                                                                    style={{border:'1px solid var(--glass-border)',display:'block',color:'var(--orange)',textDecoration:'none',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                                                    {link}
+                                                                </a>
+                                                            )}
+                                                            {!(!link || editingLinkIdx===idx) &&
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>setEditingLinkIdx(idx)} style={{flexShrink:0}}>{I.edit} Editar</button>}
                                                             {(f.linksVideos||[]).length>1 &&
-                                                                <button className="btn btn-glass btn-sm" onClick={()=>removeLinkVideo(idx)} style={{color:'#8B3535'}}>×</button>}
+                                                                <button className="btn btn-glass btn-sm" onClick={()=>removeLinkVideo(idx)} style={{color:'#8B3535',flexShrink:0}}>×</button>}
                                                         </div>
                                                     ))}
                                                 </div>
