@@ -189,6 +189,43 @@
         .main > *:nth-child(2) { animation-delay: 0.06s; }
         .main > *:nth-child(3) { animation-delay: 0.12s; }
         .main > *:nth-child(4) { animation-delay: 0.18s; }
+
+        /* ========= MOBILE RESPONSIVE ========= */
+        /* La app fue diseñada solo para desktop (sidebar+header fijos en px). Este bloque la
+           hace usable en celular: el sidebar pasa a ser un drawer, el header se compacta, y
+           el "escape hatch" de abajo corrige los grids/tablas que usan estilos inline
+           (style={{gridTemplateColumns:...}}) que un media query normal no puede tocar. */
+        .sidebar-toggle { display: none; background: none; border: none; cursor: pointer; padding: 8px; margin-left: 4px; border-radius: 8px; color: var(--text-dim); align-items: center; justify-content: center; flex-shrink: 0; }
+        .sidebar-toggle svg { width: 20px; height: 20px; }
+        @media (hover: hover) and (pointer: fine) { .sidebar-toggle:hover { background: var(--cream-dark); } }
+        .sidebar-backdrop { display: none; }
+
+        @media (max-width: 860px) {
+            .sidebar-toggle { display: inline-flex; }
+            .sidebar { transform: translateX(-100%); transition: transform 220ms var(--ease-out); z-index: 300; box-shadow: 0 16px 48px rgba(11,38,34,0.25); }
+            .sidebar.open { transform: translateX(0); }
+            .main { margin-left: 0 !important; }
+            .app-header-logo { width: auto; border-right: none; padding: 0 4px 0 2px; }
+            .app-header-logo img { height: 22px; }
+            .sidebar-backdrop.open { display: block; position: fixed; inset: 0; top: var(--header-h); background: rgba(11,38,34,0.35); z-index: 250; }
+        }
+
+        @media (max-width: 640px) {
+            .app-header-title { padding: 0 10px; min-width: 0; overflow: hidden; }
+            .app-header-title strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .app-header-title span { display: none; }
+            .cmdk-hint kbd { display: none; }
+            .cmdk-hint { padding: 8px 12px; }
+            .hdr-email { display: none; }
+            .app-header-right { gap: 6px; padding-right: 12px; }
+            .main { padding: calc(var(--header-h) + 20px) 14px 32px; }
+
+            /* Escape hatch: cientos de secciones usan grids/columnas fijas por estilo inline
+               (ej. style={{gridTemplateColumns:'1fr 1fr 1fr 1fr'}}) — imposible de listar una
+               por una aquí. Un !important sobre el atributo style renderizado los colapsa a
+               una columna sin tener que tocar cada componente. */
+            [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+        }
         .page-header { margin-bottom: 28px; }
         .page-header h1 { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -0.9px; margin-bottom: 4px; }
         .page-header p  { font-size: 13px; color: var(--text-dim); }

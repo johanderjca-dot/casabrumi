@@ -15,6 +15,7 @@ const I = {
     dollar:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
     truck:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
     plus:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    menu:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
     logout:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
     invoice: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
     inbox:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>,
@@ -787,13 +788,14 @@ function App() {
 }
 
 // ── HEADER ──
-function Header({ user, onLogout, activeTab, navSections, onPhotoChange, onCmdK, tiendas, activeTiendaId, setActiveTiendaId }) {
+function Header({ user, onLogout, activeTab, navSections, onPhotoChange, onCmdK, tiendas, activeTiendaId, setActiveTiendaId, onToggleSidebar }) {
     const fileRef = React.useRef(null);
     const current = navSections.flatMap(s=>s.items).find(i=>i.key===activeTab);
     const today   = new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
     const isMac   = navigator.platform.toUpperCase().includes('MAC');
     return (
         <header className="app-header">
+            <button className="sidebar-toggle" onClick={onToggleSidebar} aria-label="Abrir menú">{I.menu}</button>
             <div className="app-header-logo">
                 <img src={LOGO} alt="Casa Brumi" />
             </div>
@@ -837,16 +839,16 @@ function Header({ user, onLogout, activeTab, navSections, onPhotoChange, onCmdK,
 }
 
 // ── SIDEBAR ──
-function Sidebar({ activeTab, setActiveTab, navSections }) {
+function Sidebar({ activeTab, setActiveTab, navSections, open, onClose }) {
     return (
-        <aside className="sidebar" style={{borderRadius:0}}>
+        <aside className={`sidebar ${open ? 'open' : ''}`} style={{borderRadius:0}}>
             <nav className="sidebar-nav">
                 {navSections.map((sec, si) => (
                     <div key={si}>
                         <div className="nav-label">{sec.label}</div>
                         {sec.items.map(item => (
                             <div key={item.key} className={`nav-item ${activeTab === item.key ? 'active' : ''}`}
-                                onClick={() => setActiveTab(item.key)} role="button" tabIndex={0}
+                                onClick={() => { setActiveTab(item.key); onClose?.(); }} role="button" tabIndex={0}
                                 onKeyDown={e => e.key === 'Enter' && setActiveTab(item.key)}>
                                 <span aria-hidden="true">{item.icon}</span>{item.label}
                             </div>
@@ -876,6 +878,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [roleForm,          setRoleForm]          = useState({ nombre:'', permisos:{} });
     const [savingRole,        setSavingRole]        = useState(false);
     const [showCmdK,   setShowCmdK]   = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [cmdQuery,   setCmdQuery]   = useState('');
     const COSTEO_DEFAULTS = {
         productoIdCargado: '',
@@ -2283,8 +2286,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         <div className="app-root">
             <img src={LOGO} aria-hidden="true" style={{position:'fixed',top:'50%',left:'50%',transform:'translate(calc(-50% + 110px), -50%)',width:'520px',maxWidth:'55vw',opacity:0.055,filter:'brightness(0)',pointerEvents:'none',userSelect:'none',zIndex:0}} />
             <Header user={user} onLogout={onLogout} activeTab={activeTab} navSections={navSections} onPhotoChange={onPhotoChange} onCmdK={() => { setCmdQuery(''); setShowCmdK(true); }}
-                tiendas={tiendas} activeTiendaId={activeTiendaId} setActiveTiendaId={setActiveTiendaId} />
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} />
+                tiendas={tiendas} activeTiendaId={activeTiendaId} setActiveTiendaId={setActiveTiendaId} onToggleSidebar={() => setSidebarOpen(o => !o)} />
+            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} navSections={navSections} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+            {sidebarOpen && <div className="sidebar-backdrop open" onClick={() => setSidebarOpen(false)} />}
             {showCmdK && (() => {
                 const acciones = [
                     { key:'ganadores', label: 'Nuevo producto ganador', icon: I_star,   kind: 'Acción', run: () => { setActiveTab('ganadores'); setActiveProducto(null); setEditingProducto(null); setProdForm({nombre:'',descripcion:'',estado:'Activo',proveedor:'',vendedor:'',imagen:'',codigo:'',temporada:''}); setShowProdModal(true); } },
