@@ -370,7 +370,7 @@ function CierreDiario({ productos, user, tiendaId }) {
         </div>
 
         {historial.length > 0 && (
-            <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden'}}>
+            <div className="glass" style={{borderRadius:'var(--r)',overflow:'hidden',overflowX:'auto'}}>
                 <div className="sec-header" style={{padding:'16px 24px',borderBottom:'1px solid var(--glass-border)',margin:0}}>
                     <h2>Historial de Cierres</h2>
                 </div>
@@ -2441,7 +2441,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                     {ventas.length > 0 && (
                         <>
                             <div className="sec-header" style={{marginTop:4}}><h2>Últimas ventas</h2></div>
-                            <RevealTable className="card glass">
+                            <RevealTable className="card glass" style={{overflowX:'auto'}}>
                                 <table>
                                     <thead><tr><th>Vendedor</th><th>Cliente</th><th>Producto</th><th>Monto</th><th>Estado</th></tr></thead>
                                     <tbody>
