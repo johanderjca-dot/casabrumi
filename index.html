@@ -157,6 +157,7 @@
         .hdr-role  { font-size: 8px; font-weight: 800; color: var(--orange); text-transform: uppercase; letter-spacing: 2px; }
         .hdr-email { font-size: 11px; color: var(--text-dimmer); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cmdk-hint { display: inline-flex; align-items: center; gap: 7px; padding: 6px 13px; border-radius: 99px; background: var(--cream-dark); border: 1px solid var(--glass-border); color: var(--text-dim); font-size: 11px; font-family: inherit; cursor: pointer; transition: transform 140ms var(--ease-out), border-color 140ms ease, background 140ms ease; }
+        .cmdk-hint-icon { display: none; flex-shrink: 0; }
         @media (hover: hover) and (pointer: fine) { .cmdk-hint:hover { background: var(--parchment); border-color: var(--stone-mid); color: var(--text); transform: translateY(-1px); } }
         .cmdk-hint:active { transform: scale(0.97); }
         .cmdk-hint kbd { font-family: 'Fira Code', monospace; font-size: 10px; background: var(--stone); border: none; border-radius: 4px; padding: 1px 6px; color: var(--earth-2); }
@@ -211,14 +212,27 @@
         }
 
         @media (max-width: 640px) {
-            .app-header-title { padding: 0 10px; min-width: 0; overflow: hidden; }
+            .app-header-title { padding: 0 8px; min-width: 0; overflow: hidden; }
             .app-header-title strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .app-header-title span { display: none; }
+            .app-header-logo img { height: 18px; }
+            /* Header-right NUNCA envuelve en móvil: el contenedor tiene una altura fija
+               (--header-h) y si el contenido pasa a una 2da línea, esa línea se sale del header
+               (que es position:fixed, sin overflow:hidden) y queda flotando encima del contenido
+               de la página — eso era el "todo descuadrado" que se veía en el celular. En vez de
+               envolver, cada elemento se reduce/oculta lo necesario para caber en una sola fila. */
+            .app-header-right { gap: 5px; padding-right: 10px; flex-wrap: nowrap; }
+            .app-header-right select { max-width: 62px; padding: 7px 20px 7px 8px !important; font-size: 11px !important; text-overflow: ellipsis; }
+            .cmdk-hint-icon { display: inline-flex; }
+            .cmdk-hint-label { display: none; }
             .cmdk-hint kbd { display: none; }
-            .cmdk-hint { padding: 8px 12px; }
+            .cmdk-hint { padding: 8px; }
+            .app-header-divider { display: none; }
             .hdr-email { display: none; }
-            .app-header-right { gap: 6px; padding-right: 12px; flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
-            .app-header-right select { max-width: 96px; text-overflow: ellipsis; }
+            .hdr-role { font-size: 7px; }
+            .app-header-avatar { width: 26px; height: 26px; }
+            .btn-logout { padding: 4px; }
+            .btn-logout svg { width: 14px; height: 14px; }
             .main { padding: calc(var(--header-h) + 20px) 14px 32px; }
             .kpi-grid { grid-template-columns: 1fr 1fr !important; }
             .bd-datarow { grid-template-columns: 1fr 1fr !important; }
@@ -239,6 +253,30 @@
             [style*="grid-column"] { grid-column: auto !important; }
             [style*="grid-row"] { grid-row: auto !important; }
             [style*="display: flex"] { flex-wrap: wrap; }
+
+            /* Tablas: en vez de scroll horizontal (minWidth inline de cientos/800px+ que obligaba
+               a deslizar de lado, sensación de "infinito" porque no hay tope visual ni rebote),
+               cada fila se apila como una tarjeta vertical de pares etiqueta:valor. La etiqueta
+               sale del <th> correspondiente, copiada a data-label en cada <td> por un
+               MutationObserver en App() (ver src/app.jsx) — así funciona igual en las 15 tablas
+               del panel sin tener que tocar cada una a mano. */
+            .main table, .glass table { min-width: 0 !important; width: 100%; }
+            .main table thead, .glass table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+            .main table, .main table tbody, .main table tr, .main table td,
+            .glass table, .glass table tbody, .glass table tr, .glass table td { display: block; width: 100%; }
+            .main table tr, .glass table tr { padding: 10px 0; border-bottom: 1px solid rgba(11,38,34,0.08); }
+            .main table tbody tr:last-child, .glass table tbody tr:last-child { border-bottom: none; }
+            .main table td, .glass table td {
+                padding: 4px 0 !important; border: none !important; display: flex; align-items: flex-start;
+                justify-content: space-between; gap: 12px; text-align: right; max-width: none !important; white-space: normal !important;
+            }
+            .main table td::before, .glass table td::before {
+                content: attr(data-label); font-size: 10px; font-weight: 700; text-transform: uppercase;
+                letter-spacing: 0.4px; color: var(--text-dimmer); text-align: left; flex-shrink: 0;
+            }
+            .main table td:empty, .glass table td:empty { display: none; }
+            .main table td[colspan], .glass table td[colspan] { display: block; text-align: left; }
+            .main table td[colspan]::before, .glass table td[colspan]::before { content: none; }
         }
 
         @media (max-width: 420px) {

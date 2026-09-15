@@ -638,6 +638,37 @@ function App() {
         });
     }, []);
 
+    // Móvil: las tablas se apilan en tarjetas (ver CSS "responsive table" en index.html) en vez
+    // de scrollear hacia los lados. Esto etiqueta cada <td> con el texto de su <th> correspondiente
+    // (data-label, leído por el CSS con content: attr(data-label)) para que la tarjeta apilada
+    // muestre "Nombre: valor" en vez de solo el valor. Corre una vez al montar y luego se re-aplica
+    // solo con un MutationObserver (no con useEffect por render) porque las tablas viven en
+    // componentes muy anidados (AdminPanel, CierreDiario) cuyo re-render no siempre burbujea hasta
+    // App — el observer detecta cualquier tabla nueva sin importar en qué componente nazca.
+    useEffect(() => {
+        let rafId = null;
+        const labelTables = () => {
+            rafId = null;
+            document.querySelectorAll('table').forEach(table => {
+                const headerCells = table.querySelectorAll(':scope > thead > tr > th');
+                if (!headerCells.length) return;
+                const labels = Array.from(headerCells).map(th => th.textContent.trim());
+                table.querySelectorAll(':scope > tbody > tr').forEach(tr => {
+                    Array.from(tr.children).forEach((td, i) => {
+                        if (td.hasAttribute('colspan')) return; // celda de resumen/detalle, no corresponde a 1 columna
+                        const label = labels[i] || '';
+                        if (td.getAttribute('data-label') !== label) td.setAttribute('data-label', label);
+                    });
+                });
+            });
+        };
+        const schedule = () => { if (rafId === null) rafId = requestAnimationFrame(labelTables); };
+        schedule();
+        const observer = new MutationObserver(schedule);
+        observer.observe(document.body, { childList: true, subtree: true });
+        return () => { observer.disconnect(); if (rafId !== null) cancelAnimationFrame(rafId); };
+    }, []);
+
     const handleAuth = async e => {
         e.preventDefault();
         setError(''); setBusy(true);
@@ -812,8 +843,9 @@ function Header({ user, onLogout, activeTab, navSections, onPhotoChange, onCmdK,
                     </select>
                 )}
                 {onCmdK && (
-                    <button className="cmdk-hint" onClick={onCmdK}>
-                        Buscar… <kbd>{isMac ? '⌘' : 'Ctrl'} K</kbd>
+                    <button className="cmdk-hint" onClick={onCmdK} aria-label="Buscar">
+                        <svg className="cmdk-hint-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <span className="cmdk-hint-label">Buscar…</span> <kbd>{isMac ? '⌘' : 'Ctrl'} K</kbd>
                     </button>
                 )}
                 <div className="app-header-divider" />
