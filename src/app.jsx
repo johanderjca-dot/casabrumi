@@ -1042,15 +1042,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // que filtra vacíos borraría ese ítem en el siguiente render antes de que puedas escribirle.
     const parsePruebaSocial = v => { const lines = (v||'').split('\n'); return { principal: lines[0]||'', secundaria: lines[1]||'' }; };
     const stringifyPruebaSocial = p => `${p.principal||''}\n${p.secundaria||''}`;
-    const campoHint = c => {
-        switch (c.tipo) {
-            case 'titulo':          return 'el texto más grande de la pieza';
-            case 'titulo-italico':  return 'más chico, en cursiva';
-            case 'lista':           { const n = (c.items||[]).length; return `${n} punto${n===1?'':'s'}, numerados`; }
-            case 'bloques':         { const n = (c.bloques||[]).length; return `${n} bloque${n===1?'':'s'}, cada uno con su palabra`; }
-            default:                return '';
-        }
-    };
     const [cGroupsOpen,        setCGroupsOpen]        = useState({ shopify: true });
     const [loteActivo,         setLoteActivo]         = useState(null);
     useEffect(() => { setLoteActivo(null); }, [activeProducto?.id]);
@@ -4097,7 +4088,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                                 <select className="bd-tiposel" value={c.tipo||'texto'} onChange={e=>updateCampoSlide(sIdx,cIdx,'tipo',e.target.value)}>
                                                                     {CAMPO_TIPOS.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                                                                 </select>
-                                                                {campoHint(c) && <div className="bd-field-hint">{campoHint(c)}</div>}
                                                             </div>
                                                             {(() => {
                                                                 if (c.tipo === 'titulo') return (
@@ -4182,7 +4172,6 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     <div key={cIdx} className="bd-field-row" style={{gridTemplateColumns:'118px 1fr'}}>
                                                         <div>
                                                             <div className="bd-field-label">{c.label}</div>
-                                                            {campoHint(c) && <div className="bd-field-hint">{campoHint(c)}</div>}
                                                         </div>
                                                         {(() => {
                                                             if (c.tipo === 'titulo') return <div className="bd-val-titulo">{c.valor}</div>;
