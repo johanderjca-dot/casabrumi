@@ -1015,9 +1015,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [briefs,          setBriefs]          = useState([]);
     const [activeBrief,     setActiveBrief]     = useState(null);
     const [briefForm,       setBriefForm]       = useState(null);
-    const BRIEF_DEFAULT_ELEMENTOS = [{label:'Logo',valor:true},{label:'Pie de página (www.brumishop.com)',valor:true},{label:'Producto (imagen enviada al correo)',valor:true}];
+    const BRIEF_DEFAULT_ELEMENTOS = [{label:'Logo',valor:true},{label:'Pie (www.brumishop.com)',valor:true},{label:'Producto (imagen enviada al correo)',valor:true}];
     const isElementoCheck = (label) => /^(logo|pie|producto)\b/i.test((label||'').trim());
     const elementoChecked = (valor) => typeof valor === 'boolean' ? valor : !!(valor && valor.toString().trim() && valor.toString().trim().toLowerCase() !== 'no');
+    const canonicalElementoLabel = (label) => {
+        const l = (label||'').trim().toLowerCase();
+        if (l.startsWith('logo')) return 'Logo';
+        if (l.startsWith('pie')) return 'Pie (www.brumishop.com)';
+        if (l.startsWith('producto')) return 'Producto (imagen enviada al correo)';
+        return label;
+    };
 
     // ── Tipos de campo dentro de un slide — cada uno se tipografía distinto en el cuadro.
     // 'valor' sigue siendo un solo string por simplicidad de esquema; lista/bloques/prueba
@@ -2109,7 +2116,13 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     };
 
     // ── Brief de Creativos ──
-    const openBrief = (b) => { setActiveBrief(b); setBriefForm({ piezas:'', formato:'', medidas:'', destino:'', elementosFijos: BRIEF_DEFAULT_ELEMENTOS, slides: [], ...b }); };
+    const openBrief = (b) => {
+        setActiveBrief(b);
+        const elementosFijos = (b.elementosFijos && b.elementosFijos.length ? b.elementosFijos : BRIEF_DEFAULT_ELEMENTOS)
+            .filter(el => !/^sello\b/i.test((el.label||'').trim()))
+            .map(el => isElementoCheck(el.label) ? {...el, label: canonicalElementoLabel(el.label)} : el);
+        setBriefForm({ piezas:'', formato:'', medidas:'', destino:'', slides: [], ...b, elementosFijos });
+    };
     const closeBrief = () => { setActiveBrief(null); setBriefForm(null); };
 
     const saveBrief = () => {
