@@ -983,7 +983,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // ── Listado Productos a Testear: pestaña dentro de Productos para llevar seguimiento de links de
     // TikTok/Instagram encontrados en investigación de producto, antes de decidir si valen la pena.
     const [prodSeccion,        setProdSeccion]        = useState('productos'); // 'productos' | 'tiktok'
-    const TIKTOK_ESTADOS = ['En búsqueda','Guardado','Producto para aprobar','En corrección','Convertido a producto','Descartado'];
+    // Orden = prioridad de la lista: los que necesitan corrección se revisan primero, los
+    // descartados quedan al final (ver sort de tiktokLinksScoped). "Guardado" se quitó por
+    // pedido del usuario (estado sin uso claro) — links viejos con ese estado, si quedara
+    // alguno, simplemente no calzan con ningún botón y caen al final del listado.
+    const TIKTOK_ESTADOS = ['En corrección','En búsqueda','Producto para aprobar','Convertido a producto','Descartado'];
     const [tiktokLinks,        setTiktokLinks]        = useState([]);
     const [tiktokForm,         setTiktokForm]         = useState({ link:'', plataforma:'TikTok', nota:'' });
     const [savingTiktok,       setSavingTiktok]       = useState(false);
@@ -2241,7 +2245,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const vendedoresScoped = vendedores.filter(perteneceATienda);
     const gastosScoped     = gastos.filter(perteneceATienda);
     const productosScoped  = productos.filter(perteneceATienda);
-    const tiktokLinksScoped = tiktokLinks.filter(perteneceATienda);
+    const tiktokLinksScoped = tiktokLinks.filter(perteneceATienda).slice().sort((a, b) => {
+        const idx = e => { const i = TIKTOK_ESTADOS.indexOf(e); return i === -1 ? TIKTOK_ESTADOS.length : i; };
+        return idx(a.estado) - idx(b.estado);
+    });
     const briefsScoped = briefs.filter(perteneceATienda);
     // El diseñador (sin ser master) solo ve los briefs ya marcados "Listo" — mientras se llenan
     // quedan en Borrador y no le aparecen.
