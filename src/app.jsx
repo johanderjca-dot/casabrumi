@@ -1015,7 +1015,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const [briefs,          setBriefs]          = useState([]);
     const [activeBrief,     setActiveBrief]     = useState(null);
     const [briefForm,       setBriefForm]       = useState(null);
-    const BRIEF_DEFAULT_ELEMENTOS = [{label:'Logo',valor:''},{label:'Sello',valor:''},{label:'Pie',valor:''},{label:'Producto',valor:''}];
+    const BRIEF_DEFAULT_ELEMENTOS = [{label:'Logo',valor:true},{label:'Pie de página (www.brumishop.com)',valor:true},{label:'Producto (imagen enviada al correo)',valor:true}];
+    const isElementoCheck = (label) => /^(logo|pie|producto)\b/i.test((label||'').trim());
+    const elementoChecked = (valor) => typeof valor === 'boolean' ? valor : !!(valor && valor.toString().trim() && valor.toString().trim().toLowerCase() !== 'no');
 
     // ── Tipos de campo dentro de un slide — cada uno se tipografía distinto en el cuadro.
     // 'valor' sigue siendo un solo string por simplicidad de esquema; lista/bloques/prueba
@@ -3998,10 +4000,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     const NUM_WORDS = ['cero','un','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez'];
                                     const slidesWord = nSlides>=1 && nSlides<=10 ? NUM_WORDS[nSlides] : String(nSlides);
                                     const DATA_FIELDS = [
-                                        {key:'piezas', label:'Piezas', ph:'Ej. 2 slides'},
-                                        {key:'formato', label:'Formato', ph:'Ej. 1:1 cuadrado'},
-                                        {key:'medidas', label:'Medidas', ph:'Ej. 2048 x 2048 px'},
-                                        {key:'destino', label:'Destino', ph:'Ej. Web Shopify'},
+                                        {key:'piezas', label:'Piezas', options:['1','2','3','4','5']},
+                                        {key:'formato', label:'Formato', options:['1:1','9:16 (Stories)']},
+                                        {key:'medidas', label:'Medidas', options:['2048 x 2048 px','1080 x 1920 px (Stories)']},
+                                        {key:'destino', label:'Destino', options:['Web Shopify','Instagram Stories','Instagram Feed']},
                                     ];
                                     return (
                                         <div className="bd-card" style={{marginBottom:16}}>
@@ -4013,7 +4015,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                     <div key={f.key} className="bd-datacol">
                                                         <div className="bd-datalabel">{f.label}</div>
                                                         {esMaster
-                                                            ? <input className="bd-dataval bd-dataval-input bd-editable" placeholder={f.ph} value={b[f.key]} onChange={e=>setBriefForm(x=>({...x,[f.key]:e.target.value}))} />
+                                                            ? <select className="bd-dataval bd-dataval-input bd-editable bd-dataval-select" value={b[f.key]||''} onChange={e=>setBriefForm(x=>({...x,[f.key]:e.target.value}))}>
+                                                                <option value="">—</option>
+                                                                {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                                                                {b[f.key] && !f.options.includes(b[f.key]) && <option value={b[f.key]}>{b[f.key]}</option>}
+                                                              </select>
                                                             : <div className="bd-dataval">{b[f.key] || '—'}</div>}
                                                     </div>
                                                 ))}
@@ -4027,17 +4033,28 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             <div className="bd-sec-rule" />
 
                                             <div className="bd-elbox">
-                                                {(esMaster ? (b.elementosFijos||[]) : (b.elementosFijos||[]).filter(el=>el.label||el.valor)).map((el,idx)=>(
-                                                    <div key={idx} className="bd-elrow">
-                                                        {esMaster
-                                                            ? <input className="bd-ellabel bd-editable" placeholder="Etiqueta" value={el.label} onChange={e=>updateElementoFijo(idx,'label',e.target.value)} />
-                                                            : <div className="bd-ellabel">{el.label}</div>}
-                                                        {esMaster
-                                                            ? <textarea ref={autoGrowRef} rows={1} className="bd-elval bd-editable" placeholder="Valor" value={el.valor} onChange={e=>updateElementoFijo(idx,'valor',e.target.value)} />
-                                                            : <div className="bd-elval" style={{whiteSpace:'pre-wrap'}}>{el.valor}</div>}
-                                                        {esMaster && <button className="btn btn-glass btn-sm bd-elremove" onClick={()=>removeElementoFijo(idx)} style={{color:'#8B3535'}}>×</button>}
-                                                    </div>
-                                                ))}
+                                                {(esMaster ? (b.elementosFijos||[]) : (b.elementosFijos||[]).filter(el=>el.label||el.valor)).map((el,idx)=>{
+                                                    const isCheck = isElementoCheck(el.label);
+                                                    const checked = elementoChecked(el.valor);
+                                                    return (
+                                                        <div key={idx} className="bd-elrow">
+                                                            {esMaster && !isCheck
+                                                                ? <input className="bd-ellabel bd-editable" placeholder="Etiqueta" value={el.label} onChange={e=>updateElementoFijo(idx,'label',e.target.value)} />
+                                                                : <div className="bd-ellabel">{el.label}</div>}
+                                                            {isCheck
+                                                                ? (esMaster
+                                                                    ? <div className="bd-checktoggle">
+                                                                        <button type="button" className={`bd-checkbtn${checked?' active':''}`} onClick={()=>updateElementoFijo(idx,'valor',true)}>Sí</button>
+                                                                        <button type="button" className={`bd-checkbtn${!checked?' active':''}`} onClick={()=>updateElementoFijo(idx,'valor',false)}>No</button>
+                                                                      </div>
+                                                                    : <div className="bd-elval">{checked ? 'Sí' : 'No'}</div>)
+                                                                : (esMaster
+                                                                    ? <textarea ref={autoGrowRef} rows={1} className="bd-elval bd-editable" placeholder="Valor" value={el.valor} onChange={e=>updateElementoFijo(idx,'valor',e.target.value)} />
+                                                                    : <div className="bd-elval" style={{whiteSpace:'pre-wrap'}}>{el.valor}</div>)}
+                                                            {esMaster && <button className="btn btn-glass btn-sm bd-elremove" onClick={()=>removeElementoFijo(idx)} style={{color:'#8B3535'}}>×</button>}
+                                                        </div>
+                                                    );
+                                                })}
                                                 {esMaster && <button className="bd-addlink" onClick={addElementoFijo}>{I.plus} Agregar elemento</button>}
                                             </div>
                                         </div>
