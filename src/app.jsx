@@ -1031,8 +1031,8 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // social codifican su estructura con saltos de línea (ver parse*/stringify* abajo).
     const CAMPO_TIPOS = [
         {value:'texto',          label:'Texto'},
-        {value:'titulo',         label:'Título grande'},
-        {value:'titulo-italico', label:'Título itálico'},
+        {value:'titulo',         label:'Título 1'},
+        {value:'titulo-italico', label:'Título 2'},
         {value:'lista',          label:'Lista numerada'},
         {value:'bloques',        label:'Bloques'},
         {value:'prueba-social',  label:'Prueba social'},
