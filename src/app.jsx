@@ -1133,7 +1133,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // ── Envíos: transportadoras (por provincia, con precio/tiempo) + recomendador que rankea
     // por precio/velocidad/confiabilidad según los pesos que define el master ──
     const DR_PROVINCIAS = ['Azua','Bahoruco','Barahona','Dajabón','Distrito Nacional','Duarte','El Seibo','Elías Piña','Espaillat','Hato Mayor','Hermanas Mirabal','Independencia','La Altagracia','La Romana','La Vega','María Trinidad Sánchez','Monseñor Nouel','Monte Cristi','Monte Plata','Pedernales','Peravia','Puerto Plata','Samaná','San Cristóbal','San José de Ocoa','San Juan','San Pedro de Macorís','Sánchez Ramírez','Santiago','Santiago Rodríguez','Santo Domingo','Valverde'];
-    const TRANSPORTADORA_VACIA = { nombre:'', confiabilidad:4, notas:'', zonas:[], codPct:0, codMinimo:0, seguroPct:0, seguroUmbral:0 };
+    const TRANSPORTADORA_VACIA = { nombre:'', confiabilidad:4, notas:'', zonas:[], codPct:0, codMinimo:0, seguroPct:0, seguroUmbral:0, zonasPeligrosas:[] };
     const [transportadoras, setTransportadoras] = useState([]);
     const [transpDetalle,   setTranspDetalle]   = useState(null);
     const [transpEditando,  setTranspEditando]  = useState(false);
@@ -1150,12 +1150,16 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const abrirTransp  = t => { setTranspDetalle(t); setTranspEditando(false); };
     const nuevaTransp  = () => { setTranspDetalle({id:null, ...TRANSPORTADORA_VACIA}); setTranspForm(TRANSPORTADORA_VACIA); setTranspEditando(true); };
-    const editarTranspActual = () => { setTranspForm({ nombre:transpDetalle.nombre||'', confiabilidad:transpDetalle.confiabilidad||4, notas:transpDetalle.notas||'', zonas:(transpDetalle.zonas||[]).map(z=>({...z})), codPct:transpDetalle.codPct||0, codMinimo:transpDetalle.codMinimo||0, seguroPct:transpDetalle.seguroPct||0, seguroUmbral:transpDetalle.seguroUmbral||0 }); setTranspEditando(true); };
+    const editarTranspActual = () => { setTranspForm({ nombre:transpDetalle.nombre||'', confiabilidad:transpDetalle.confiabilidad||4, notas:transpDetalle.notas||'', zonas:(transpDetalle.zonas||[]).map(z=>({...z})), codPct:transpDetalle.codPct||0, codMinimo:transpDetalle.codMinimo||0, seguroPct:transpDetalle.seguroPct||0, seguroUmbral:transpDetalle.seguroUmbral||0, zonasPeligrosas:(transpDetalle.zonasPeligrosas||[]).map(z=>({...z})) }); setTranspEditando(true); };
     const cerrarTransp = () => { setTranspDetalle(null); setTranspEditando(false); };
 
     const addZonaTransp = () => setTranspForm(f => ({...f, zonas:[...(f.zonas||[]), {provincia:DR_PROVINCIAS[0], precio:'', tiempoDias:''}]}));
     const updZonaTransp = (i,k,v) => setTranspForm(f => ({...f, zonas: f.zonas.map((z,idx)=>idx===i?{...z,[k]:v}:z)}));
     const delZonaTransp = (i) => setTranspForm(f => ({...f, zonas: f.zonas.filter((_,idx)=>idx!==i)}));
+
+    const addZonaPeligrosa = () => setTranspForm(f => ({...f, zonasPeligrosas:[...(f.zonasPeligrosas||[]), {provincia:DR_PROVINCIAS[0], sector:'', observacion:'Se coordina punto de encuentro seguro con el cliente.'}]}));
+    const updZonaPeligrosa = (i,k,v) => setTranspForm(f => ({...f, zonasPeligrosas: f.zonasPeligrosas.map((z,idx)=>idx===i?{...z,[k]:v}:z)}));
+    const delZonaPeligrosa = (i) => setTranspForm(f => ({...f, zonasPeligrosas: f.zonasPeligrosas.filter((_,idx)=>idx!==i)}));
 
     const guardarTransp = async () => {
         if (!transpForm.nombre.trim() || savingTransp) return;
@@ -1170,6 +1174,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 codMinimo: Number(transpForm.codMinimo)||0,
                 seguroPct: Number(transpForm.seguroPct)||0,
                 seguroUmbral: Number(transpForm.seguroUmbral)||0,
+                zonasPeligrosas: (transpForm.zonasPeligrosas||[]).filter(z=>z.provincia && z.sector).map(z=>({ provincia:z.provincia, sector:z.sector.trim(), observacion:z.observacion.trim() })),
             };
             if (transpDetalle.id) {
                 await db.collection('transportadoras').doc(transpDetalle.id).update(data);
@@ -2872,7 +2877,9 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </div>
                                 ) : (
                                     <div>
-                                        {ranking.map((r,i)=>(
+                                        {ranking.map((r,i)=>{
+                                            const riesgos = (r.transportadora.zonasPeligrosas||[]).filter(z=>z.provincia===envioProvinciaSel);
+                                            return (
                                             <div key={r.transportadora.id} className={`env-rank-row ${i===0?'env-rank-top':''}`}>
                                                 <div className="env-rank-pos">{i+1}</div>
                                                 <div style={{flex:1,minWidth:0}}>
@@ -2885,9 +2892,15 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                         </span>
                                                     </div>
                                                     <div className="env-rank-bar-track"><div className="env-rank-bar-fill" style={{width:`${Math.round(r.score*100)}%`}} /></div>
+                                                    {!!riesgos.length && (
+                                                        <div style={{marginTop:6,fontSize:11,color:'#96551A'}}>
+                                                            ⚠ Sectores de riesgo en {envioProvinciaSel}: {riesgos.map(z=>z.sector).join(', ')} — {riesgos[0].observacion}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )
                             )}
@@ -6036,6 +6049,22 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </div>
                                 </div>
                                 <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Zonas de riesgo (opcional)</label>
+                                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                        {(transpForm.zonasPeligrosas||[]).map((z,i)=>(
+                                            <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1.4fr auto',gap:8,alignItems:'center'}}>
+                                                <select className="cst-input" style={{fontFamily:'inherit',fontWeight:600,fontSize:13,padding:'8px 10px'}} value={z.provincia} onChange={e=>updZonaPeligrosa(i,'provincia',e.target.value)}>
+                                                    {DR_PROVINCIAS.map(p=><option key={p} value={p}>{p}</option>)}
+                                                </select>
+                                                <input className="cst-input" style={{fontSize:13,padding:'8px 10px'}} value={z.sector} onChange={e=>updZonaPeligrosa(i,'sector',e.target.value)} placeholder="Sector/barrio" />
+                                                <input className="cst-input" style={{fontSize:13,padding:'8px 10px'}} value={z.observacion} onChange={e=>updZonaPeligrosa(i,'observacion',e.target.value)} placeholder="Observación" />
+                                                <button className="btn btn-glass btn-sm" onClick={()=>delZonaPeligrosa(i)} style={{color:'#A03B3B'}}>×</button>
+                                            </div>
+                                        ))}
+                                        <button className="btn btn-glass btn-sm" onClick={addZonaPeligrosa} style={{alignSelf:'flex-start'}}>{I.plus} Agregar zona de riesgo</button>
+                                    </div>
+                                </div>
+                                <div className="form-group">
                                     <label style={{color:'var(--text-dim)'}}>Notas</label>
                                     <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}}
                                         value={transpForm.notas} onChange={e=>setTranspForm(f=>({...f,notas:e.target.value}))} placeholder="Condiciones, contacto, horarios..." />
@@ -6070,6 +6099,19 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                             </div>
                                         )}
                                     </div>
+                                    {!!(transpDetalle.zonasPeligrosas||[]).length && (
+                                        <div>
+                                            <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Zonas de riesgo</div>
+                                            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                                                {transpDetalle.zonasPeligrosas.map((z,i)=>(
+                                                    <div key={i} style={{fontSize:13,padding:'6px 0',borderBottom:i<(transpDetalle.zonasPeligrosas.length-1)?'1px solid var(--glass-border)':'none'}}>
+                                                        <span style={{fontWeight:600}}>{z.provincia} — {z.sector}</span>
+                                                        {z.observacion && <div style={{color:'var(--text-dim)',fontSize:12,marginTop:2}}>{z.observacion}</div>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div>
                                         <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>Notas</div>
                                         <p style={{fontSize:14,color:'var(--text)',whiteSpace:'pre-wrap',lineHeight:1.6}}>{transpDetalle.notas || 'Sin notas.'}</p>
