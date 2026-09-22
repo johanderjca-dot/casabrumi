@@ -1183,7 +1183,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     // Pesos del recomendador (precio/velocidad/confiabilidad) — configuración compartida, la
     // define el master y todos la ven al recomendar.
-    const PESOS_ENVIO_DEFAULT = { precio:40, velocidad:30, confiabilidad:30 };
+    const PESOS_ENVIO_DEFAULT = { precio:100, velocidad:0, confiabilidad:0 };
     const [pesosEnvio, setPesosEnvio] = useState(PESOS_ENVIO_DEFAULT);
     useEffect(() => {
         const unsub = db.collection('configuracion').doc('envios').onSnapshot(
