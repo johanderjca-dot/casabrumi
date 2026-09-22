@@ -1133,7 +1133,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     // ── Envíos: transportadoras (por provincia, con precio/tiempo) + recomendador que rankea
     // por precio/velocidad/confiabilidad según los pesos que define el master ──
     const DR_PROVINCIAS = ['Azua','Bahoruco','Barahona','Dajabón','Distrito Nacional','Duarte','El Seibo','Elías Piña','Espaillat','Hato Mayor','Hermanas Mirabal','Independencia','La Altagracia','La Romana','La Vega','María Trinidad Sánchez','Monseñor Nouel','Monte Cristi','Monte Plata','Pedernales','Peravia','Puerto Plata','Samaná','San Cristóbal','San José de Ocoa','San Juan','San Pedro de Macorís','Sánchez Ramírez','Santiago','Santiago Rodríguez','Santo Domingo','Valverde'];
-    const TRANSPORTADORA_VACIA = { nombre:'', confiabilidad:4, notas:'', zonas:[] };
+    const TRANSPORTADORA_VACIA = { nombre:'', confiabilidad:4, notas:'', zonas:[], codPct:0, codMinimo:0, seguroPct:0, seguroUmbral:0 };
     const [transportadoras, setTransportadoras] = useState([]);
     const [transpDetalle,   setTranspDetalle]   = useState(null);
     const [transpEditando,  setTranspEditando]  = useState(false);
@@ -1150,7 +1150,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const abrirTransp  = t => { setTranspDetalle(t); setTranspEditando(false); };
     const nuevaTransp  = () => { setTranspDetalle({id:null, ...TRANSPORTADORA_VACIA}); setTranspForm(TRANSPORTADORA_VACIA); setTranspEditando(true); };
-    const editarTranspActual = () => { setTranspForm({ nombre:transpDetalle.nombre||'', confiabilidad:transpDetalle.confiabilidad||4, notas:transpDetalle.notas||'', zonas:(transpDetalle.zonas||[]).map(z=>({...z})) }); setTranspEditando(true); };
+    const editarTranspActual = () => { setTranspForm({ nombre:transpDetalle.nombre||'', confiabilidad:transpDetalle.confiabilidad||4, notas:transpDetalle.notas||'', zonas:(transpDetalle.zonas||[]).map(z=>({...z})), codPct:transpDetalle.codPct||0, codMinimo:transpDetalle.codMinimo||0, seguroPct:transpDetalle.seguroPct||0, seguroUmbral:transpDetalle.seguroUmbral||0 }); setTranspEditando(true); };
     const cerrarTransp = () => { setTranspDetalle(null); setTranspEditando(false); };
 
     const addZonaTransp = () => setTranspForm(f => ({...f, zonas:[...(f.zonas||[]), {provincia:DR_PROVINCIAS[0], precio:'', tiempoDias:''}]}));
@@ -1166,6 +1166,10 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                 confiabilidad: Math.max(1, Math.min(5, Number(transpForm.confiabilidad)||1)),
                 notas: transpForm.notas.trim(),
                 zonas: (transpForm.zonas||[]).filter(z=>z.provincia).map(z=>({ provincia:z.provincia, precio:Number(z.precio)||0, tiempoDias:Number(z.tiempoDias)||0 })),
+                codPct: Number(transpForm.codPct)||0,
+                codMinimo: Number(transpForm.codMinimo)||0,
+                seguroPct: Number(transpForm.seguroPct)||0,
+                seguroUmbral: Number(transpForm.seguroUmbral)||0,
             };
             if (transpDetalle.id) {
                 await db.collection('transportadoras').doc(transpDetalle.id).update(data);
@@ -1199,28 +1203,42 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
     const [envioProvinciaSel, setEnvioProvinciaSel] = useState('');
     const [envioDireccion,    setEnvioDireccion]    = useState('');
+    const [envioValorPedido,  setEnvioValorPedido]  = useState('');
 
-    // Rankea las transportadoras que cubren `provincia`: normaliza precio/tiempo (más bajo=mejor)
-    // y confiabilidad (más alto=mejor) a 0-1, y combina según los pesos configurados.
-    const calcularRankingEnvio = (provincia) => {
+    // Costo real de una transportadora para un pedido: flete base + comisión COD (% con
+    // mínimo, si se conoce el valor del pedido) + seguro (% a partir de un umbral).
+    const calcularCostoEnvio = (t, zona, valorPedido) => {
+        const base = Number(zona.precio)||0;
+        const valor = Number(valorPedido)||0;
+        const codPct = Number(t.codPct)||0, codMinimo = Number(t.codMinimo)||0;
+        const seguroPct = Number(t.seguroPct)||0, seguroUmbral = Number(t.seguroUmbral)||0;
+        const cod = (valor && codPct) ? Math.max(codMinimo, (codPct/100)*valor) : 0;
+        const seguro = (valor && seguroPct && valor>=seguroUmbral) ? (seguroPct/100)*valor : 0;
+        return { base, cod, seguro, total: base+cod+seguro };
+    };
+
+    // Rankea las transportadoras que cubren `provincia`: normaliza costo total/tiempo (más
+    // bajo=mejor) y confiabilidad (más alto=mejor) a 0-1, y combina según los pesos configurados.
+    const calcularRankingEnvio = (provincia, valorPedido) => {
         if (!provincia) return [];
         const candidatas = transportadoras
             .filter(perteneceATienda)
             .map(t => ({ t, zona: (t.zonas||[]).find(z=>z.provincia===provincia) }))
-            .filter(x => x.zona);
+            .filter(x => x.zona)
+            .map(({t,zona}) => ({ t, zona, costo: calcularCostoEnvio(t, zona, valorPedido) }));
         if (!candidatas.length) return [];
-        const precios = candidatas.map(x=>x.zona.precio);
+        const precios = candidatas.map(x=>x.costo.total);
         const tiempos = candidatas.map(x=>x.zona.tiempoDias);
         const minP = Math.min(...precios), maxP = Math.max(...precios);
         const minT = Math.min(...tiempos), maxT = Math.max(...tiempos);
         const wP = Number(pesosEnvio.precio)||0, wV = Number(pesosEnvio.velocidad)||0, wC = Number(pesosEnvio.confiabilidad)||0;
         const wSum = (wP+wV+wC) || 1;
-        return candidatas.map(({t,zona}) => {
-            const scorePrecio = maxP===minP ? 1 : (maxP - zona.precio)/(maxP-minP);
+        return candidatas.map(({t,zona,costo}) => {
+            const scorePrecio = maxP===minP ? 1 : (maxP - costo.total)/(maxP-minP);
             const scoreTiempo = maxT===minT ? 1 : (maxT - zona.tiempoDias)/(maxT-minT);
             const scoreConf   = Math.max(0,Math.min(5,Number(t.confiabilidad)||0))/5;
             const score = (wP*scorePrecio + wV*scoreTiempo + wC*scoreConf) / wSum;
-            return { transportadora:t, zona, score, scorePrecio, scoreTiempo, scoreConf };
+            return { transportadora:t, zona, costo, score, scorePrecio, scoreTiempo, scoreConf };
         }).sort((a,b)=>b.score-a.score);
     };
 
@@ -2801,7 +2819,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                 {activeTab === 'envios' && (() => {
                     const misTransportadoras = transportadoras.filter(perteneceATienda);
-                    const ranking = calcularRankingEnvio(envioProvinciaSel);
+                    const ranking = calcularRankingEnvio(envioProvinciaSel, envioValorPedido);
                     const wTotal = (Number(pesosEnvio.precio)||0)+(Number(pesosEnvio.velocidad)||0)+(Number(pesosEnvio.confiabilidad)||0);
                     const setPeso = (campo, val) => guardarPesosEnvio({...pesosEnvio, [campo]: Number(val)});
                     return <>
@@ -2811,7 +2829,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                         <div className="card glass cst-card" style={{marginBottom:16}}>
                             <div className="cst-sec-label">Recomendador</div>
-                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:18}}>
                                 <div>
                                     <label className="cst-field-label">Provincia del destinatario</label>
                                     <select className="cst-input" style={{fontFamily:'inherit',fontWeight:600,fontSize:14}} value={envioProvinciaSel} onChange={e=>setEnvioProvinciaSel(e.target.value)}>
@@ -2822,6 +2840,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <div>
                                     <label className="cst-field-label">Dirección (referencia, opcional)</label>
                                     <input className="cst-input" style={{fontFamily:'inherit',fontWeight:600,fontSize:14}} value={envioDireccion} onChange={e=>setEnvioDireccion(e.target.value)} placeholder="Calle, sector, punto de referencia..." />
+                                </div>
+                                <div>
+                                    <label className="cst-field-label">Valor del pedido (RD$, opcional)</label>
+                                    <div className="cst-input-wrap"><span className="cst-prefix">RD$</span>
+                                        <input type="number" className="cst-input has-prefix" style={{fontFamily:'inherit',fontWeight:600,fontSize:14}} value={envioValorPedido} onChange={e=>setEnvioValorPedido(e.target.value)} placeholder="Para calcular COD/seguro" /></div>
                                 </div>
                             </div>
 
@@ -2855,7 +2878,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                                 <div style={{flex:1,minWidth:0}}>
                                                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
                                                         <span style={{fontWeight:700,fontSize:14}}>{r.transportadora.nombre}{i===0 && <span style={{marginLeft:8,fontSize:10,fontWeight:700,color:'var(--orange)',textTransform:'uppercase',letterSpacing:0.6}}>Mejor opción</span>}</span>
-                                                        <span style={{fontSize:11,color:'var(--text-dim)',fontFamily:'Fira Code'}}>RD${r.zona.precio} · {r.zona.tiempoDias}d · {r.transportadora.confiabilidad}/5</span>
+                                                        <span style={{fontSize:11,color:'var(--text-dim)',fontFamily:'Fira Code'}}>
+                                                            {r.costo.cod>0 || r.costo.seguro>0
+                                                                ? <>RD${r.costo.base}{r.costo.cod>0 && <> +{r.costo.cod.toFixed(0)} COD</>}{r.costo.seguro>0 && <> +{r.costo.seguro.toFixed(0)} seg.</>} = RD${r.costo.total.toFixed(0)}</>
+                                                                : <>RD${r.costo.total}</>} · {r.zona.tiempoDias===0?'mismo día':`${r.zona.tiempoDias}d`} · {r.transportadora.confiabilidad}/5
+                                                        </span>
                                                     </div>
                                                     <div className="env-rank-bar-track"><div className="env-rank-bar-fill" style={{width:`${Math.round(r.score*100)}%`}} /></div>
                                                 </div>
@@ -2875,17 +2902,32 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             <div className="card glass"><div className="empty"><div className="empty-icon">{I_envios}</div><h3>Sin transportadoras aún</h3><p>Agrega tu primera transportadora para empezar a recomendar envíos.</p></div></div>
                         ) : (
                             <div className="card glass" style={{overflowX:'auto'}}>
-                                <table style={{minWidth:600}}>
-                                    <thead><tr><th style={{minWidth:160}}>Nombre</th><th style={{minWidth:100}}>Confiabilidad</th><th style={{minWidth:120}}>Zonas cubiertas</th><th style={{minWidth:200}}>Notas</th></tr></thead>
+                                <table style={{minWidth:760}}>
+                                    <thead><tr>
+                                        <th style={{minWidth:150}}>Nombre</th>
+                                        <th style={{minWidth:110}}>Precio desde</th>
+                                        <th style={{minWidth:110}}>Comisión COD</th>
+                                        <th style={{minWidth:110}}>Seguro</th>
+                                        <th style={{minWidth:100}}>Confiabilidad</th>
+                                        <th style={{minWidth:110}}>Zonas cubiertas</th>
+                                        <th style={{minWidth:200}}>Notas</th>
+                                    </tr></thead>
                                     <tbody>
-                                        {misTransportadoras.map(t => (
-                                            <tr key={t.id} onClick={()=>abrirTransp(t)} style={{cursor:'pointer'}}>
-                                                <td style={{fontWeight:600}}>{t.nombre||'—'}</td>
-                                                <td>{t.confiabilidad||'—'}/5</td>
-                                                <td>{(t.zonas||[]).length}</td>
-                                                <td style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:220,color:'var(--text-dim)'}}>{t.notas||'—'}</td>
-                                            </tr>
-                                        ))}
+                                        {misTransportadoras.map(t => {
+                                            const precios = (t.zonas||[]).map(z=>Number(z.precio)||0);
+                                            const precioDesde = precios.length ? Math.min(...precios) : null;
+                                            return (
+                                                <tr key={t.id} onClick={()=>abrirTransp(t)} style={{cursor:'pointer'}}>
+                                                    <td style={{fontWeight:600}}>{t.nombre||'—'}</td>
+                                                    <td>{precioDesde!=null ? `RD$${precioDesde}` : '—'}</td>
+                                                    <td>{t.codPct ? `${t.codPct}%${t.codMinimo?` (mín. RD$${t.codMinimo})`:''}` : '—'}</td>
+                                                    <td>{t.seguroPct ? `${t.seguroPct}%${t.seguroUmbral?` (desde RD$${t.seguroUmbral})`:''}` : '—'}</td>
+                                                    <td>{t.confiabilidad||'—'}/5</td>
+                                                    <td>{(t.zonas||[]).length}</td>
+                                                    <td style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:220,color:'var(--text-dim)'}}>{t.notas||'—'}</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -5959,6 +6001,24 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     </div>
                                 </div>
                                 <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Comisión COD (opcional)</label>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                                        <div className="cst-input-wrap"><span className="cst-prefix">%</span>
+                                            <input type="number" className="cst-input has-prefix" value={transpForm.codPct} onChange={e=>setTranspForm(f=>({...f,codPct:e.target.value}))} placeholder="Ej. 3" /></div>
+                                        <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:11}}>RD$</span>
+                                            <input type="number" className="cst-input has-prefix" style={{paddingLeft:32}} value={transpForm.codMinimo} onChange={e=>setTranspForm(f=>({...f,codMinimo:e.target.value}))} placeholder="Mínimo" /></div>
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Seguro (opcional)</label>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                                        <div className="cst-input-wrap"><span className="cst-prefix">%</span>
+                                            <input type="number" className="cst-input has-prefix" value={transpForm.seguroPct} onChange={e=>setTranspForm(f=>({...f,seguroPct:e.target.value}))} placeholder="Ej. 1" /></div>
+                                        <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:11}}>RD$</span>
+                                            <input type="number" className="cst-input has-prefix" style={{paddingLeft:32}} value={transpForm.seguroUmbral} onChange={e=>setTranspForm(f=>({...f,seguroUmbral:e.target.value}))} placeholder="A partir de" /></div>
+                                    </div>
+                                </div>
+                                <div className="form-group">
                                     <label style={{color:'var(--text-dim)'}}>Zonas que cubre</label>
                                     <div style={{display:'flex',flexDirection:'column',gap:8}}>
                                         {(transpForm.zonas||[]).map((z,i)=>(
@@ -5992,7 +6052,11 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                     <button className="modal-close" onClick={cerrarTransp}>×</button>
                                 </div>
                                 <div style={{display:'flex',flexDirection:'column',gap:14,padding:'4px 2px 8px'}}>
-                                    <span className="badge badge-gold" style={{alignSelf:'flex-start',fontSize:11}}><span className="badge-dot"/>Confiabilidad {transpDetalle.confiabilidad||'—'}/5</span>
+                                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                                        <span className="badge badge-gold" style={{fontSize:11}}><span className="badge-dot"/>Confiabilidad {transpDetalle.confiabilidad||'—'}/5</span>
+                                        {!!transpDetalle.codPct && <span className="badge badge-gold" style={{fontSize:11}}><span className="badge-dot"/>COD {transpDetalle.codPct}%{transpDetalle.codMinimo?` (mín. RD$${transpDetalle.codMinimo})`:''}</span>}
+                                        {!!transpDetalle.seguroPct && <span className="badge badge-gold" style={{fontSize:11}}><span className="badge-dot"/>Seguro {transpDetalle.seguroPct}%{transpDetalle.seguroUmbral?` (desde RD$${transpDetalle.seguroUmbral})`:''}</span>}
+                                    </div>
                                     <div>
                                         <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Zonas que cubre</div>
                                         {(transpDetalle.zonas||[]).length===0 ? <p style={{fontSize:14,color:'var(--text-dim)'}}>Sin zonas registradas.</p> : (
