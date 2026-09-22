@@ -92,6 +92,9 @@ service cloud.firestore {
     // ── proveedores ── ficha de cada proveedor, gateada por su permiso
     match /proveedores/{id} { allow read, write: if tienePermiso('proveedores'); }
 
+    // ── transportadoras ── empresas de envíos con sus zonas/precio/tiempo, gateada por su permiso
+    match /transportadoras/{id} { allow read, write: if tienePermiso('envios'); }
+
     // ── empleados, pagos_salarios ── nómina (salario fijo, día de pago, historial mensual),
     // gateada por su propio permiso ya que es información sensible
     match /empleados/{id}      { allow read, write: if tienePermiso('salarios'); }
@@ -126,6 +129,12 @@ service cloud.firestore {
     // que la colección links (quien gestiona links también gestiona sus categorías)
     match /configuracion/accesosCategorias {
       allow read, write: if tienePermiso('accesos');
+    }
+
+    // ── configuracion/envios ── pesos (precio/velocidad/confiabilidad) del recomendador de
+    // transportadoras; mismo permiso que la colección transportadoras
+    match /configuracion/envios {
+      allow read, write: if tienePermiso('envios');
     }
 
     // cualquier otra coleccion no listada: denegada por defecto

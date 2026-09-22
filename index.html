@@ -353,6 +353,12 @@
         .cst-range::-webkit-slider-thumb:hover { transform: scale(1.18); }
         .cst-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--orange); border: 3px solid var(--surface-3); box-shadow: 0 1px 6px rgba(18,154,143,0.45); cursor: pointer; }
         .cst-card { padding: 18px 20px; border-radius: 14px; }
+        .env-rank-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 8px; }
+        .env-rank-row.env-rank-top { border-color: var(--orange); background: var(--orange-dim); }
+        .env-rank-pos { width: 26px; height: 26px; border-radius: 50%; background: var(--stone); color: var(--text-dim); font-family: 'Fira Code', monospace; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .env-rank-row.env-rank-top .env-rank-pos { background: var(--orange); color: #fff; }
+        .env-rank-bar-track { height: 5px; border-radius: 99px; background: var(--stone); overflow: hidden; margin-top: 6px; }
+        .env-rank-bar-fill { height: 100%; background: var(--orange); border-radius: 99px; }
         .calc-card { max-width: 320px; }
         .calc-display { font-family: 'Fira Code', monospace; font-size: 28px; font-weight: 700; color: var(--text); background: var(--cream-dark); border: 1px solid var(--glass-border); border-radius: 10px; padding: 14px 16px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 12px; }
         .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -592,6 +598,6 @@ const crearUsuarioConAuth = async (email, password) => {
 };
 </script>
 
-<script src="app.js?v=00228f3e"></script>
+<script src="app.js?v=d614f5bb"></script>
 </body>
 </html>

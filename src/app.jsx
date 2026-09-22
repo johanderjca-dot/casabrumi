@@ -1130,6 +1130,101 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const deleteProveedor = id => { if (confirm('¿Eliminar este proveedor?')) { db.collection('proveedores').doc(id).delete().catch(err => console.error('Error eliminando proveedor:', err)); cerrarProveedor(); } };
 
 
+    // ── Envíos: transportadoras (por provincia, con precio/tiempo) + recomendador que rankea
+    // por precio/velocidad/confiabilidad según los pesos que define el master ──
+    const DR_PROVINCIAS = ['Azua','Bahoruco','Barahona','Dajabón','Distrito Nacional','Duarte','El Seibo','Elías Piña','Espaillat','Hato Mayor','Hermanas Mirabal','Independencia','La Altagracia','La Romana','La Vega','María Trinidad Sánchez','Monseñor Nouel','Monte Cristi','Monte Plata','Pedernales','Peravia','Puerto Plata','Samaná','San Cristóbal','San José de Ocoa','San Juan','San Pedro de Macorís','Sánchez Ramírez','Santiago','Santiago Rodríguez','Santo Domingo','Valverde'];
+    const TRANSPORTADORA_VACIA = { nombre:'', confiabilidad:4, notas:'', zonas:[] };
+    const [transportadoras, setTransportadoras] = useState([]);
+    const [transpDetalle,   setTranspDetalle]   = useState(null);
+    const [transpEditando,  setTranspEditando]  = useState(false);
+    const [transpForm,      setTranspForm]      = useState(TRANSPORTADORA_VACIA);
+    const [savingTransp,    setSavingTransp]    = useState(false);
+
+    useEffect(() => {
+        const unsub = db.collection('transportadoras').orderBy('nombre').onSnapshot(
+            snap => setTransportadoras(snap.docs.map(d=>({id:d.id,...d.data()}))),
+            err => console.error('Transportadoras:', err)
+        );
+        return unsub;
+    }, []);
+
+    const abrirTransp  = t => { setTranspDetalle(t); setTranspEditando(false); };
+    const nuevaTransp  = () => { setTranspDetalle({id:null, ...TRANSPORTADORA_VACIA}); setTranspForm(TRANSPORTADORA_VACIA); setTranspEditando(true); };
+    const editarTranspActual = () => { setTranspForm({ nombre:transpDetalle.nombre||'', confiabilidad:transpDetalle.confiabilidad||4, notas:transpDetalle.notas||'', zonas:(transpDetalle.zonas||[]).map(z=>({...z})) }); setTranspEditando(true); };
+    const cerrarTransp = () => { setTranspDetalle(null); setTranspEditando(false); };
+
+    const addZonaTransp = () => setTranspForm(f => ({...f, zonas:[...(f.zonas||[]), {provincia:DR_PROVINCIAS[0], precio:'', tiempoDias:''}]}));
+    const updZonaTransp = (i,k,v) => setTranspForm(f => ({...f, zonas: f.zonas.map((z,idx)=>idx===i?{...z,[k]:v}:z)}));
+    const delZonaTransp = (i) => setTranspForm(f => ({...f, zonas: f.zonas.filter((_,idx)=>idx!==i)}));
+
+    const guardarTransp = async () => {
+        if (!transpForm.nombre.trim() || savingTransp) return;
+        setSavingTransp(true);
+        try {
+            const data = {
+                nombre: transpForm.nombre.trim(),
+                confiabilidad: Math.max(1, Math.min(5, Number(transpForm.confiabilidad)||1)),
+                notas: transpForm.notas.trim(),
+                zonas: (transpForm.zonas||[]).filter(z=>z.provincia).map(z=>({ provincia:z.provincia, precio:Number(z.precio)||0, tiempoDias:Number(z.tiempoDias)||0 })),
+            };
+            if (transpDetalle.id) {
+                await db.collection('transportadoras').doc(transpDetalle.id).update(data);
+                setTranspDetalle(d=>({...d, ...data}));
+                setTranspEditando(false);
+            } else {
+                await db.collection('transportadoras').add({ ...data, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp() });
+                cerrarTransp();
+            }
+        } catch(err) { console.error('Error guardando transportadora:', err); }
+        finally { setSavingTransp(false); }
+    };
+    const cancelarEdicionTransp = () => { transpDetalle && transpDetalle.id ? setTranspEditando(false) : cerrarTransp(); };
+    const deleteTransp = id => { if (confirm('¿Eliminar esta transportadora?')) { db.collection('transportadoras').doc(id).delete().catch(err => console.error('Error eliminando transportadora:', err)); cerrarTransp(); } };
+
+    // Pesos del recomendador (precio/velocidad/confiabilidad) — configuración compartida, la
+    // define el master y todos la ven al recomendar.
+    const PESOS_ENVIO_DEFAULT = { precio:40, velocidad:30, confiabilidad:30 };
+    const [pesosEnvio, setPesosEnvio] = useState(PESOS_ENVIO_DEFAULT);
+    useEffect(() => {
+        const unsub = db.collection('configuracion').doc('envios').onSnapshot(
+            doc => { if (doc.exists) setPesosEnvio(p=>({...PESOS_ENVIO_DEFAULT, ...doc.data()})); },
+            err => console.error('Config envíos:', err)
+        );
+        return unsub;
+    }, []);
+    const guardarPesosEnvio = (nuevos) => {
+        setPesosEnvio(nuevos);
+        db.collection('configuracion').doc('envios').set(nuevos, {merge:true}).catch(err=>console.error('Error guardando pesos de envío:', err));
+    };
+
+    const [envioProvinciaSel, setEnvioProvinciaSel] = useState('');
+    const [envioDireccion,    setEnvioDireccion]    = useState('');
+
+    // Rankea las transportadoras que cubren `provincia`: normaliza precio/tiempo (más bajo=mejor)
+    // y confiabilidad (más alto=mejor) a 0-1, y combina según los pesos configurados.
+    const calcularRankingEnvio = (provincia) => {
+        if (!provincia) return [];
+        const candidatas = transportadoras
+            .filter(perteneceATienda)
+            .map(t => ({ t, zona: (t.zonas||[]).find(z=>z.provincia===provincia) }))
+            .filter(x => x.zona);
+        if (!candidatas.length) return [];
+        const precios = candidatas.map(x=>x.zona.precio);
+        const tiempos = candidatas.map(x=>x.zona.tiempoDias);
+        const minP = Math.min(...precios), maxP = Math.max(...precios);
+        const minT = Math.min(...tiempos), maxT = Math.max(...tiempos);
+        const wP = Number(pesosEnvio.precio)||0, wV = Number(pesosEnvio.velocidad)||0, wC = Number(pesosEnvio.confiabilidad)||0;
+        const wSum = (wP+wV+wC) || 1;
+        return candidatas.map(({t,zona}) => {
+            const scorePrecio = maxP===minP ? 1 : (maxP - zona.precio)/(maxP-minP);
+            const scoreTiempo = maxT===minT ? 1 : (maxT - zona.tiempoDias)/(maxT-minT);
+            const scoreConf   = Math.max(0,Math.min(5,Number(t.confiabilidad)||0))/5;
+            const score = (wP*scorePrecio + wV*scoreTiempo + wC*scoreConf) / wSum;
+            return { transportadora:t, zona, score, scorePrecio, scoreTiempo, scoreConf };
+        }).sort((a,b)=>b.score-a.score);
+    };
+
+
     // ── Salarios (nómina): empleados con salario fijo + historial de pagos por mes ──
     const EMPLEADO_DEFAULT = { nombre:'', puesto:'', salario:'', diaPago:'1', notas:'', activo:true };
     const [empleados,        setEmpleados]        = useState([]);
@@ -1653,6 +1748,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         ['cierre','Cierre Diario'], ['contabilidad','Contabilidad'], ['costeo','Calculadora Costeo'],
         ['diccionario','Diccionario'], ['accesos','Accesos Rápidos'], ['tiendas','Tiendas'],
         ['salarios','Salarios'], ['marcas','Identidad de Marca'], ['creativos','Brief de Creativos'],
+        ['envios','Envíos'],
     ];
 
     // ── Roles personalizados — nombre libre + permisos por módulo, asignables desde el dropdown de Rol.
@@ -2279,6 +2375,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const I_wallet = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>;
     const I_palette = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 0 20 2.5 2.5 0 0 0 0-5 2.5 2.5 0 0 1 0-5h1a5 5 0 0 0 5-5c0-2.76-2.24-5-5-5"/><circle cx="7" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="6" r="1.2" fill="currentColor" stroke="none"/></svg>;
     const I_brief = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>;
+    const I_envios = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>;
 
     // Usuarios (gestión de cuentas) es siempre exclusivo del master, sin importar los checkboxes
     // de permisos guardados — evita que un vendedor con ese permiso cree/edite otras cuentas.
@@ -2295,6 +2392,7 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
         { label: 'Gestion',   items: [
             { key: 'proveedores', label: 'Proveedores', icon: I.truck  },
             { key: 'ganadores',   label: 'Productos', icon: I_star },
+            { key: 'envios',      label: 'Envíos',      icon: I_envios },
             { key: 'cierre',      label: 'Cierre Diario',       icon: I_cierre },
             { key: 'contabilidad', label: 'Contabilidad', icon: I_balanza },
             { key: 'salarios', label: 'Salarios', icon: I_wallet },
@@ -2698,6 +2796,100 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                             </table>
                         </div>
                     )}
+                    </>;
+                })()}
+
+                {activeTab === 'envios' && (() => {
+                    const misTransportadoras = transportadoras.filter(perteneceATienda);
+                    const ranking = calcularRankingEnvio(envioProvinciaSel);
+                    const wTotal = (Number(pesosEnvio.precio)||0)+(Number(pesosEnvio.velocidad)||0)+(Number(pesosEnvio.confiabilidad)||0);
+                    const setPeso = (campo, val) => guardarPesosEnvio({...pesosEnvio, [campo]: Number(val)});
+                    return <>
+                        <div className="page-header">
+                            <div><h1>Envíos</h1><p>Elige la mejor transportadora según provincia, precio, tiempo y confiabilidad</p></div>
+                        </div>
+
+                        <div className="card glass cst-card" style={{marginBottom:16}}>
+                            <div className="cst-sec-label">Recomendador</div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
+                                <div>
+                                    <label className="cst-field-label">Provincia del destinatario</label>
+                                    <select className="cst-input" style={{fontFamily:'inherit',fontWeight:600,fontSize:14}} value={envioProvinciaSel} onChange={e=>setEnvioProvinciaSel(e.target.value)}>
+                                        <option value="">Selecciona una provincia</option>
+                                        {DR_PROVINCIAS.map(p=><option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="cst-field-label">Dirección (referencia, opcional)</label>
+                                    <input className="cst-input" style={{fontFamily:'inherit',fontWeight:600,fontSize:14}} value={envioDireccion} onChange={e=>setEnvioDireccion(e.target.value)} placeholder="Calle, sector, punto de referencia..." />
+                                </div>
+                            </div>
+
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:18,marginBottom: envioProvinciaSel ? 22 : 0}}>
+                                {[['precio','Precio'],['velocidad','Velocidad'],['confiabilidad','Confiabilidad']].map(([key,label])=>{
+                                    const val = Number(pesosEnvio[key])||0;
+                                    const pct = wTotal ? Math.round(val/wTotal*100) : 0;
+                                    return (
+                                        <div key={key}>
+                                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                                                <span className="cst-field-label" style={{marginBottom:0}}>{label}</span>
+                                                <span style={{fontSize:12,fontWeight:800,fontFamily:'Fira Code',color:'var(--orange)'}}>{pct}%</span>
+                                            </div>
+                                            <input type="range" min="0" max="100" className="cst-range" value={val} onChange={e=>setPeso(key,e.target.value)}
+                                                style={{background:`linear-gradient(90deg, var(--orange) ${val}%, var(--stone) ${val}%)`}} />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {envioProvinciaSel && (
+                                ranking.length === 0 ? (
+                                    <div style={{padding:'16px 4px',color:'var(--text-dim)',fontSize:13}}>
+                                        Ninguna transportadora registrada cubre {envioProvinciaSel} todavía. Agrégala abajo en "Transportadoras".
+                                    </div>
+                                ) : (
+                                    <div>
+                                        {ranking.map((r,i)=>(
+                                            <div key={r.transportadora.id} className={`env-rank-row ${i===0?'env-rank-top':''}`}>
+                                                <div className="env-rank-pos">{i+1}</div>
+                                                <div style={{flex:1,minWidth:0}}>
+                                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+                                                        <span style={{fontWeight:700,fontSize:14}}>{r.transportadora.nombre}{i===0 && <span style={{marginLeft:8,fontSize:10,fontWeight:700,color:'var(--orange)',textTransform:'uppercase',letterSpacing:0.6}}>Mejor opción</span>}</span>
+                                                        <span style={{fontSize:11,color:'var(--text-dim)',fontFamily:'Fira Code'}}>RD${r.zona.precio} · {r.zona.tiempoDias}d · {r.transportadora.confiabilidad}/5</span>
+                                                    </div>
+                                                    <div className="env-rank-bar-track"><div className="env-rank-bar-fill" style={{width:`${Math.round(r.score*100)}%`}} /></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            )}
+                        </div>
+
+                        <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,marginTop:4}}>
+                            <div><h1 style={{fontSize:18}}>Transportadoras</h1><p>Zonas que cubre cada una, con su precio y tiempo de entrega</p></div>
+                            <button className="btn btn-gold" onClick={nuevaTransp}>{I.plus} Nueva transportadora</button>
+                        </div>
+
+                        {misTransportadoras.length===0 ? (
+                            <div className="card glass"><div className="empty"><div className="empty-icon">{I_envios}</div><h3>Sin transportadoras aún</h3><p>Agrega tu primera transportadora para empezar a recomendar envíos.</p></div></div>
+                        ) : (
+                            <div className="card glass" style={{overflowX:'auto'}}>
+                                <table style={{minWidth:600}}>
+                                    <thead><tr><th style={{minWidth:160}}>Nombre</th><th style={{minWidth:100}}>Confiabilidad</th><th style={{minWidth:120}}>Zonas cubiertas</th><th style={{minWidth:200}}>Notas</th></tr></thead>
+                                    <tbody>
+                                        {misTransportadoras.map(t => (
+                                            <tr key={t.id} onClick={()=>abrirTransp(t)} style={{cursor:'pointer'}}>
+                                                <td style={{fontWeight:600}}>{t.nombre||'—'}</td>
+                                                <td>{t.confiabilidad||'—'}/5</td>
+                                                <td>{(t.zonas||[]).length}</td>
+                                                <td style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:220,color:'var(--text-dim)'}}>{t.notas||'—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </>;
                 })()}
 
@@ -5739,6 +5931,89 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
                                 <div className="modal-actions">
                                     <button className="btn btn-glass" style={{color:'#A03B3B'}} onClick={()=>deleteProveedor(proveedorDetalle.id)}>Eliminar</button>
                                     <button className="btn btn-gold" onClick={editarProveedorActual}>{I.edit} Editar</button>
+                                </div>
+                            </>)}
+                        </div>
+                    </div>
+                )}
+
+                {transpDetalle && (
+                    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) cerrarTransp(); }}>
+                        <div className="modal glass glass-high" style={{boxShadow:'var(--glass-shadow-lg)'}}>
+                            {transpEditando ? (<>
+                                <div className="modal-hd">
+                                    <h2>{transpDetalle.id ? 'Editar Transportadora' : 'Nueva Transportadora'}</h2>
+                                    <button className="modal-close" onClick={cancelarEdicionTransp}>×</button>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Nombre de la transportadora</label>
+                                    <input className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)'}}
+                                        value={transpForm.nombre} onChange={e=>setTranspForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej. Caribe Express" />
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Confiabilidad (1-5)</label>
+                                    <div style={{display:'flex',gap:6}}>
+                                        {[1,2,3,4,5].map(n=>(
+                                            <button key={n} className={`btn btn-sm ${Number(transpForm.confiabilidad)===n?'btn-gold':'btn-glass'}`} onClick={()=>setTranspForm(f=>({...f,confiabilidad:n}))}>{n}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Zonas que cubre</label>
+                                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                        {(transpForm.zonas||[]).map((z,i)=>(
+                                            <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 90px 80px auto',gap:8,alignItems:'center'}}>
+                                                <select className="cst-input" style={{fontFamily:'inherit',fontWeight:600,fontSize:13,padding:'8px 10px'}} value={z.provincia} onChange={e=>updZonaTransp(i,'provincia',e.target.value)}>
+                                                    {DR_PROVINCIAS.map(p=><option key={p} value={p}>{p}</option>)}
+                                                </select>
+                                                <div className="cst-input-wrap"><span className="cst-prefix" style={{fontSize:11}}>RD$</span>
+                                                    <input type="number" className="cst-input has-prefix" style={{fontSize:13,padding:'8px 8px 8px 32px'}} value={z.precio} onChange={e=>updZonaTransp(i,'precio',e.target.value)} placeholder="Precio" /></div>
+                                                <input type="number" className="cst-input" style={{fontSize:13,padding:'8px 10px'}} value={z.tiempoDias} onChange={e=>updZonaTransp(i,'tiempoDias',e.target.value)} placeholder="Días" />
+                                                <button className="btn btn-glass btn-sm" onClick={()=>delZonaTransp(i)} style={{color:'#A03B3B'}}>×</button>
+                                            </div>
+                                        ))}
+                                        <button className="btn btn-glass btn-sm" onClick={addZonaTransp} style={{alignSelf:'flex-start'}}>{I.plus} Agregar zona</button>
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color:'var(--text-dim)'}}>Notas</label>
+                                    <textarea className="form-input glass no-icon" style={{border:'1px solid var(--glass-border)',height:'70px',resize:'vertical'}}
+                                        value={transpForm.notas} onChange={e=>setTranspForm(f=>({...f,notas:e.target.value}))} placeholder="Condiciones, contacto, horarios..." />
+                                </div>
+                                <div className="modal-actions">
+                                    <button className="btn btn-glass" onClick={cancelarEdicionTransp}>Cancelar</button>
+                                    <button className="btn btn-gold" onClick={guardarTransp} disabled={savingTransp||!transpForm.nombre.trim()}>
+                                        {savingTransp ? 'Guardando...' : (transpDetalle.id ? <>{I.edit} Guardar</> : <>{I.plus} Crear Transportadora</>)}
+                                    </button>
+                                </div>
+                            </>) : (<>
+                                <div className="modal-hd">
+                                    <h2>{transpDetalle.nombre}</h2>
+                                    <button className="modal-close" onClick={cerrarTransp}>×</button>
+                                </div>
+                                <div style={{display:'flex',flexDirection:'column',gap:14,padding:'4px 2px 8px'}}>
+                                    <span className="badge badge-gold" style={{alignSelf:'flex-start',fontSize:11}}><span className="badge-dot"/>Confiabilidad {transpDetalle.confiabilidad||'—'}/5</span>
+                                    <div>
+                                        <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Zonas que cubre</div>
+                                        {(transpDetalle.zonas||[]).length===0 ? <p style={{fontSize:14,color:'var(--text-dim)'}}>Sin zonas registradas.</p> : (
+                                            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                                                {(transpDetalle.zonas||[]).map((z,i)=>(
+                                                    <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0',borderBottom:i<(transpDetalle.zonas.length-1)?'1px solid var(--glass-border)':'none'}}>
+                                                        <span style={{fontWeight:600}}>{z.provincia}</span>
+                                                        <span style={{color:'var(--text-dim)',fontFamily:'Fira Code'}}>RD${z.precio} · {z.tiempoDias}d</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize:11,fontWeight:700,color:'var(--text-dimmer)',textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>Notas</div>
+                                        <p style={{fontSize:14,color:'var(--text)',whiteSpace:'pre-wrap',lineHeight:1.6}}>{transpDetalle.notas || 'Sin notas.'}</p>
+                                    </div>
+                                </div>
+                                <div className="modal-actions">
+                                    <button className="btn btn-glass" style={{color:'#A03B3B'}} onClick={()=>deleteTransp(transpDetalle.id)}>Eliminar</button>
+                                    <button className="btn btn-gold" onClick={editarTranspActual}>{I.edit} Editar</button>
                                 </div>
                             </>)}
                         </div>
