@@ -1190,6 +1190,102 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
     const cancelarEdicionTransp = () => { transpDetalle && transpDetalle.id ? setTranspEditando(false) : cerrarTransp(); };
     const deleteTransp = id => { if (confirm('¿Eliminar esta transportadora?')) { db.collection('transportadoras').doc(id).delete().catch(err => console.error('Error eliminando transportadora:', err)); cerrarTransp(); } };
 
+    // Carga de una sola vez las 3 transportadoras reales que Johander compartió (Aurelpack,
+    // Gintracom, TokTok Logistic) con su precio/cobertura real — evita que el master tenga que
+    // copiar/pegar un script en la consola o cargar ~30 zonas a mano por transportadora.
+    const [savingSeedTransp, setSavingSeedTransp] = useState(false);
+    const cargarTransportadorasDemo = async () => {
+        if (savingSeedTransp) return;
+        setSavingSeedTransp(true);
+        const zonasNacionalGintracom = [
+            'Azua','Bahoruco','Barahona','Dajabón','Distrito Nacional','Duarte','El Seibo','Elías Piña',
+            'Espaillat','Hato Mayor','Hermanas Mirabal','Independencia','La Altagracia','La Romana','La Vega',
+            'María Trinidad Sánchez','Monseñor Nouel','Monte Cristi','Monte Plata','Pedernales','Peravia',
+            'Puerto Plata','Samaná','San Cristóbal','San José de Ocoa','San Juan','San Pedro de Macorís',
+            'Sánchez Ramírez','Santiago','Santiago Rodríguez','Valverde',
+        ].map(provincia => ({ provincia, precio: 370, tiempoDias: 2 }));
+        const OBS_SEGURO = 'Se coordina punto de encuentro seguro con el cliente.';
+        const nuevas = [
+            {
+                nombre: 'Aurelpack',
+                confiabilidad: 4,
+                notas: 'RD$350 por envío, no cobran devolución. En La Altagracia: Punta Cana/Cap Cana/Bávaro/Verón/Friusa pausados (solo cubre Higüey/La Otra Banda). En La Vega: Jarabacoa solo miércoles/viernes/sábado.',
+                zonas: [
+                    'Azua','Barahona','Dajabón','Distrito Nacional','Duarte','Espaillat','Hato Mayor','Hermanas Mirabal',
+                    'La Altagracia','La Romana','La Vega','María Trinidad Sánchez','Monseñor Nouel','Monte Cristi','Monte Plata',
+                    'Peravia','Puerto Plata','Samaná','San Cristóbal','San José de Ocoa','San Juan','San Pedro de Macorís',
+                    'Sánchez Ramírez','Santiago','Santiago Rodríguez','Santo Domingo','Valverde',
+                ].map(provincia => ({ provincia, precio: 350, tiempoDias: 0 })),
+            },
+            {
+                nombre: 'Gintracom',
+                confiabilidad: 4,
+                notas: 'Tarifa plana hasta 5KG, tier 0-500 envíos/mes (270 DOP provincial / 370 DOP nacional). Con 501-1000 envíos/mes baja a 243/333, y con 1001-2000 a 216/296 — avísame si suben el volumen para actualizar el precio. Trayectos "Especiales" cuestan más (300/400 en el tier actual) — no modelado por sector. Devoluciones: solo cobran el flete de ida (no el 3% COD ni el 1% de seguro). Retiro en bodega gratis (cantidad mínima). Cobertura 32/32 provincias.',
+                zonas: [{ provincia: 'Santo Domingo', precio: 270, tiempoDias: 2 }, ...zonasNacionalGintracom],
+                codPct: 3, codMinimo: 60, seguroPct: 1, seguroUmbral: 1400,
+                zonasPeligrosas: [
+                    { provincia: 'Barahona', sector: 'Barahona — Barrio Camboya', observacion: OBS_SEGURO },
+                    { provincia: 'Barahona', sector: 'Barahona — Lo Solares de Milton', observacion: OBS_SEGURO },
+                    { provincia: 'Barahona', sector: 'Barahona — Sector La Guasará', observacion: OBS_SEGURO },
+                    { provincia: 'Duarte', sector: 'San Francisco de Macorís — Ugamba', observacion: OBS_SEGURO },
+                    { provincia: 'Duarte', sector: 'San Francisco de Macorís — Sector Vista del Valle', observacion: OBS_SEGURO },
+                    { provincia: 'Dajabón', sector: 'Dajabón — Partido', observacion: OBS_SEGURO },
+                    { provincia: 'Dajabón', sector: 'Dajabón — La Peñita', observacion: OBS_SEGURO },
+                    { provincia: 'Dajabón', sector: 'Dajabón — Capotillo', observacion: OBS_SEGURO },
+                    { provincia: 'Espaillat', sector: 'Moca — Barrio Viejo Puerto Rico', observacion: OBS_SEGURO },
+                    { provincia: 'Hato Mayor', sector: 'Hato Mayor — Sector La China', observacion: OBS_SEGURO },
+                    { provincia: 'Hermanas Mirabal', sector: 'Tenares — Sector Cristo Rey', observacion: OBS_SEGURO },
+                    { provincia: 'Hermanas Mirabal', sector: 'Tenares — Sector El Matadero', observacion: OBS_SEGURO },
+                    { provincia: 'La Altagracia', sector: 'Higuey — La Caoba', observacion: OBS_SEGURO },
+                    { provincia: 'La Altagracia', sector: 'Higuey — El Cerro Atrás', observacion: OBS_SEGURO },
+                    { provincia: 'La Altagracia', sector: 'Punta Cana — Sector El Hoyo de Friusa', observacion: OBS_SEGURO },
+                    { provincia: 'La Romana', sector: 'La Romana — Barrio Juan Pablo Duarte', observacion: OBS_SEGURO },
+                    { provincia: 'La Romana', sector: 'La Romana — Barrio El Sexto', observacion: OBS_SEGURO },
+                    { provincia: 'La Romana', sector: 'La Romana — La Caoba', observacion: OBS_SEGURO },
+                    { provincia: 'La Romana', sector: 'La Romana — Villa Alegre', observacion: OBS_SEGURO },
+                    { provincia: 'Monte Plata', sector: 'Monte Plata — Sector Bayaguana', observacion: OBS_SEGURO },
+                    { provincia: 'Peravia', sector: 'Baní — Sector Cañafito', observacion: OBS_SEGURO },
+                    { provincia: 'Peravia', sector: 'Baní — Lo Quemado de España', observacion: OBS_SEGURO },
+                    { provincia: 'Puerto Plata', sector: 'Puerto Plata — Playa Oeste', observacion: OBS_SEGURO },
+                    { provincia: 'San Juan', sector: 'San Juan — Kilómetro 3', observacion: OBS_SEGURO },
+                    { provincia: 'San Juan', sector: 'San Juan — Sector El Batey', observacion: OBS_SEGURO },
+                    { provincia: 'San Pedro de Macorís', sector: 'San Pedro de Macorís — Barrio Blanco', observacion: OBS_SEGURO },
+                    { provincia: 'Sánchez Ramírez', sector: 'Cotuí — Pueblo Nuevo', observacion: OBS_SEGURO },
+                    { provincia: 'Sánchez Ramírez', sector: 'Cotuí — El Paraíso', observacion: OBS_SEGURO },
+                    { provincia: 'Santiago', sector: 'Santiago — Sector Cien Fuegos', observacion: OBS_SEGURO },
+                    { provincia: 'Santiago', sector: 'Santiago — Sector Los Ciruelitos', observacion: OBS_SEGURO },
+                    { provincia: 'Santiago', sector: 'Santiago — La Yagüita de Pastor', observacion: OBS_SEGURO },
+                    { provincia: 'Santiago', sector: 'Santiago — Sector Buenos Aires', observacion: OBS_SEGURO },
+                    { provincia: 'Santo Domingo', sector: 'Santo Domingo — Sector El Capotillo', observacion: OBS_SEGURO },
+                    { provincia: 'Santo Domingo', sector: 'Santo Domingo — Sector Gualey', observacion: OBS_SEGURO },
+                    { provincia: 'Santo Domingo', sector: 'Santo Domingo — Sector Guachupita', observacion: OBS_SEGURO },
+                    { provincia: 'Santo Domingo', sector: 'Santo Domingo — Sector Los Guaricanos', observacion: OBS_SEGURO },
+                    { provincia: 'Santo Domingo', sector: 'Santo Domingo — Los Guandules', observacion: OBS_SEGURO },
+                    { provincia: 'Santo Domingo', sector: 'Santo Domingo — La Ciénega', observacion: OBS_SEGURO },
+                    { provincia: 'Valverde', sector: 'Mao — Sector El Batey', observacion: OBS_SEGURO },
+                    { provincia: 'Bahoruco', sector: 'Neiba — El Palmar', observacion: OBS_SEGURO },
+                ],
+            },
+            {
+                nombre: 'TokTok Logistic',
+                confiabilidad: 4,
+                notas: 'Cobertura solo en Gran Santo Domingo (hiperlocal) — Distrito Nacional a RD$300, resto de Santo Domingo (Este/Oeste/Norte, Los Alcarrizos, Pedro Brand) a RD$360. Sectores más alejados a RD$430: Guerra, Boca Chica, Bajos de Haina, El Km 24 (Pedro Brand), San Felipe/La Victoria/Hacienda Estrella/Haras Nacionales/Mata Gorda/Punta (Santo Domingo Norte). No especificaron tiempo de entrega ni comisión COD/seguro — dejé 1 día como estimado, ajústalo si sabes el real.',
+                zonas: [
+                    { provincia: 'Distrito Nacional', precio: 300, tiempoDias: 1 },
+                    { provincia: 'Santo Domingo', precio: 360, tiempoDias: 1 },
+                ],
+            },
+        ];
+        try {
+            for (const t of nuevas) {
+                const existe = await db.collection('transportadoras').where('nombre', '==', t.nombre).get();
+                if (!existe.empty) continue;
+                await db.collection('transportadoras').add({ ...t, tiendaId: activeTiendaId, creadoEn: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+        } catch(err) { console.error('Error cargando transportadoras de ejemplo:', err); }
+        finally { setSavingSeedTransp(false); }
+    };
+
     // Pesos del recomendador (precio/velocidad/confiabilidad) — configuración compartida, la
     // define el master y todos la ven al recomendar.
     const PESOS_ENVIO_DEFAULT = { precio:100, velocidad:0, confiabilidad:0 };
@@ -2908,11 +3004,18 @@ function AdminPanel({ user, onLogout, onPhotoChange }) {
 
                         <div className="page-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,marginTop:4}}>
                             <div><h1 style={{fontSize:18}}>Transportadoras</h1><p>Zonas que cubre cada una, con su precio y tiempo de entrega</p></div>
-                            <button className="btn btn-gold" onClick={nuevaTransp}>{I.plus} Nueva transportadora</button>
+                            <div style={{display:'flex',gap:8}}>
+                                {misTransportadoras.length===0 && (
+                                    <button className="btn btn-glass" onClick={cargarTransportadorasDemo} disabled={savingSeedTransp}>
+                                        {savingSeedTransp ? 'Cargando...' : 'Cargar Aurelpack/Gintracom/TokTok'}
+                                    </button>
+                                )}
+                                <button className="btn btn-gold" onClick={nuevaTransp}>{I.plus} Nueva transportadora</button>
+                            </div>
                         </div>
 
                         {misTransportadoras.length===0 ? (
-                            <div className="card glass"><div className="empty"><div className="empty-icon">{I_envios}</div><h3>Sin transportadoras aún</h3><p>Agrega tu primera transportadora para empezar a recomendar envíos.</p></div></div>
+                            <div className="card glass"><div className="empty"><div className="empty-icon">{I_envios}</div><h3>Sin transportadoras aún</h3><p>Agrega tu primera transportadora para empezar a recomendar envíos, o carga las 3 de arriba con un clic.</p></div></div>
                         ) : (
                             <div className="card glass" style={{overflowX:'auto'}}>
                                 <table style={{minWidth:760}}>
